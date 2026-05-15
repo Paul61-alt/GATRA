@@ -1,0 +1,161 @@
+// app.jsx â top-level wiring: workspace tabs (New scan / Home / Current scan) + Tweaks
+const { useState: _uS_app, useEffect: _uE_app } = React;
+
+const SCAN_TABS = [
+  { key: "overview",  label: "Overview",   icon: "overview" },
+  { key: "list",      label: "Competitors", icon: "list",     count: 8 },
+  { key: "compare",   label: "Compare",    icon: "compare" },
+  { key: "map",       label: "Map",        icon: "map" },
+  { key: "features",  label: "Features",   icon: "features" },
+  { key: "pricing",   label: "Pricing",    icon: "pricing" },
+  { key: "timeline",  label: "Timeline",   icon: "timeline" },
+];
+
+function App() {
+  const [tweaks, setTweak] = useTweaks(window.RADAR_TWEAK_DEFAULTS);
+  const [data, setData] = _uS_app(window.RADAR_DATA);
+  // Boot into "new" when no scan data exists yet
+  const [view, setView] = _uS_app(data ? "home" : "new");
+  const [activeTab, setActiveTab] = _uS_app("overview");
+
+  // Persist density on root via data attribute
+  _uE_app(() => {
+    document.documentElement.setAttribute("data-density", tweaks.density);
+  }, [tweaks.density]);
+
+  const handleScanComplete = (scanData) => {
+    window.RADAR_DATA = scanData;
+    setData(scanData);
+    setView("current");
+  };
+
+  return (
+    <div className="app" data-screen-label={
+      view === "new"     ? "01 New scan"   :
+      view === "home"    ? "02 Home"       :
+                           "03 Current scan"
+    }>
+      <Sidebar
+        view={view}
+        onView={setView}
+        currentSubjectName={data ? data.subject.name : null}
+      />
+
+      <div className="main">
+        {view === "new" && (
+          <SearchScreen onComplete={handleScanComplete} />
+        )}
+
+        {view === "home" && (
+          <HomeScreen
+            onOpenCurrent={() => setView("current")}
+            onNewScan={() => setView("new")}
+          />
+        )}
+
+        {view === "current" && data && (
+          <>
+            <Topbar subject={data.subject} />
+            <Tabs tabs={SCAN_TABS} active={activeTab} onTab={setActiveTab} />
+            <div className="content">
+              {activeTab === "overview" && <OverviewScreen data={data} />}
+              {activeTab === "list"     && <ListScreen data={data} />}
+              {activeTab === "compare"  && <CompareScreen data={data} />}
+              {activeTab === "map"      && <MapScreen data={data} />}
+              {activeTab === "features" && <FeaturesScreen data={data} />}
+              {activeTab === "pricing"  && <PricingScreen data={data} />}
+              {activeTab === "timeline" && <TimelineScreen data={data} />}
+            </div>
+          </>
+        )}
+      </div>
+
+      <RadarTweaksPanel
+        t={tweaks}
+        setTweak={setTweak}
+        onJumpToSearch={() => setView("new")}
+      />
+    </div>
+  );
+}
+
+// âââ Tweaks Panel âââââââââââââââââââââââââââââââââââââââââââââ
+function RadarTweaksPanel({ t, setTweak, onJumpToSearch }) {
+  return (
+    <TweaksPanel>
+      <TweakSection label="Display" />
+      <TweakRadio
+        label="Density"
+        value={t.density}
+        options={["compact", "comfortable"]}
+        onChange={(v) => setTweak("density", v)}
+      />
+
+      <TweakSection label="Brand accent" />
+      <TweakColor
+        label="Subject highlight"
+        value={t.accent}
+        options={["#b34a1f", "#1f6b3d", "#1a3a6b", "#5a3d8a", "#0a0a0a"]}
+        onChange={(v) => {
+          setTweak("accent", v);
+          // Live update CSS variables
+          const root = document.documentElement;
+          root.style.setProperty("--accent", v);
+          // Derive softer companions from the chosen accent
+          const map = {
+            "#b34a1f": ["#c2541f", "#fdf2ea", "#f7e5d4", "#6b2811"],
+            "#1f6b3d": ["#1f7547", "#eaf3ed", "#d4e7da", "#0e3a20"],
+            "#1a3a6b": ["#1f4480", "#e9eef5", "#d3dcec", "#0e1f3a"],
+            "#5a3d8a": ["#6b48a3", "#efe9f5", "#dcd0eb", "#2e1f47"],
+            "#0a0a0a": ["#1a1a1a", "#efeeec", "#e0dfdc", "#000000"],
+          };
+          const [a2, bg, bg2, fg] = map[v] || map["#b34a1f"];
+          root.style.setProperty("--accent-2", a2);
+          root.style.setProperty("--accent-bg", bg);
+          root.style.setProperty("--accent-bg-2", bg2);
+          root.style.setProperty("--accent-fg", fg);
+        }}
+      />
+
+      <TweakSection label="Navigation" />
+      {onJumpToSearch && (
+        <TweakButton onClick={onJumpToSearch}>
+          Re-run scan from URL
+        </TweakButton>
+      )}
+
+      <TweakSection label="About" />
+      <div style={{
+        fontSize: 11, color: "var(--fg-3)", lineHeight: 1.5,
+        padding: "0 2px",
+      }}>
+        Radar is a prototype for VC due-diligence competitive scans.
+        Compact mode tightens the table density to investor-deck levels.
+      </div>
+    </TweaksPanel>
+  );
+}
+
+// âââ Apply persisted accent on first render ââââââââââââââââââ
+(function applyInitialAccent() {
+  const t = window.RADAR_TWEAK_DEFAULTS;
+  const root = document.documentElement;
+  const map = {
+    "#b34a1f": ["#c2541f", "#fdf2ea", "#f7e5d4", "#6b2811"],
+    "#1f6b3d": ["#1f7547", "#eaf3ed", "#d4e7da", "#0e3a20"],
+    "#1a3a6b": ["#1f4480", "#e9eef5", "#d3dcec", "#0e1f3a"],
+    "#5a3d8a": ["#6b48a3", "#efe9f5", "#dcd0eb", "#2e1f47"],
+    "#0a0a0a": ["#1a1a1a", "#efeeec", "#e0dfdc", "#000000"],
+  };
+  if (t.accent && map[t.accent]) {
+    root.style.setProperty("--accent", t.accent);
+    const [a2, bg, bg2, fg] = map[t.accent];
+    root.style.setProperty("--accent-2", a2);
+    root.style.setProperty("--accent-bg", bg);
+    root.style.setProperty("--accent-bg-2", bg2);
+    root.style.setProperty("--accent-fg", fg);
+  }
+  root.setAttribute("data-density", t.density || "comfortable");
+})();
+
+ReactDOM.createRoot(document.getElementById("root")).render(<App/>);
