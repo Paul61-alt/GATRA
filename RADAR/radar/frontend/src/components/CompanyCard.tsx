@@ -63,6 +63,22 @@ export function CompanyCard({ profile }: Props) {
           ))}
         </div>
       )}
+
+      {profile.tech_stack && profile.tech_stack.length > 0 && (
+        <div className="space-y-1">
+          <p className="text-xs text-[#555] uppercase tracking-wider">Tech stack</p>
+          <div className="flex flex-wrap gap-2">
+            {profile.tech_stack.slice(0, 10).map((tool, i) => (
+              <span
+                key={i}
+                className="text-xs px-2 py-1 rounded bg-[#1a1a1a] text-[#aaa] border border-[#222]"
+              >
+                {tool}
+              </span>
+            ))}
+          </div>
+        </div>
+      )}
     </div>
   );
 }

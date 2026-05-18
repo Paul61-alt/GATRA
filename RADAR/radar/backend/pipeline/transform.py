@@ -6,6 +6,7 @@ radar scores, arr, customers, avg_contract) are filled with neutral placeholders
 from __future__ import annotations
 
 import re
+from datetime import datetime
 from urllib.parse import urlparse
 
 from models.company import CompanyProfile, FundingRound, HQ
@@ -194,12 +195,21 @@ def pipeline_run_to_radar_output(run: PipelineRun) -> RadarOutput:
 
     scanned_at = run.completed_at or run.created_at
 
+    duration_ms = 0
+    if run.completed_at and run.created_at:
+        try:
+            t0 = datetime.fromisoformat(run.created_at)
+            t1 = datetime.fromisoformat(run.completed_at)
+            duration_ms = int((t1 - t0).total_seconds() * 1000)
+        except (ValueError, TypeError):
+            pass
+
     return RadarOutput(
         query=ScanQuery(
             url=run.company_domain,
             name=run.company_profile.name,
             scanned_at=scanned_at,
-            duration_ms=0,
+            duration_ms=duration_ms,
             sources_scanned=0,
         ),
         subject=subject,

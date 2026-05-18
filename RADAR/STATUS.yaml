@@ -1,0 +1,193 @@
+# RADAR — Status snapshot
+# Source-of-truth pour "où on en est". Co-existe avec BACKLOG.md (NOW/NEXT/LATER) et JOURNAL.md (daily).
+# Update manuel quand jalon franchi. Pas de duplication avec BACKLOG (référencer les IDs S0.1, S0.2…).
+
+project:
+  name: RADAR
+  mission: "Veille concurrentielle VC. URL startup → memo concurrentiel structuré <60s."
+  context: "Hackathon Linkup — ship > perfect"
+  demo_date: TBD          # remplir
+  cut_line_date: TBD      # J-3 démo, freeze features
+  updated_at: 2026-05-18
+
+# ─────────────────────────────────────────────────────────────
+# HEALTH — état global, scan rapide
+# ─────────────────────────────────────────────────────────────
+health:
+  pipeline_e2e:     "❌ Jamais run bout-en-bout sur vraie URL"
+  backend_code:     "✅ 3 phases codées, FastAPI complet, cache + rate limit + kill switch"
+  frontend_code:    "✅ Pages + design-system (12 docs) + components (CompanyCard, Grid, Map, Feed)"
+  tests_e2e:        "❌ Aucun smoke test validé. Evals Braintrust par phase uniquement"
+  perf_target:      "⚠️ 137–200s total vs cible <90s (bench 4 domains)"
+  deploy:           "❌ 0 setup (Vercel frontend + Railway/Render backend prévus)"
+  pre_cache_demo:   "❌ 0/5 boîtes pré-computées (Doctolib, Notion, Slite, Alan, Pennylane)"
+  design_system:    "✅ Source-of-truth tokens.ts + tailwind.preset.ts + 12 specs markdown"
+
+# ─────────────────────────────────────────────────────────────
+# COMPONENTS — par fichier-clé, état + dernière mesure
+# ─────────────────────────────────────────────────────────────
+components:
+
+  backend:
+    pipeline_understand:
+      path: radar/backend/pipeline/understand.py
+      status: "✅ Codé, eval Braintrust passe"
+      last_bench_s: "11–45s sur 4 domains"
+      target_s: 15
+    pipeline_discover:
+      path: radar/backend/pipeline/discover.py
+      status: "⚠️ Codé, mais bottleneck perf"
+      last_bench_s: "107–132s sur 4 domains"
+      target_s: 20
+      issue: "5× trop lent. Investiguer Linkup /tasks batch async vs séquentiel"
+    pipeline_enrich:
+      path: radar/backend/pipeline/enrich.py
+      status: "✅ Codé, dans la cible"
+      last_bench_s: "17–22s sur 4 domains"
+      target_s: 60
+    main_api:
+      path: radar/backend/main.py
+      status: "✅ FastAPI routes + CORS + rate limit + kill switch + cache"
+    linkup_client:
+      path: radar/backend/clients/linkup_client.py
+      status: "✅ Wrapper search + fetch + tasks (batch async) + retry/fallback"
+    claude_client:
+      path: radar/backend/clients/claude_client.py
+      status: "✅ Extraction JSON via claude-sonnet-4-20250514"
+    models:
+      paths:
+        - radar/backend/models/company.py
+        - radar/backend/models/competitor.py
+        - radar/backend/models/pipeline.py
+      status: "✅ Pydantic v2, pattern DataPoint (value + confidence + source_url + extracted_at)"
+    utils:
+      paths:
+        - radar/backend/utils/geocoding.py
+        - radar/backend/utils/cache.py
+        - radar/backend/utils/dedup.py
+      status: "✅ Nominatim (1 req/s), cache JSON fichier, dedup par website"
+
+  frontend:
+    entry:
+      path: radar/frontend/src/pages/index.tsx
+      status: "✅ Form URL + state management + API call"
+      tested_e2e: false
+    components:
+      paths:
+        - radar/frontend/src/components/CompanyCard.tsx
+        - radar/frontend/src/components/landing/
+        - radar/frontend/src/components/loading/OperationsConsole.tsx
+        - radar/frontend/src/components/ui/
+      status: "✅ Codés, jamais montés en prod-like"
+    design_system:
+      paths:
+        - radar/frontend/src/design-system/tokens.ts
+        - radar/frontend/src/design-system/tailwind.preset.ts
+        - docs/design-system/  # 12 specs markdown
+      status: "✅ Source-of-truth complète. Palantir × Perplexity, dark only"
+    types:
+      path: radar/frontend/src/types/index.ts
+      status: "⚠️ Mirrors manuels des modèles Pydantic — drift risk"
+
+  evals:
+    paths:
+      - radar/backend/evals/eval_understand.py
+      - radar/backend/evals/eval_discover.py
+      - radar/backend/evals/eval_enrich.py
+      - radar/backend/evals/probe_understand.py
+      - radar/backend/evals/bench_phases.py
+    status: "✅ Braintrust par phase. Pas de pytest e2e"
+    bench_results_csv: radar/backend/evals/bench_results.csv
+
+# ─────────────────────────────────────────────────────────────
+# BENCH — dernières mesures par domaine (cible total <90s)
+# ─────────────────────────────────────────────────────────────
+bench_results:
+  - domain: linear.app
+    understand_s: 11.99
+    discover_s: 107.19
+    enrich_s: 17.36
+    total_s: 136.54
+  - domain: pennylane.com
+    understand_s: 11.02
+    discover_s: 77.97
+    enrich_s: 21.58
+    total_s: 110.57
+  - domain: mistral.ai
+    understand_s: 45.02
+    discover_s: 132.07
+    enrich_s: 16.52
+    total_s: 193.61
+  - domain: cal.com
+    understand_s: 9.65
+    discover_s: 59.36
+    enrich_s: 22.72
+    total_s: 91.73
+
+# ─────────────────────────────────────────────────────────────
+# NEXT MILESTONES — dérivés de BACKLOG.md (référence IDs)
+# ─────────────────────────────────────────────────────────────
+next_milestones:
+  - id: S0.1
+    label: Smoke test Phase 1 (understand)
+    blocker: true
+    eta: "30 min"
+    started: 2026-05-17
+    command: "cd RADAR/radar/backend && python -m pipeline.understand 'doctolib.fr'"
+    dod: "CompanyProfile JSON valide, <20s, logs propres"
+  - id: S0.2
+    label: Smoke test Phase 2 (discover)
+    eta: "30 min"
+    note: "Attention bottleneck 107–132s à investiguer"
+  - id: S0.3
+    label: Smoke test Phase 3 (enrich)
+    eta: "1h"
+  - id: S0.4
+    label: End-to-end via FastAPI (<90s)
+    eta: "1–2h"
+  - id: S0.5
+    label: End-to-end via frontend
+    eta: "1–2h"
+
+# ─────────────────────────────────────────────────────────────
+# GAPS — trous identifiés
+# ─────────────────────────────────────────────────────────────
+gaps:
+  - id: G1
+    label: "Test E2E jamais validé"
+    severity: BLOCKER
+    fix: "Run S0.1 → S0.5 dans l'ordre"
+  - id: G2
+    label: "Discover bottleneck 5× trop lent (107–132s vs 20s cible)"
+    severity: HIGH
+    fix: "Vérifier parallélisation Linkup /tasks vs calls séquentiels"
+  - id: G3
+    label: "Pre-cache démo 0/5"
+    severity: HIGH
+    fix: "Créer scripts/precompute_demo.py (E2 dans BACKLOG)"
+  - id: G4
+    label: "Deploy 0 setup"
+    severity: MEDIUM
+    fix: "S4.1 Railway + S4.2 Vercel + S4.3 smoke prod (J-2 max)"
+  - id: G5
+    label: "Types Pydantic ↔ TypeScript sync manuelle"
+    severity: LOW
+    fix: "Acceptable hackathon. Long terme: codegen depuis Pydantic"
+
+# ─────────────────────────────────────────────────────────────
+# CUT-LINE — règle freeze démo
+# ─────────────────────────────────────────────────────────────
+cut_line:
+  rule: "J-3 avant démo = freeze features. Polish + fallbacks + pre-cache uniquement. Toute story non-mergée à J-3 → LATER."
+  date: TBD
+
+# ─────────────────────────────────────────────────────────────
+# REFERENCES — fichiers source-of-truth
+# ─────────────────────────────────────────────────────────────
+references:
+  architecture: RADAR/CLAUDE/CLAUDE.md
+  backlog: radar/BACKLOG.md
+  journal: radar/JOURNAL.md
+  bench: radar/backend/evals/bench_results.csv
+  design_system_specs: docs/design-system/
+  design_system_tokens: radar/frontend/src/design-system/tokens.ts

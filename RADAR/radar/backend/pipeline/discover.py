@@ -1,12 +1,15 @@
 """Phase 2 — DISCOVER: find 15 competitors for a domain."""
 import logging
 import time
+from typing import Awaitable, Callable, Optional
 
 from clients.linkup_client import LinkupClient
 from models.company import CompanyProfile
 from utils.dedup import dedup_by_website
 
 logger = logging.getLogger(__name__)
+
+EventCallback = Callable[[dict], Awaitable[None]]
 
 _SCHEMA = {
     "type": "object",
@@ -33,11 +36,22 @@ _SCHEMA = {
 }
 
 
-async def run(profile: CompanyProfile, linkup: LinkupClient) -> list[dict]:
+async def run(
+    profile: CompanyProfile,
+    linkup: LinkupClient,
+    event_cb: Optional[EventCallback] = None,
+) -> list[dict]:
     """Return list of up to 15 deduplicated competitor dicts."""
     t0 = time.monotonic()
     domain = profile.domain
     logger.info("phase=DISCOVER company=%s status=start", domain)
+
+    async def emit(event: dict) -> None:
+        if event_cb:
+            try:
+                await event_cb(event)
+            except Exception as _e:
+                logger.debug("discover emit error ignored: %s", _e)
 
     markets = ", ".join(m.label for m in profile.markets) if profile.markets else "its market"
     positioning = profile.positioning or f"{profile.name} startup"
@@ -63,6 +77,18 @@ async def run(profile: CompanyProfile, linkup: LinkupClient) -> list[dict]:
         raw_list = data
 
     competitors = dedup_by_website(raw_list)[:15]
+
+    for c in competitors:
+        c_name = str(c.get("name", ""))[:100]
+        c_website = str(c.get("website", ""))[:100]
+        if c_name or c_website:
+            await emit({
+                "phase": "DISCOVER",
+                "status": "progress",
+                "kind": "candidate_found",
+                "payload": {"name": c_name, "website": c_website},
+            })
+
     logger.info("phase=DISCOVER company=%s status=ok count=%d duration=%.1fs", domain, len(competitors), time.monotonic() - t0)
     return competitors
 

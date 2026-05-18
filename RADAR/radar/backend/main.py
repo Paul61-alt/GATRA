@@ -1,3 +1,4 @@
+import asyncio
 import json
 import logging
 import os
@@ -7,10 +8,15 @@ from datetime import datetime, timezone
 from uuid import uuid4
 
 from dotenv import load_dotenv
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
+from slowapi import Limiter
+from slowapi.errors import RateLimitExceeded
+from slowapi.middleware import SlowAPIMiddleware
+from slowapi.util import get_remote_address
+from starlette.responses import JSONResponse
 
 load_dotenv()
 
@@ -25,20 +31,36 @@ from pipeline.transform import pipeline_run_to_radar_output
 from utils import cache_get, cache_set
 
 
+def _check_kill_switch() -> None:
+    if os.environ.get("RADAR_KILL_SWITCH", "").lower() in ("1", "true", "on"):
+        raise HTTPException(status_code=503, detail="Service temporarily disabled")
+
+
+limiter = Limiter(key_func=get_remote_address, default_limits=["10/minute", "100/hour"])
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     app.state.linkup = LinkupClient()
     app.state.claude = ClaudeClient()
+    app.state.pipeline_sem = asyncio.Semaphore(
+        int(os.environ.get("RADAR_MAX_CONCURRENT", "2"))
+    )
     yield
 
 
 app = FastAPI(title="Radar API", version="1.0.0", lifespan=lifespan)
+app.state.limiter = limiter
+app.add_exception_handler(
+    RateLimitExceeded,
+    lambda request, exc: JSONResponse(status_code=429, content={"detail": "Too Many Requests"}),
+)
+app.add_middleware(SlowAPIMiddleware)
 
 _ALLOWED_ORIGINS = [
     "http://localhost:3000",
     "http://localhost:5173",
     "http://localhost:8080",
-    "null",  # file:// origin — browsers send "null" for local file access
     os.environ.get("FRONTEND_URL", ""),
 ]
 
@@ -65,7 +87,9 @@ def _normalize_domain(url: str) -> str:
 
 
 @app.post("/analyze")
-async def analyze(req: AnalyzeRequest) -> dict:
+@limiter.limit("3/minute")
+async def analyze(request: Request, req: AnalyzeRequest) -> dict:
+    _check_kill_switch()
     domain = _normalize_domain(req.url)
     if not domain:
         raise HTTPException(status_code=422, detail="Invalid URL")
@@ -82,11 +106,12 @@ async def analyze(req: AnalyzeRequest) -> dict:
     try:
         linkup: LinkupClient = app.state.linkup
 
-        company_profile = await understand.run(domain, linkup, run_id)
+        async with app.state.pipeline_sem:
+            company_profile = await understand.run(domain, linkup, run_id)
 
-        competitor_dicts = await discover.run(company_profile, linkup)
+            competitor_dicts = await discover.run(company_profile, linkup)
 
-        competitor_profiles = await enrich.run(competitor_dicts, linkup, run_id)
+            competitor_profiles = await enrich.run(competitor_dicts, linkup, run_id)
 
         run = PipelineRun(
             id=run_id,
@@ -117,8 +142,10 @@ async def analyze(req: AnalyzeRequest) -> dict:
 
 
 @app.post("/scan")
-async def scan(req: AnalyzeRequest) -> dict:
+@limiter.limit("3/minute")
+async def scan(request: Request, req: AnalyzeRequest) -> dict:
     """Like /analyze but returns RadarOutput (camelCase, frontend-ready)."""
+    _check_kill_switch()
     domain = _normalize_domain(req.url)
     if not domain:
         raise HTTPException(status_code=422, detail="Invalid URL")
@@ -136,9 +163,10 @@ async def scan(req: AnalyzeRequest) -> dict:
     try:
         linkup: LinkupClient = app.state.linkup
 
-        company_profile = await understand.run(domain, linkup, run_id)
-        competitor_dicts = await discover.run(company_profile, linkup)
-        competitor_profiles = await enrich.run(competitor_dicts, linkup, run_id)
+        async with app.state.pipeline_sem:
+            company_profile = await understand.run(domain, linkup, run_id)
+            competitor_dicts = await discover.run(company_profile, linkup)
+            competitor_profiles = await enrich.run(competitor_dicts, linkup, run_id)
 
         run = PipelineRun(
             id=run_id,
@@ -162,52 +190,91 @@ async def scan(req: AnalyzeRequest) -> dict:
 
 
 @app.post("/scan/stream")
-async def scan_stream(req: AnalyzeRequest) -> StreamingResponse:
-    """SSE endpoint — emits phase events then final result."""
+@limiter.limit("3/minute")
+async def scan_stream(request: Request, req: AnalyzeRequest) -> StreamingResponse:
+    """SSE endpoint — emits fine-grained progress events then final result."""
+    _check_kill_switch()
     domain = _normalize_domain(req.url)
     if not domain:
         raise HTTPException(status_code=422, detail="Invalid URL")
 
     async def event_stream():
-        def emit(data: dict) -> str:
-            return f"data: {json.dumps(data)}\n\n"
+        def _sse(data: dict) -> str:
+            # Leading comment SSE event forces chunk flush before the data event.
+            # Prevents Nagle/ASGI buffering of small chunks.
+            return f": flush\n\ndata: {json.dumps(data)}\n\n"
 
-        run_id = str(uuid4())
-        created_at = datetime.now(timezone.utc).isoformat()
-        t0 = time.monotonic()
-        linkup: LinkupClient = app.state.linkup
+        cached = cache_get(f"radar_{domain}")
+        if cached:
+            cached["from_cache"] = True
+            yield _sse({"result": cached})
+            return
+
+        queue: asyncio.Queue = asyncio.Queue()
+
+        async def emit(event: dict) -> None:
+            await queue.put(event)
+
+        async def run_pipeline() -> None:
+            run_id = str(uuid4())
+            created_at = datetime.now(timezone.utc).isoformat()
+            t0 = time.monotonic()
+            try:
+                linkup: LinkupClient = app.state.linkup
+                async with app.state.pipeline_sem:
+                    await queue.put({"phase": "UNDERSTAND", "status": "start"})
+                    company_profile = await understand.run(domain, linkup, run_id, event_cb=emit)
+                    await queue.put({"phase": "UNDERSTAND", "status": "ok", "name": company_profile.name})
+
+                    await queue.put({"phase": "DISCOVER", "status": "start"})
+                    competitor_dicts = await discover.run(company_profile, linkup, event_cb=emit)
+                    await queue.put({"phase": "DISCOVER", "status": "ok", "count": len(competitor_dicts)})
+
+                    await queue.put({"phase": "ENRICH", "status": "start"})
+                    competitor_profiles = await enrich.run(competitor_dicts, linkup, run_id, event_cb=emit)
+                    await queue.put({"phase": "ENRICH", "status": "ok", "count": len(competitor_profiles)})
+
+                run = PipelineRun(
+                    id=run_id,
+                    company_domain=domain,
+                    status=PipelineStatus.COMPLETED,
+                    created_at=created_at,
+                    completed_at=datetime.now(timezone.utc).isoformat(),
+                    company_profile=company_profile,
+                    competitors=competitor_profiles,
+                )
+                radar_output = pipeline_run_to_radar_output(run)
+                result = radar_output.model_dump(by_alias=True, mode="json", exclude_none=True)
+                cache_set(f"radar_{domain}", result)
+                logger.info("scan_stream=complete domain=%s duration=%.1fs", domain, time.monotonic() - t0)
+                await queue.put({"result": result})
+            except Exception as e:
+                logger.error("scan_stream=error domain=%s error=%s", domain, e, exc_info=True)
+                await queue.put({"error": str(e)})
+            finally:
+                await queue.put(None)  # sentinel — signals end of stream
+
+        pipeline_task = asyncio.create_task(run_pipeline())
+
+        # Immediate ping confirms HTTP body open before first pipeline event.
+        # Without this, frontend sees no bytes until run_pipeline emits, which
+        # makes a stuck pipeline indistinguishable from a network hang.
+        yield ": connected\n\n"
 
         try:
-            yield emit({"phase": "UNDERSTAND", "status": "start"})
-            company_profile = await understand.run(domain, linkup, run_id)
-            yield emit({"phase": "UNDERSTAND", "status": "ok", "name": company_profile.name})
-
-            yield emit({"phase": "DISCOVER", "status": "start"})
-            competitor_dicts = await discover.run(company_profile, linkup)
-            yield emit({"phase": "DISCOVER", "status": "ok", "count": len(competitor_dicts)})
-
-            yield emit({"phase": "ENRICH", "status": "start"})
-            competitor_profiles = await enrich.run(competitor_dicts, linkup, run_id)
-            yield emit({"phase": "ENRICH", "status": "ok", "count": len(competitor_profiles)})
-
-            run = PipelineRun(
-                id=run_id,
-                company_domain=domain,
-                status=PipelineStatus.COMPLETED,
-                created_at=created_at,
-                completed_at=datetime.now(timezone.utc).isoformat(),
-                company_profile=company_profile,
-                competitors=competitor_profiles,
-            )
-            radar_output = pipeline_run_to_radar_output(run)
-            result = radar_output.model_dump(by_alias=True, mode="json", exclude_none=True)
-            cache_set(f"radar_{domain}", result)
-            logger.info("scan_stream=complete domain=%s duration=%.1fs", domain, time.monotonic() - t0)
-            yield emit({"result": result})
-
-        except Exception as e:
-            logger.error("scan_stream=error domain=%s error=%s", domain, e, exc_info=True)
-            yield emit({"error": str(e)})
+            while True:
+                try:
+                    event = await asyncio.wait_for(queue.get(), timeout=15.0)
+                except asyncio.TimeoutError:
+                    # Keepalive prevents proxy/browser idle timeouts and proves
+                    # the stream is still alive during long phases.
+                    yield ": keepalive\n\n"
+                    continue
+                if event is None:
+                    break
+                yield _sse(event)
+        except GeneratorExit:
+            pipeline_task.cancel()
 
     return StreamingResponse(
         event_stream(),

@@ -1,7 +1,7 @@
 """Eval Phase 1 — UNDERSTAND.
 
-Run: bt eval evals/eval_understand.py
-     (from backend/ with .env loaded)
+Run: braintrust eval evals/eval_understand.py
+     (from backend/ with .venv activated and BRAINTRUST_API_KEY exported)
 """
 import sys
 import os
@@ -11,15 +11,17 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from dotenv import load_dotenv
 load_dotenv()
 
+import anthropic
 import braintrust
 from braintrust import Eval
-from autoevals import ClosedQA
 
 from clients.linkup_client import LinkupClient
 from pipeline.understand import run as understand_run
 from evals.datasets import UNDERSTAND_DOMAINS
 
 braintrust.init_logger(project="RADAR")
+
+_claude = anthropic.Anthropic()
 
 
 async def task(domain: str) -> dict:
@@ -29,16 +31,31 @@ async def task(domain: str) -> dict:
 
 
 def score_completeness(input, expected, output):
-    """LLM judge: profile has all key fields with plausible values."""
-    return ClosedQA()(
-        input=f"Domain analyzed: {input}",
-        output=str(output),
-        criteria=(
-            "The company profile contains non-null values for: name, summary, hq_city, hq_country, "
-            "positioning. The values are factually plausible for the given domain. "
-            "No obviously hallucinated or generic placeholder data."
-        ),
+    """Claude judge: profile has all key fields with plausible values."""
+    if not isinstance(output, dict):
+        return 0.0
+
+    prompt = f"""You are evaluating an AI-generated company profile for the domain: {input}
+
+Profile JSON:
+{output}
+
+Criteria: Does the profile contain non-null, factually plausible values for ALL of these fields?
+- name
+- summary (a real paragraph, not generic)
+- hq.city and hq.country
+- positioning
+- at least 1 market
+
+Answer with ONLY "yes" or "no", nothing else."""
+
+    response = _claude.messages.create(
+        model="claude-haiku-4-5-20251001",
+        max_tokens=5,
+        messages=[{"role": "user", "content": prompt}],
     )
+    answer = response.content[0].text.strip().lower()
+    return 1.0 if answer.startswith("yes") else 0.0
 
 
 def score_markets(input, expected, output):
@@ -49,7 +66,7 @@ def score_markets(input, expected, output):
 
 Eval(
     "RADAR",
-    experiment_name="understand-v1",
+    experiment_name="understand-v3",
     data=[{"input": domain} for domain in UNDERSTAND_DOMAINS],
     task=task,
     scores=[score_completeness, score_markets],

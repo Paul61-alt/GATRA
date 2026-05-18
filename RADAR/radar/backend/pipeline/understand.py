@@ -2,6 +2,7 @@
 import logging
 import time
 from datetime import datetime, timezone
+from typing import Awaitable, Callable, Optional
 from uuid import uuid4
 
 from clients.linkup_client import LinkupClient
@@ -12,6 +13,8 @@ from models.company import (
 from utils.geocoding import geocode
 
 logger = logging.getLogger(__name__)
+
+EventCallback = Callable[[dict], Awaitable[None]]
 
 _SCHEMA = {
     "type": "object",
@@ -147,6 +150,10 @@ _SCHEMA = {
             "type": "array",
             "items": {"type": "string"},
         },
+        "tech_stack": {
+            "type": "array",
+            "items": {"type": "string"},
+        },
 
         # ── TEAM ──────────────────────────────────────────────────
         "key_people": {
@@ -182,10 +189,23 @@ _SCHEMA = {
 }
 
 
-async def run(domain: str, linkup: LinkupClient, run_id: str | None = None, depth: str = "standard") -> CompanyProfile:
+async def run(
+    domain: str,
+    linkup: LinkupClient,
+    run_id: str | None = None,
+    depth: str = "standard",
+    event_cb: Optional[EventCallback] = None,
+) -> CompanyProfile:
     t0 = time.monotonic()
     run_id = run_id or str(uuid4())
     now = datetime.now(timezone.utc).isoformat()
+
+    async def emit(event: dict) -> None:
+        if event_cb:
+            try:
+                await event_cb(event)
+            except Exception as _e:
+                logger.debug("understand emit error ignored: %s", _e)
 
     logger.info("phase=UNDERSTAND company=%s status=start", domain)
 
@@ -206,6 +226,7 @@ async def run(domain: str, linkup: LinkupClient, run_id: str | None = None, dept
             "pricing model (Freemium/Subscription/Usage-based/Enterprise/Hybrid), "
             "key differentiator in 20 words max, top 3 product features, "
             "3-5 notable customers or client logos visible on website, "
+            "main technology stack and SaaS tools used (max 10 — e.g. AWS, Stripe, Segment, Vercel, Postgres), "
             "founding team and key executives (name, role, background, LinkedIn URL), "
             "recent growth signals (headcount growth, geographic expansion, new products), "
             "last 3 notable news items with date and source URL"
@@ -216,6 +237,22 @@ async def run(domain: str, linkup: LinkupClient, run_id: str | None = None, dept
     data: dict = raw.get("data") or raw.get("answer") or raw.get("output") or {}
     sources: list = raw.get("sources", [])
     src_url = sources[0].get("url") if sources else None
+
+    # Emit source_consulted for each URL returned by Linkup
+    for src in sources:
+        src_item_url = src.get("url", "")
+        if src_item_url:
+            try:
+                from urllib.parse import urlparse as _urlparse
+                src_domain = _urlparse(src_item_url).netloc.lstrip("www.") or src_item_url[:100]
+            except Exception:
+                src_domain = src_item_url[:100]
+            await emit({
+                "phase": "UNDERSTAND",
+                "status": "progress",
+                "kind": "source_consulted",
+                "payload": {"url": src_item_url[:100], "domain": src_domain[:100]},
+            })
 
     def _dp_obj(obj) -> DataPoint | None:
         """Parse a DataPoint object returned by Linkup structured output."""
@@ -232,6 +269,47 @@ async def run(domain: str, linkup: LinkupClient, run_id: str | None = None, dept
             extracted_at=now,
         )
 
+    # Emit field_extracted for key scalar fields
+    _field_emit_map = [
+        ("founded_year",   data.get("founded_year"),   0.9),
+        ("hq_city",        data.get("hq_city"),        0.9),
+        ("hq_country",     data.get("hq_country"),     0.9),
+        ("funding_stage",  data.get("funding_stage"),  0.85),
+        ("geo_coverage",   data.get("geo_coverage"),   0.8),
+    ]
+    for _field, _value, _conf in _field_emit_map:
+        if _value is not None:
+            _str_value = str(_value)[:100]
+            await emit({
+                "phase": "UNDERSTAND",
+                "status": "progress",
+                "kind": "field_extracted",
+                "payload": {"field": _field, "value": _str_value, "confidence": _conf},
+            })
+
+    # Emit for structured DataPoint fields with their own confidence
+    _dp_field_map = [
+        ("employees",        data.get("employees")),
+        ("funding_total_eur", data.get("funding_total_eur")),
+        ("target_segment",   data.get("target_segment")),
+        ("business_model",   data.get("business_model")),
+        ("pricing_model",    data.get("pricing_model")),
+    ]
+    for _field, _obj in _dp_field_map:
+        if isinstance(_obj, dict) and _obj.get("value") is not None:
+            _conf_raw = _obj.get("confidence", "medium")
+            _conf_num = {"high": 0.95, "medium": 0.75, "low": 0.5}.get(str(_conf_raw), 0.75)
+            await emit({
+                "phase": "UNDERSTAND",
+                "status": "progress",
+                "kind": "field_extracted",
+                "payload": {
+                    "field": _field,
+                    "value": str(_obj["value"])[:100],
+                    "confidence": _conf_num,
+                },
+            })
+
     hq = None
     if data.get("hq_city") or data.get("hq_country"):
         city, country = data.get("hq_city"), data.get("hq_country")
@@ -242,6 +320,17 @@ async def run(domain: str, linkup: LinkupClient, run_id: str | None = None, dept
             lat=coords[0] if coords else None,
             lng=coords[1] if coords else None,
         )
+        if coords:
+            await emit({
+                "phase": "UNDERSTAND",
+                "status": "progress",
+                "kind": "field_extracted",
+                "payload": {
+                    "field": "hq.coords",
+                    "value": f"{coords[0]:.4f},{coords[1]:.4f}",
+                    "confidence": 0.99,
+                },
+            })
 
     funding_rounds = [
         FundingRound(
@@ -269,6 +358,13 @@ async def run(domain: str, linkup: LinkupClient, run_id: str | None = None, dept
             primary=m.get("primary", False),
         )
         for m in (data.get("markets") or [])
+    ] or [
+        Market(
+            id=v.lower().replace(" ", "_"),
+            label=v,
+            primary=i == 0,
+        )
+        for i, v in enumerate(data.get("target_verticals") or [])
     ]
 
     key_people = [
@@ -314,6 +410,7 @@ async def run(domain: str, linkup: LinkupClient, run_id: str | None = None, dept
         key_differentiator=_dp_obj(data.get("key_differentiator")),
         top_3_features=data.get("top_3_features") or [],
         notable_customers=data.get("notable_customers") or [],
+        tech_stack=data.get("tech_stack") or [],
         key_people=key_people,
         growth_signals=data.get("growth_signals") or [],
         recent_news=recent_news,

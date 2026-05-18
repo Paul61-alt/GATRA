@@ -1,6 +1,7 @@
 import asyncio
 import logging
 import os
+from datetime import datetime, timezone
 from typing import Any, Optional
 from urllib.parse import urlparse
 
@@ -12,9 +13,24 @@ LINKUP_BASE = "https://api.linkup.so/v1"
 _MAX_RETRIES = 3
 _RETRY_STATUSES = {429, 500, 502, 503}
 
+_call_count: dict[str, int] = {}
+
 
 def _extract_domain(url: str) -> str:
     return urlparse(url).netloc.lstrip("www.")
+
+
+def _check_daily_budget() -> None:
+    budget = int(os.environ.get("RADAR_DAILY_BUDGET", "500"))
+    today = datetime.now(timezone.utc).date().isoformat()
+    used = _call_count.get(today, 0)
+    if used >= budget:
+        raise RuntimeError(
+            f"Linkup daily budget exceeded: {used}/{budget} calls on {today}"
+        )
+    _call_count[today] = used + 1
+    if used and used % 50 == 0:
+        logger.warning("linkup daily_usage=%d/%d date=%s", used, budget, today)
 
 
 class LinkupClient:
@@ -26,6 +42,7 @@ class LinkupClient:
         }
 
     async def _post(self, path: str, body: dict) -> Any:
+        _check_daily_budget()
         url = f"{LINKUP_BASE}{path}"
         async with httpx.AsyncClient(timeout=360) as client:
             for attempt in range(_MAX_RETRIES):
@@ -40,11 +57,19 @@ class LinkupClient:
         raise RuntimeError("Linkup max retries exceeded")
 
     async def _get(self, path: str) -> Any:
+        _check_daily_budget()
         url = f"{LINKUP_BASE}{path}"
         async with httpx.AsyncClient(timeout=30) as client:
-            r = await client.get(url, headers=self._headers)
-            r.raise_for_status()
-            return r.json()
+            for attempt in range(_MAX_RETRIES):
+                r = await client.get(url, headers=self._headers)
+                if r.status_code in _RETRY_STATUSES and attempt < _MAX_RETRIES - 1:
+                    wait = 2 ** (attempt + 1)
+                    logger.warning("linkup GET retry=%d status=%d wait=%ds", attempt + 1, r.status_code, wait)
+                    await asyncio.sleep(wait)
+                    continue
+                r.raise_for_status()
+                return r.json()
+        raise RuntimeError("Linkup GET max retries exceeded")
 
     async def search(
         self,
@@ -88,7 +113,7 @@ class LinkupClient:
         task_ids = [t["id"] for t in created]
         logger.info("linkup tasks_created=%d", len(task_ids))
 
-        max_wait, interval = 300, 5
+        max_wait, interval = 600, 10  # Research depth=S can take up to 5 min per job
         elapsed = 0
         while elapsed < max_wait:
             await asyncio.sleep(interval)
@@ -108,3 +133,4 @@ class LinkupClient:
         except Exception as e:
             logger.warning("linkup research failed (beta) error=%s", e)
             return {}
+

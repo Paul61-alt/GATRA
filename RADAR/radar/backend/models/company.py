@@ -81,6 +81,7 @@ class CompanyProfile(BaseModel):
     key_differentiator: Optional[DataPoint] = None
     top_3_features: List[str] = []
     notable_customers: List[str] = []
+    tech_stack: List[str] = []
 
     # Team
     key_people: List[KeyPerson] = []

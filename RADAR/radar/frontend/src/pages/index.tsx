@@ -1,123 +1,261 @@
 import { useState, FormEvent } from "react";
-import { PipelineRun } from "../types";
+import {
+  RadarOutput,
+  RadarCompany,
+  CompanyProfile,
+  CompetitorProfile,
+} from "../types";
 import { CompanyCard } from "../components/CompanyCard";
 import { CompetitorGrid } from "../components/CompetitorGrid";
 import { CompetitorMap } from "../components/CompetitorMap";
 import { PricingSignalFeed } from "../components/PricingSignalFeed";
+import { TopBar } from "../components/landing/TopBar";
+import { Hero } from "../components/landing/Hero";
+import { Footer } from "../components/landing/Footer";
+import { OperationsConsole } from "../components/loading/OperationsConsole";
 
 const API_URL = import.meta.env.VITE_API_URL ?? "http://localhost:8000";
+
+// ─── Adapters: map RadarOutput → legacy component prop shapes ────────────────
+
+function parseHqString(hq: string): { city: string | null; country: string | null } {
+  if (!hq) return { city: null, country: null };
+  const parts = hq.split(",").map((s) => s.trim());
+  if (parts.length >= 2) {
+    return { city: parts[0], country: parts[parts.length - 1] };
+  }
+  return { city: hq, country: null };
+}
+
+function radarCompanyToCompanyProfile(c: RadarCompany): CompanyProfile {
+  const { city, country } = parseHqString(c.hq);
+  const [lat, lng] = c.hqCoords ?? [null, null];
+
+  return {
+    name: c.name,
+    domain: c.domain,
+    summary: c.tagline ?? null,
+    founded_year: c.founded ?? null,
+    hq: { city, country, lat: lat ?? null, lng: lng ?? null },
+    employees:
+      c.employees != null
+        ? { value: c.employees, confidence: "medium", source_url: null, extracted_at: "" }
+        : null,
+    funding: c.funding
+      ? {
+          total_raised_eur: {
+            value: c.funding.total,
+            confidence: "medium",
+            source_url: null,
+            extracted_at: "",
+          },
+          last_round: c.funding.lastRound ?? null,
+          last_round_date: c.funding.lastRoundAt ?? null,
+          rounds: [],
+        }
+      : null,
+    growth_signals: c.notable ?? [],
+    tech_stack: [],
+    positioning: c.tagline ?? null,
+    markets: c.category ? [{ id: c.category, label: c.category, primary: true }] : [],
+    pipeline_run_id: c.id,
+    analysis_version: "radar-v2",
+  };
+}
+
+function radarCompanyToCompetitorProfile(c: RadarCompany): CompetitorProfile {
+  const { city, country } = parseHqString(c.hq);
+  const [lat, lng] = c.hqCoords ?? [null, null];
+
+  return {
+    name: c.name,
+    website: c.domain,
+    hq: { city, country, lat: lat ?? null, lng: lng ?? null },
+    founded_year: c.founded ?? null,
+    funding_stage: c.funding?.lastRound
+      ? { value: c.funding.lastRound, confidence: "medium", source_url: null, extracted_at: "" }
+      : null,
+    employee_count:
+      c.employees != null
+        ? { value: c.employees, confidence: "medium", source_url: null, extracted_at: "" }
+        : null,
+    one_liner: c.tagline ?? null,
+    differentiator: c.tagline ?? null,
+    pricing: c.pricing
+      ? {
+          tiers: [
+            {
+              name: c.pricing.model ?? "Paid",
+              price_monthly_eur: {
+                value: c.pricing.startsAt,
+                confidence: "medium",
+                source_url: null,
+                extracted_at: "",
+              },
+              price_annual_eur: null,
+              features: [],
+            },
+          ],
+          free_plan: null,
+          source_url: null,
+          extracted_at: "",
+        }
+      : null,
+    recent_signals: c.notable ?? [],
+    pipeline_run_id: c.id,
+    analysis_version: "radar-v2",
+  };
+}
+
+// ─── Background effects ───────────────────────────────────────────────────────
+
+function GridBackground() {
+  return (
+    <div
+      aria-hidden
+      className="fixed inset-0 pointer-events-none"
+      style={{
+        backgroundImage:
+          "linear-gradient(var(--line-subtle) 1px, transparent 1px), linear-gradient(90deg, var(--line-subtle) 1px, transparent 1px)",
+        backgroundSize: "40px 40px",
+        opacity: 0.05,
+        zIndex: 0,
+      }}
+    />
+  );
+}
+
+function ScanLine() {
+  return (
+    <div
+      aria-hidden
+      className="fixed inset-0 pointer-events-none overflow-hidden"
+      style={{ zIndex: 0 }}
+    >
+      <div
+        className="animate-scan w-full"
+        style={{
+          height: "1px",
+          background:
+            "linear-gradient(90deg, transparent 0%, var(--accent-500) 50%, transparent 100%)",
+          opacity: 0.03,
+        }}
+      />
+    </div>
+  );
+}
+
+// ─── Main page ────────────────────────────────────────────────────────────────
 
 export default function IndexPage() {
   const [url, setUrl] = useState("");
   const [loading, setLoading] = useState(false);
-  const [result, setResult] = useState<PipelineRun | null>(null);
+  const [result, setResult] = useState<RadarOutput | null>(null);
   const [error, setError] = useState<string | null>(null);
 
-  async function handleSubmit(e: FormEvent) {
+  function handleSubmit(e: FormEvent) {
     e.preventDefault();
-    if (!url.trim()) return;
-
-    setLoading(true);
+    const query = url.trim();
+    if (!query) return;
     setError(null);
     setResult(null);
-
-    try {
-      const res = await fetch(`${API_URL}/analyze`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ url: url.trim() }),
-      });
-
-      if (!res.ok) {
-        const body = await res.json().catch(() => ({}));
-        throw new Error(body.detail?.error ?? `HTTP ${res.status}`);
-      }
-
-      const data: PipelineRun = await res.json();
-      setResult(data);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Unknown error");
-    } finally {
-      setLoading(false);
-    }
+    setLoading(true);
   }
 
+  function runQuery(query: string) {
+    const trimmed = query.trim();
+    if (!trimmed) return;
+    setError(null);
+    setResult(null);
+    setUrl(trimmed);
+    setLoading(true);
+  }
+
+  const subjectProfile = result ? radarCompanyToCompanyProfile(result.subject) : null;
+  const competitorProfiles = result
+    ? result.competitors.map(radarCompanyToCompetitorProfile)
+    : [];
+  const isIdle = !loading && !result && !error;
+
   return (
-    <div className="min-h-screen bg-[#0a0a0f] text-[#e8e8e8]">
-      <div className="max-w-6xl mx-auto px-6 py-12 space-y-10">
-        {/* Header */}
-        <div>
-          <h1 className="font-mono text-4xl font-bold text-white tracking-tight">RADAR</h1>
-          <p className="text-[#555] text-sm uppercase tracking-widest mt-1">
-            Competitor Intelligence · Powered by Linkup
-          </p>
-        </div>
-
-        {/* Input */}
-        <form onSubmit={handleSubmit} className="flex gap-3">
-          <input
-            type="text"
-            value={url}
-            onChange={(e) => setUrl(e.target.value)}
-            placeholder="doctolib.fr"
-            className="flex-1 bg-[#111118] border border-[#333] rounded-md px-4 py-2.5 text-white font-mono placeholder-[#444] focus:outline-none focus:border-[#555]"
+    <div className="min-h-screen bg-surface-base text-fg-primary">
+      {/* Landing */}
+      {isIdle && (
+        <>
+          <GridBackground />
+          <ScanLine />
+          <TopBar />
+          <Hero
+            url={url}
+            setUrl={setUrl}
+            onSubmit={handleSubmit}
+            onRunQuery={runQuery}
+            disabled={loading}
           />
-          <button
-            type="submit"
-            disabled={loading || !url.trim()}
-            className="bg-white text-black font-mono font-bold px-6 py-2.5 rounded-md disabled:opacity-40 hover:bg-[#e0e0e0] transition-colors"
-          >
-            {loading ? "Analyzing…" : "Analyze →"}
-          </button>
-        </form>
+          <Footer />
+        </>
+      )}
 
-        {/* Error */}
-        {error && (
-          <div className="bg-red-900/20 border border-red-700/40 rounded-md p-4 text-red-300 text-sm">
+      {/* Operations Console — shown while scan is in progress */}
+      {loading && !result && (
+        <OperationsConsole
+          query={url}
+          apiUrl={API_URL}
+          onResult={(r) => {
+            setResult(r);
+            setLoading(false);
+          }}
+          onError={(e) => {
+            setError(e);
+            setLoading(false);
+          }}
+        />
+      )}
+
+      {/* Error state (post-load, not handled by console) */}
+      {!loading && error && (
+        <div className="max-w-6xl mx-auto px-6 py-12">
+          <div className="flex items-center justify-between mb-8">
+            <span className="font-mono font-semibold tracking-tight text-fg-primary">RADAR</span>
+            <span className="font-mono text-sm text-fg-muted">{url}</span>
+          </div>
+          <div className="bg-tint-error border border-status-error/30 rounded-md p-4 text-status-error text-sm font-mono">
             {error}
           </div>
-        )}
+        </div>
+      )}
 
-        {/* Loading */}
-        {loading && (
-          <div className="space-y-2">
-            {["UNDERSTAND", "DISCOVER", "ENRICH"].map((phase) => (
-              <div key={phase} className="flex items-center gap-3">
-                <div className="w-2 h-2 rounded-full bg-blue-400 animate-pulse" />
-                <span className="font-mono text-sm text-[#666]">{phase}</span>
-              </div>
-            ))}
+      {/* Results */}
+      {result && (
+        <div className="max-w-6xl mx-auto px-6 py-12 space-y-10">
+          <div className="flex items-center justify-between">
+            <span className="font-mono font-semibold tracking-tight text-fg-primary">RADAR</span>
+            <span className="font-mono text-sm text-fg-muted">{url}</span>
           </div>
-        )}
 
-        {/* Results */}
-        {result && (
           <div className="space-y-8">
-            {result.from_cache && (
-              <p className="text-xs text-[#555] font-mono">⚡ Served from cache</p>
-            )}
+            <p className="text-xs text-fg-muted font-mono">
+              Scanned in {(result.query.durationMs / 1000).toFixed(1)}s ·{" "}
+              {result.query.sourcesScanned} sources
+            </p>
 
-            {result.company_profile && (
-              <CompanyCard profile={result.company_profile} />
-            )}
+            {subjectProfile && <CompanyCard profile={subjectProfile} />}
 
-            {result.competitors.length > 0 && (
+            {competitorProfiles.length > 0 && (
               <>
                 <div>
-                  <h2 className="text-sm text-[#555] uppercase tracking-wider mb-4">
-                    {result.competitors.length} Competitors
+                  <h2 className="text-sm text-fg-muted uppercase tracking-wider mb-4">
+                    {competitorProfiles.length} Competitors
                   </h2>
-                  <CompetitorMap competitors={result.competitors} />
+                  <CompetitorMap competitors={competitorProfiles} />
                 </div>
-
-                <CompetitorGrid competitors={result.competitors} />
-
-                <PricingSignalFeed competitors={result.competitors} />
+                <CompetitorGrid competitors={competitorProfiles} />
+                <PricingSignalFeed competitors={competitorProfiles} />
               </>
             )}
           </div>
-        )}
-      </div>
+        </div>
+      )}
     </div>
   );
 }

@@ -86,6 +86,7 @@ async def _run_fetch_claude(domain: str, linkup: LinkupClient, claude: ClaudeCli
         "pricing_model (Freemium/Subscription/Usage-based/Enterprise/Hybrid), "
         "key_differentiator (string, 20 words max), "
         "notable_customers (array of strings), "
+        "tech_stack (array of strings, max 10 — e.g. AWS, Stripe, Segment, Vercel), "
         "growth_signals (array of strings), "
         "markets (array of {id, label, primary})"
     )
@@ -138,6 +139,7 @@ async def _run_fetch_claude(domain: str, linkup: LinkupClient, claude: ClaudeCli
         pricing_model=_dp(data.get("pricing_model")),
         key_differentiator=_dp(data.get("key_differentiator")),
         notable_customers=data.get("notable_customers") or [],
+        tech_stack=data.get("tech_stack") or [],
         growth_signals=data.get("growth_signals") or [],
         markets=markets,
         pipeline_run_id="probe-fetch",
@@ -195,6 +197,7 @@ def _field_summary(profile: CompanyProfile) -> dict[str, str]:
     f["differentiator"] = _dp_val(profile.key_differentiator)
     f["top_features#"]  = str(len(profile.top_3_features))
     f["customers#"]     = str(len(profile.notable_customers))
+    f["tech_stack#"]    = str(len(profile.tech_stack))
     # Team & signals
     f["key_people#"]    = str(len(profile.key_people))
     f["growth_signals#"]= str(len(profile.growth_signals))

@@ -75,6 +75,17 @@ radar/
 └── Learning (pour tous les documents explicatifs que je te demande)
 ```
 
+Et au niveau du repo (hors `radar/`) :
+
+```
+RADAR/
+├── docs/
+│   └── design-system/         ← specs markdown (principes, tokens, components, motion, voice, iconography, moodboard)
+└── radar/frontend/src/design-system/
+    ├── tokens.ts              ← source of truth des tokens (TypeScript)
+    └── tailwind.preset.ts     ← preset Tailwind consommant tokens.ts
+```
+
 ---
 
 ## 🔑 Variables d'environnement
@@ -177,19 +188,35 @@ Les types TypeScript dans `frontend/src/types/` sont des mirrors manuels des mod
 
 ## 🚀 Commandes utiles
 
+> **⚠️ Backend tourne dans un venv Python.** Toujours rappeler à l'utilisateur d'activer le venv ET d'être dans `RADAR/radar/backend/` avant toute commande Python ou `braintrust`.
+>
+> Setup terminal type pour ce projet :
+> ```bash
+> cd /Users/paul.pietra/Dev/GATRA/RADAR/radar/backend
+> source .venv/bin/activate
+> export $(grep -v '^#' .env | xargs)   # charge LINKUP/ANTHROPIC/BRAINTRUST keys
+> ```
+> Le CLI s'appelle `braintrust` (pas `bt`). Sans venv activé → `command not found`.
+
 ```bash
 # Backend
-cd backend
+cd RADAR/radar/backend
+source .venv/bin/activate
 pip install -r requirements.txt
 uvicorn main:app --reload --port 8000
 
-# Tester un pipeline complet en CLI
-python -m pipeline.understand "https://doctolib.fr"
+# Tester un pipeline complet en CLI (venv activé)
+python -m pipeline.understand "doctolib.fr"
 python -m pipeline.discover "doctolib.fr"
 python -m pipeline.enrich '["livi.fr", "qare.fr", "medadom.com"]'
 
+# Eval Braintrust (venv activé + BRAINTRUST_API_KEY exporté)
+braintrust eval evals/eval_understand.py
+braintrust eval evals/eval_discover.py
+braintrust eval evals/eval_enrich.py
+
 # Frontend
-cd frontend
+cd RADAR/radar/frontend
 npm install
 npm run dev   # port 3000
 
@@ -244,6 +271,36 @@ python scripts/precompute_demo.py  # à créer en semaine 3
 3. **Coût Linkup** — ~0.60€ par analyse complète. Ne jamais lancer un pipeline complet en boucle pour débugger — utiliser les mocks dans `tests/fixtures/`
 4. **CORS** — le backend FastAPI doit autoriser `localhost:3000` en dev et le domaine Vercel en prod
 5. **Rate limiting Nominatim** — 1 req/s max, ajouter `asyncio.sleep(1)` entre les calls dans `geocoding.py`
+
+---
+
+## 🎨 Design System (Intelligence Ops)
+
+RADAR a un design system formel — Palantir corporate × Perplexity transparency. Audience cible : VCs et corporate strategy. Toute UI doit s'y conformer.
+
+### Structure hybride
+
+- **Specs lisibles** : `RADAR/docs/design-system/` (markdown — principes, visual language, tokens, components, motion, voice, iconography, moodboard)
+- **Source of truth code** : `RADAR/radar/frontend/src/design-system/tokens.ts` (constantes TS)
+- **Preset Tailwind** : `RADAR/radar/frontend/src/design-system/tailwind.preset.ts` (consomme tokens.ts, exposé à Tailwind via `tailwind.config.ts`)
+
+### Règles non négociables
+
+1. **Pas de valeur hard-codée** dans les composants (couleurs, espacements, fontes, durées). Toujours via `tokens.ts` ou classes Tailwind générées par le preset.
+2. **Pas de second système** — pas de Material UI, pas de shadcn copié-collé tel quel. Si un primitive est nécessaire, l'ajouter au design system (docs + code) avant de l'utiliser.
+3. **Dark only** — pas de light mode v0. Pas de toggle.
+4. **Mono pour data, sans pour prose** — JetBrains Mono pour IDs/URLs/données, Inter pour prose/headings.
+5. **Motion fonctionnel uniquement** — pas d'animations décoratives. Voir `04_motion.md`.
+
+### Composants disponibles
+
+Voir `RADAR/docs/design-system/03_components.md` pour la liste complète et leurs specs. Avant de créer un nouveau composant, vérifier qu'un existant ne couvre pas le besoin.
+
+### Quand modifier le design system
+
+- Nouveau token (couleur, espacement, etc.) → update `tokens.ts` ET `02_tokens.md` dans la même commit.
+- Nouveau composant → ajouter spec à `03_components.md` ET implémenter dans `src/components/` consommant les tokens.
+- Changement de visuel → vérifier l'alignment avec `01_visual_language.md` et le 10-second test (voir doc).
 
 ---
 
