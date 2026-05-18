@@ -6,8 +6,8 @@ project:
   name: RADAR
   mission: "Veille concurrentielle VC. URL startup → memo concurrentiel structuré <60s."
   context: "Hackathon Linkup — ship > perfect"
-  demo_date: TBD          # remplir
-  cut_line_date: TBD      # J-3 démo, freeze features
+  demo_date: 2026-05-29          # remplir
+  cut_line_date: 2026-05-25      # J-3 démo, freeze features
   updated_at: 2026-05-18
 
 # ─────────────────────────────────────────────────────────────
