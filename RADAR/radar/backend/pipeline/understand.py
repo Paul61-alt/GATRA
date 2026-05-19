@@ -189,6 +189,32 @@ _SCHEMA = {
 }
 
 
+def _understand_query(domain: str) -> str:
+    return (
+        f"You are a company intelligence analyst. Build a complete profile of {domain}.\n\n"
+        f"Search {domain}, {domain}/about, {domain}/team, {domain}/pricing, Crunchbase, LinkedIn, "
+        f"Pitchbook, TechCrunch, and recent news. Run adjacent searches for "
+        f"'{domain} funding', '{domain} employees', '{domain} customers' to ensure breadth.\n\n"
+        "Extract the following — cite source URL for each section:\n\n"
+        f"IDENTITY: Official company name, website URL, founding year.\n\n"
+        f"HQ: Headquarters city and country. Geographic coverage (Local/National/Regional/Global).\n\n"
+        f"FUNDING: Total raised EUR, all funding rounds (amount, date, lead investor), "
+        "current stage (Seed/Series A/B/C+/Public/Bootstrapped), notable investors.\n\n"
+        f"EMPLOYEES: Current headcount with source and confidence level.\n\n"
+        f"POSITIONING: One-paragraph business description. Main product markets and verticals. "
+        "Target customer segment (Enterprise/Mid-Market/SMB/Consumer/Mixed) — cite homepage or press evidence.\n\n"
+        f"BUSINESS MODEL: B2B/B2C/B2B2C/Marketplace/API-Platform. "
+        "GTM motion (sales-led/product-led/marketing-led/community-led). "
+        "Pricing model (Freemium/Subscription/Usage-based/Enterprise/Hybrid).\n\n"
+        f"PRODUCT: Key differentiator in 20 words max. Top 3 features. "
+        "3-5 notable customers or client logos visible on website.\n\n"
+        f"TECH: Main technology stack (max 10 tools, e.g. AWS, Stripe, Vercel, Postgres).\n\n"
+        f"TEAM: Founders and key executives — name, role, background, LinkedIn URL for each.\n\n"
+        f"SIGNALS: Recent growth signals (headcount growth, geo expansion, new products). "
+        "Last 3 notable news items with date and source URL."
+    )
+
+
 async def run(
     domain: str,
     linkup: LinkupClient,
@@ -211,26 +237,7 @@ async def run(
 
     raw = await linkup.search(
         depth=depth,
-        query=(
-            f"Company profile for {domain}: "
-            "official name, website URL, founding year, headquarters city and country, "
-            "geographic coverage (Local/National/Regional/Global), "
-            "employee headcount with confidence and source, "
-            "total funding raised in EUR with confidence, all funding rounds (amount, date, lead investor), "
-            "current funding stage (Seed/Series A/B/C+/Public/Bootstrapped), notable investors, "
-            "one-paragraph business positioning, main product markets or verticals, "
-            "target customer segment (Enterprise/Mid-Market/SMB/Consumer/Mixed) with evidence from homepage or press, "
-            "target industry verticals, "
-            "business model (B2B/B2C/B2B2C/Marketplace/API-Platform), "
-            "go-to-market motion (sales-led/product-led/marketing-led/community-led), "
-            "pricing model (Freemium/Subscription/Usage-based/Enterprise/Hybrid), "
-            "key differentiator in 20 words max, top 3 product features, "
-            "3-5 notable customers or client logos visible on website, "
-            "main technology stack and SaaS tools used (max 10 — e.g. AWS, Stripe, Segment, Vercel, Postgres), "
-            "founding team and key executives (name, role, background, LinkedIn URL), "
-            "recent growth signals (headcount growth, geographic expansion, new products), "
-            "last 3 notable news items with date and source URL"
-        ),
+        query=_understand_query(domain),
         schema=_SCHEMA,
     )
 

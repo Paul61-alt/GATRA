@@ -1,8 +1,10 @@
 import asyncio
+import json
 import logging
 import os
 from datetime import datetime, timezone
-from typing import Any, Optional
+from pathlib import Path
+from typing import Any, Literal, Optional
 from urllib.parse import urlparse
 
 import httpx
@@ -13,24 +15,130 @@ LINKUP_BASE = "https://api.linkup.so/v1"
 _MAX_RETRIES = 3
 _RETRY_STATUSES = {429, 500, 502, 503}
 
+# Cost model for /research depth tiers (EUR per call)
+RESEARCH_COST_EUR: dict[str, float] = {"S": 0.23, "M": 0.46, "L": 0.92, "XL": 1.84}
+DAILY_HARD_CAP_EUR = 15.0
+DAILY_WARN_CAP_EUR = 18.0
+
+
+class BudgetExceededError(RuntimeError):
+    """Raised when a scan would push cumulative daily Linkup spend above the hard cap."""
+
+
 _call_count: dict[str, int] = {}
+_LEDGER_PATH = Path(__file__).resolve().parents[2] / "cache" / "linkup_usage.jsonl"
+_ledger_loaded = False
 
 
 def _extract_domain(url: str) -> str:
     return urlparse(url).netloc.lstrip("www.")
 
 
-def _check_daily_budget() -> None:
-    budget = int(os.environ.get("RADAR_DAILY_BUDGET", "500"))
+def _load_ledger() -> None:
+    global _ledger_loaded
+    if _ledger_loaded:
+        return
+    _ledger_loaded = True
+    if not _LEDGER_PATH.exists():
+        return
+    try:
+        with _LEDGER_PATH.open("r", encoding="utf-8") as f:
+            for line in f:
+                line = line.strip()
+                if not line:
+                    continue
+                try:
+                    entry = json.loads(line)
+                except json.JSONDecodeError:
+                    logger.warning("linkup ledger skip malformed line")
+                    continue
+                if entry.get("status") != "ok":
+                    continue
+                date = entry.get("date")
+                if not date:
+                    continue
+                _call_count[date] = _call_count.get(date, 0) + 1
+    except OSError as e:
+        logger.warning("linkup ledger read failed error=%s", e)
+
+
+def _record_call(endpoint: str, status: str, cost_eur: float = 0.0) -> None:
+    entry = {
+        "ts": datetime.now(timezone.utc).isoformat().replace("+00:00", "Z"),
+        "date": datetime.now(timezone.utc).date().isoformat(),
+        "endpoint": endpoint,
+        "status": status,
+        "cost_eur": cost_eur,
+    }
+    try:
+        _LEDGER_PATH.parent.mkdir(parents=True, exist_ok=True)
+        with _LEDGER_PATH.open("a", encoding="utf-8") as f:
+            f.write(json.dumps(entry) + "\n")
+    except OSError as e:
+        logger.warning("linkup ledger write failed error=%s", e)
+
+
+def estimate_today_cost_eur() -> float:
+    """Sum cost_eur field from today's ledger entries (ok status only)."""
+    today = datetime.now(timezone.utc).date().isoformat()
+    if not _LEDGER_PATH.exists():
+        return 0.0
+    total = 0.0
+    try:
+        with _LEDGER_PATH.open("r", encoding="utf-8") as f:
+            for line in f:
+                line = line.strip()
+                if not line:
+                    continue
+                try:
+                    entry = json.loads(line)
+                except json.JSONDecodeError:
+                    continue
+                if entry.get("date") != today:
+                    continue
+                if entry.get("status") != "ok":
+                    continue
+                try:
+                    total += float(entry.get("cost_eur", 0) or 0)
+                except (TypeError, ValueError):
+                    continue
+    except OSError as e:
+        logger.warning("linkup ledger read failed error=%s", e)
+    return total
+
+
+def _kill_switch_check() -> None:
+    if os.environ.get("RADAR_KILL_SWITCH", "").lower() in ("1", "true", "on"):
+        raise RuntimeError(
+            "Linkup calls disabled by RADAR_KILL_SWITCH. "
+            "Unset in .env after reviewing usage to re-enable."
+        )
+
+
+def _check_daily_budget(endpoint: str) -> None:
+    _kill_switch_check()
+    # Status-poll GETs (/tasks/{id}, /research/{id}) don't bill LinkUp — exempt from budget.
+    if endpoint.startswith("/tasks/") or endpoint.startswith("/research/"):
+        return
+    _load_ledger()
+    budget = int(os.environ.get("RADAR_DAILY_BUDGET", "50"))
     today = datetime.now(timezone.utc).date().isoformat()
     used = _call_count.get(today, 0)
     if used >= budget:
-        raise RuntimeError(
+        _record_call(endpoint, "budget_exceeded")
+        raise BudgetExceededError(
             f"Linkup daily budget exceeded: {used}/{budget} calls on {today}"
         )
     _call_count[today] = used + 1
-    if used and used % 50 == 0:
+    if used and used % 10 == 0:
         logger.warning("linkup daily_usage=%d/%d date=%s", used, budget, today)
+
+
+def get_usage_today() -> dict:
+    _load_ledger()
+    today = datetime.now(timezone.utc).date().isoformat()
+    budget = int(os.environ.get("RADAR_DAILY_BUDGET", "50"))
+    return {"date": today, "used": _call_count.get(today, 0), "budget": budget}
 
 
 class LinkupClient:
@@ -41,34 +149,46 @@ class LinkupClient:
             "Content-Type": "application/json",
         }
 
-    async def _post(self, path: str, body: dict) -> Any:
-        _check_daily_budget()
+    async def _post(self, path: str, body: dict, cost_eur: float = 0.0) -> Any:
+        _check_daily_budget(path)
         url = f"{LINKUP_BASE}{path}"
-        async with httpx.AsyncClient(timeout=360) as client:
-            for attempt in range(_MAX_RETRIES):
-                r = await client.post(url, headers=self._headers, json=body)
-                if r.status_code in _RETRY_STATUSES and attempt < _MAX_RETRIES - 1:
-                    wait = 2 ** (attempt + 1)
-                    logger.warning("linkup retry=%d status=%d wait=%ds", attempt + 1, r.status_code, wait)
-                    await asyncio.sleep(wait)
-                    continue
-                r.raise_for_status()
-                return r.json()
+        try:
+            async with httpx.AsyncClient(timeout=360) as client:
+                for attempt in range(_MAX_RETRIES):
+                    r = await client.post(url, headers=self._headers, json=body)
+                    if r.status_code in _RETRY_STATUSES and attempt < _MAX_RETRIES - 1:
+                        wait = 2 ** (attempt + 1)
+                        logger.warning("linkup retry=%d status=%d wait=%ds", attempt + 1, r.status_code, wait)
+                        await asyncio.sleep(wait)
+                        continue
+                    r.raise_for_status()
+                    _record_call(path, "ok", cost_eur=cost_eur)
+                    return r.json()
+        except Exception:
+            _record_call(path, "error")
+            raise
+        _record_call(path, "error")
         raise RuntimeError("Linkup max retries exceeded")
 
     async def _get(self, path: str) -> Any:
-        _check_daily_budget()
+        _check_daily_budget(path)
         url = f"{LINKUP_BASE}{path}"
-        async with httpx.AsyncClient(timeout=30) as client:
-            for attempt in range(_MAX_RETRIES):
-                r = await client.get(url, headers=self._headers)
-                if r.status_code in _RETRY_STATUSES and attempt < _MAX_RETRIES - 1:
-                    wait = 2 ** (attempt + 1)
-                    logger.warning("linkup GET retry=%d status=%d wait=%ds", attempt + 1, r.status_code, wait)
-                    await asyncio.sleep(wait)
-                    continue
-                r.raise_for_status()
-                return r.json()
+        try:
+            async with httpx.AsyncClient(timeout=30) as client:
+                for attempt in range(_MAX_RETRIES):
+                    r = await client.get(url, headers=self._headers)
+                    if r.status_code in _RETRY_STATUSES and attempt < _MAX_RETRIES - 1:
+                        wait = 2 ** (attempt + 1)
+                        logger.warning("linkup GET retry=%d status=%d wait=%ds", attempt + 1, r.status_code, wait)
+                        await asyncio.sleep(wait)
+                        continue
+                    r.raise_for_status()
+                    _record_call(path, "ok")
+                    return r.json()
+        except Exception:
+            _record_call(path, "error")
+            raise
+        _record_call(path, "error")
         raise RuntimeError("Linkup GET max retries exceeded")
 
     async def search(
@@ -126,11 +246,60 @@ class LinkupClient:
                 return statuses
         raise TimeoutError(f"Linkup tasks not done after {max_wait}s")
 
-    async def research(self, query: str) -> dict:
-        """Beta deep research endpoint — always optional, never on critical path."""
-        try:
-            return await self._post("/research", {"q": query})
-        except Exception as e:
-            logger.warning("linkup research failed (beta) error=%s", e)
-            return {}
+    async def research(
+        self,
+        query: str,
+        depth: Literal["S", "M", "L", "XL"] = "S",
+        structured_schema: Optional[dict] = None,
+    ) -> dict:
+        """Submit a /research job. Returns submission dict (typically {id, status:'pending'}).
+
+        Billable: cost depends on depth tier (RESEARCH_COST_EUR).
+        """
+        body: dict = {
+            "q": query,
+            "mode": "Investigate",
+            "depth": depth,
+            "outputType": "sourcedAnswer",
+        }
+        if structured_schema:
+            body["outputType"] = "structured"
+            body["structuredOutputSchema"] = json.dumps(structured_schema)
+        cost = RESEARCH_COST_EUR.get(depth, 0.0)
+        return await self._post("/research", body, cost_eur=cost)
+
+    async def wait_for_research(
+        self, job_id: str, max_wait: int = 600, interval: int = 7
+    ) -> dict:
+        """Poll /research/{id} until status in {completed, failed} or max_wait elapsed.
+
+        Polling GETs are budget-exempt (see _check_daily_budget).
+        """
+        elapsed = 0
+        while elapsed < max_wait:
+            result = await self._get(f"/research/{job_id}")
+            status = result.get("status")
+            if status in {"completed", "failed"}:
+                return result
+            await asyncio.sleep(interval)
+            elapsed += interval
+        raise TimeoutError(f"research job {job_id} not done after {max_wait}s")
+
+    async def research_and_wait(
+        self,
+        query: str,
+        depth: Literal["S", "M", "L", "XL"] = "S",
+        structured_schema: Optional[dict] = None,
+        max_wait: int = 600,
+        interval: int = 7,
+    ) -> dict:
+        """Submit + poll. Raises if the job fails or times out."""
+        submitted = await self.research(query, depth=depth, structured_schema=structured_schema)
+        job_id = submitted.get("id")
+        if not job_id:
+            raise RuntimeError(f"research submit returned no id: {submitted}")
+        result = await self.wait_for_research(job_id, max_wait=max_wait, interval=interval)
+        if result.get("status") == "failed":
+            raise RuntimeError(f"research job {job_id} failed: {result.get('error')}")
+        return result
 

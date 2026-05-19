@@ -1,8 +1,10 @@
 """Phase 2 — DISCOVER: find 15 competitors for a domain."""
+import asyncio
 import logging
 import time
 from typing import Awaitable, Callable, Optional
 
+from clients.claude_client import ClaudeClient
 from clients.linkup_client import LinkupClient
 from models.company import CompanyProfile
 from utils.dedup import dedup_by_website
@@ -56,15 +58,29 @@ async def run(
     markets = ", ".join(m.label for m in profile.markets) if profile.markets else "its market"
     positioning = profile.positioning or f"{profile.name} startup"
 
+    def _discover_query(name: str, domain: str, positioning: str, markets: str) -> str:
+        return (
+            f"You are a competitive intelligence analyst. Find the 15 main direct competitors of {name} ({domain}).\n\n"
+            f"Context: {positioning}. Market: {markets}.\n\n"
+            f"Search G2, Capterra, AlternativeTo, ProductHunt, Crunchbase, Y Combinator, and industry news. "
+            f"Run adjacent searches for '{name} alternatives', '{name} vs', "
+            f"'best {markets} software', '{markets} startups 2024 2025'. "
+            f"Do NOT include {name} ({domain}) itself in the results.\n\n"
+            "For each competitor extract:\n"
+            "- name: company name\n"
+            "- website: full URL (https://...)\n"
+            "- hq_city, hq_country: headquarters location\n"
+            "- founded_year: integer\n"
+            "- funding_stage: Seed/Series A/B/C+/Public/Bootstrapped\n"
+            "- employee_count: approximate integer\n"
+            "- one_liner: one sentence description\n"
+            f"- differentiator: main differentiator vs {name} specifically\n\n"
+            "Prioritize direct competitors (same target segment, overlapping core features, similar pricing tier). "
+            "Exclude tools that are integrations, add-ons, or only tangentially related."
+        )
+
     raw = await linkup.search(
-        query=(
-            f"Find the 15 main direct competitors of {profile.name} ({domain}). "
-            f"Company description: {positioning}. Market: {markets}. "
-            "For each competitor return: name, website URL, HQ city, HQ country, "
-            "founding year, funding stage (Seed/Series A/B/C+/Public/Bootstrapped), "
-            "approximate employee count, one-sentence description, "
-            "and main differentiator vs the target company."
-        ),
+        query=_discover_query(profile.name, domain, positioning, markets),
         depth="deep",
         schema=_SCHEMA,
     )
@@ -77,6 +93,29 @@ async def run(
         raw_list = data
 
     competitors = dedup_by_website(raw_list)[:15]
+
+    # Rank by competitive threat so enrich phase spends depth M on the top-1.
+    if competitors:
+        subject_summary = (
+            f"{profile.name} ({profile.domain}) — "
+            f"{profile.positioning or profile.summary or ''}"
+        ).strip(" —")
+        try:
+            scores = await asyncio.to_thread(
+                ClaudeClient().score_threats, subject_summary, competitors
+            )
+            if scores:
+                competitors.sort(
+                    key=lambda c: scores.get(str(c.get("website", "")), 0),
+                    reverse=True,
+                )
+                logger.info(
+                    "phase=DISCOVER threat_sort_top=%s score=%d",
+                    competitors[0].get("website"),
+                    scores.get(str(competitors[0].get("website", "")), 0),
+                )
+        except Exception as e:
+            logger.warning("threat scoring failed, keeping discover order: %s", e)
 
     for c in competitors:
         c_name = str(c.get("name", ""))[:100]

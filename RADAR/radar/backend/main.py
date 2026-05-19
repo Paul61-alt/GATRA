@@ -273,8 +273,14 @@ async def scan_stream(request: Request, req: AnalyzeRequest) -> StreamingRespons
                 if event is None:
                     break
                 yield _sse(event)
-        except GeneratorExit:
+        except (GeneratorExit, asyncio.CancelledError):
+            # Client disconnected — cancel pipeline so it stops burning LinkUp credits.
             pipeline_task.cancel()
+            try:
+                await pipeline_task
+            except (asyncio.CancelledError, Exception):
+                pass
+            raise
 
     return StreamingResponse(
         event_stream(),

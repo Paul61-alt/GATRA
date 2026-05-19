@@ -1,16 +1,28 @@
-"""Phase 3 — ENRICH: deep competitor profiling via Linkup Research.
+"""Phase 3 — ENRICH: deep competitor profiling via Linkup /research.
 
-One Research(Investigate, depth=S) call per competitor, submitted as a single
-batch via /v1/tasks. Returns structured CompetitorProfile with pricing tiers,
-LinkedIn signals, recent signals, and funding details.
+Cap: only the top MAX_ENRICH competitors are enriched (top-1 at depth M,
+positions 2..MAX_ENRICH at depth S). The remaining competitors are returned
+as minimal stubs built from the discover payload — no Linkup call.
+
+Override for demo/test: RADAR_MAX_ENRICH=1 env var caps to 1 competitor.
+Default is 5. Production unaffected when env var is unset.
 """
 import asyncio
 import json
 import logging
+import os
 import time
 from datetime import datetime, timezone
+from typing import Literal
 
-from clients.linkup_client import LinkupClient
+from clients.linkup_client import (
+    DAILY_HARD_CAP_EUR,
+    DAILY_WARN_CAP_EUR,
+    RESEARCH_COST_EUR,
+    BudgetExceededError,
+    LinkupClient,
+    estimate_today_cost_eur,
+)
 from models.company import DataPoint, HQ
 from models.competitor import (
     CompetitorProfile,
@@ -22,6 +34,10 @@ from models.competitor import (
 from utils.geocoding import geocode
 
 logger = logging.getLogger(__name__)
+
+MAX_ENRICH = int(os.environ.get("RADAR_MAX_ENRICH", "5"))
+DEPTH_TOP: Literal["M"] = "M"
+DEPTH_REST: Literal["S"] = "S"
 
 COMPETITOR_SCHEMA = {
     "type": "object",
@@ -98,37 +114,26 @@ COMPETITOR_SCHEMA = {
 
 def _research_query(name: str, domain: str) -> str:
     return (
-        f"{name} ({domain}) deep competitive profile 2025-2026: "
-        "pricing tiers with exact monthly and annual prices, free plan availability, recent price changes; "
-        "recent product launches and AI features (2024-2026); "
-        "funding stage, latest round amount and date, total raised, key investors; "
-        "employee count and headcount growth signals; "
-        "LinkedIn company page URL; "
-        "CEO and founder LinkedIn profile URLs; "
-        "recent public statements or LinkedIn posts from founders (last 6 months); "
-        "key differentiators vs alternatives; "
-        "target customer segments and notable customers; "
-        "known weaknesses or limitations cited by users"
+        f"You are a competitive intelligence analyst building a deep benchmark profile of {name} ({domain}).\n\n"
+        f"Search {domain}, {domain}/pricing, {domain}/plans, Crunchbase, LinkedIn, G2, Capterra, "
+        f"TechCrunch, and recent news. Run several searches with adjacent keywords to ensure full breadth.\n\n"
+        "Extract the following — include a source URL for each section:\n\n"
+        f"PRICING: Visit {domain}/pricing and {domain}/plans. List every plan name, exact monthly USD price, "
+        "exact annual USD price, free tier availability (true/false), any recent pricing changes.\n\n"
+        f"FUNDING: Search Crunchbase and news for '{name} funding'. Extract: funding stage, latest round amount USD, "
+        "round date (YYYY-MM-DD), round type (Seed/Series A/B/C/etc), total raised USD, all investor names.\n\n"
+        f"COMPANY: Find the LinkedIn company page URL for {name}. Extract current employee count. "
+        "Note any headcount growth signals from LinkedIn or news.\n\n"
+        f"FOUNDERS: Find CEO and founder names for {name}. Extract their LinkedIn profile URLs. "
+        "Search for recent LinkedIn posts or press statements from founders (last 6 months) — "
+        "extract the key signal or quote for each.\n\n"
+        f"SIGNALS: Search news and press from the last 6 months about {name}. "
+        "For each item extract: date, headline, signal type (funding/product/hiring/partnership/press), source URL.\n\n"
+        f"POSITIONING: List key differentiators of {name} vs alternatives. "
+        "Identify primary target customer segment. List up to 5 publicly known customer names.\n\n"
+        f"WEAKNESSES: Search G2, Capterra, Reddit, Hacker News for user complaints or limitations of {name}. "
+        "List the most recurring themes."
     )
-
-
-def _make_tasks_payload(competitors: list[dict]) -> list[dict]:
-    return [
-        {
-            "type": "research",
-            "input": {
-                "q": _research_query(
-                    c.get("name") or c.get("website", ""),
-                    c.get("website", ""),
-                ),
-                "mode": "Investigate",
-                "depth": "S",
-                "outputType": "structured",
-                "structuredOutputSchema": json.dumps(COMPETITOR_SCHEMA),
-            },
-        }
-        for c in competitors
-    ]
 
 
 def _parse_result(
@@ -138,10 +143,12 @@ def _parse_result(
     run_id: str,
     coords,
 ) -> CompetitorProfile:
-    output = raw.get("output", {})
-    # Research structured output wraps data in "data" key; fall back to output itself
-    data = output.get("data") or output
-    sources = output.get("sources", [])
+    output = raw.get("output", {}) if isinstance(raw, dict) else {}
+    # /research structured output wraps payload in "data"; fall back to output itself.
+    data = output.get("data") or output or {}
+    if not isinstance(data, dict):
+        data = {}
+    sources = output.get("sources", []) if isinstance(output, dict) else []
     src_url = sources[0].get("url") if sources else None
 
     # ── Pricing ───────────────────────────────────────────────────
@@ -245,19 +252,29 @@ def _parse_result(
     )
 
 
-async def run(
-    competitors: list[dict],
-    linkup: LinkupClient,
-    run_id: str,
-    event_cb=None,
-) -> list[CompetitorProfile]:
-    t0 = time.monotonic()
-    now = datetime.now(timezone.utc).isoformat()
-    logger.info("phase=ENRICH status=start count=%d", len(competitors))
+def _stub(competitor: dict, run_id: str, now: str) -> CompetitorProfile:
+    """Minimal profile from a discover dict — no Linkup call."""
+    city = competitor.get("hq_city")
+    country = competitor.get("hq_country")
+    hq = HQ(city=city, country=country) if (city or country) else None
+    funding_stage_val = competitor.get("funding_stage")
+    return CompetitorProfile(
+        name=competitor.get("name") or competitor.get("website", ""),
+        website=competitor.get("website", ""),
+        hq=hq,
+        founded_year=competitor.get("founded_year"),
+        one_liner=competitor.get("one_liner"),
+        differentiator=competitor.get("differentiator"),
+        funding_stage=(
+            DataPoint(value=funding_stage_val, confidence="low", extracted_at=now)
+            if funding_stage_val else None
+        ),
+        pipeline_run_id=run_id,
+    )
 
-    tasks_payload = _make_tasks_payload(competitors)
-    task_results = await linkup.tasks(tasks_payload)
 
+async def _geocode_all(competitors: list[dict]) -> dict[int, tuple]:
+    """Parallel geocoding keyed by competitor index. Returns {} on full failure."""
     async def _noop():
         return None
 
@@ -270,29 +287,99 @@ async def run(
         ],
         return_exceptions=True,
     )
+    out: dict[int, tuple] = {}
+    for i, coords in enumerate(coords_list):
+        if isinstance(coords, tuple):
+            out[i] = coords
+    return out
 
-    profiles: list[CompetitorProfile] = []
-    for i, c in enumerate(competitors):
-        raw = task_results[i] if i < len(task_results) else {}
-        coords = coords_list[i]
-        try:
-            profile = _parse_result(raw, c, now, run_id, coords)
-        except Exception as e:
-            logger.warning("enrich parse_error competitor=%s error=%s", c.get("name"), e)
-            profile = CompetitorProfile(
-                name=c.get("name", ""),
-                website=c.get("website", ""),
-                one_liner=c.get("one_liner"),
-                pipeline_run_id=run_id,
+
+async def _enrich_one(
+    competitor: dict,
+    depth: Literal["S", "M"],
+    schema: dict,
+    linkup: LinkupClient,
+    run_id: str,
+    now: str,
+    coords,
+) -> CompetitorProfile:
+    query = _research_query(
+        competitor.get("name") or competitor.get("website", ""),
+        competitor.get("website", ""),
+    )
+    result = await linkup.research_and_wait(query, depth=depth, structured_schema=schema)
+    return _parse_result(result, competitor, now, run_id, coords)
+
+
+async def run(
+    competitors: list[dict],
+    linkup: LinkupClient,
+    run_id: str,
+    event_cb=None,
+) -> list[CompetitorProfile]:
+    t0 = time.monotonic()
+    now = datetime.now(timezone.utc).isoformat()
+    logger.info(
+        "phase=ENRICH status=start total=%d enriching=%d stubs=%d",
+        len(competitors),
+        min(len(competitors), MAX_ENRICH),
+        max(0, len(competitors) - MAX_ENRICH),
+    )
+
+    to_enrich = competitors[:MAX_ENRICH]
+    tail = competitors[MAX_ENRICH:]
+
+    # ── Budget guard ──────────────────────────────────────────────
+    if to_enrich:
+        estimated = RESEARCH_COST_EUR[DEPTH_TOP] + max(0, len(to_enrich) - 1) * RESEARCH_COST_EUR[DEPTH_REST]
+        cumul = estimate_today_cost_eur()
+        if cumul + estimated > DAILY_HARD_CAP_EUR:
+            raise BudgetExceededError(
+                f"scan would exceed daily cap €{DAILY_HARD_CAP_EUR:.2f} "
+                f"(today={cumul:.2f} + scan={estimated:.2f})"
             )
-        profiles.append(profile)
+        if cumul + estimated > DAILY_WARN_CAP_EUR:
+            logger.warning(
+                "daily linkup spend nearing cap: today=%.2f + scan=%.2f", cumul, estimated
+            )
+
+    schema = COMPETITOR_SCHEMA
+    coords_map = await _geocode_all(to_enrich)
+
+    jobs = []
+    for i, c in enumerate(to_enrich):
+        depth = DEPTH_TOP if i == 0 else DEPTH_REST
+        jobs.append(_enrich_one(c, depth, schema, linkup, run_id, now, coords_map.get(i)))
+
+    results = await asyncio.gather(*jobs, return_exceptions=True)
+
+    enriched: list[CompetitorProfile] = []
+    for c, r in zip(to_enrich, results):
+        if isinstance(r, Exception):
+            logger.error("enrich failed for %s: %s", c.get("website"), r)
+            enriched.append(_stub(c, run_id, now))
+        else:
+            enriched.append(r)
+
+    stubs = [_stub(c, run_id, now) for c in tail]
+    profiles = enriched + stubs
 
     if event_cb:
-        await event_cb({"phase": "ENRICH", "status": "batch_complete", "count": len(profiles)})
+        await event_cb(
+            {
+                "phase": "ENRICH",
+                "status": "batch_complete",
+                "count": len(profiles),
+                "enriched": len(enriched),
+                "stubs": len(stubs),
+            }
+        )
 
     logger.info(
-        "phase=ENRICH status=ok count=%d duration=%.1fs",
+        "phase=ENRICH status=ok total=%d enriched=%d stubs=%d duration=%.1fs",
         len(profiles),
+        len(enriched),
+        len(stubs),
         time.monotonic() - t0,
     )
     return profiles
