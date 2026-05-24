@@ -29,7 +29,7 @@ braintrust.init_logger(project="RADAR")
 async def task(domain: str) -> list[dict]:
     linkup = LinkupClient()
     profile = await understand_run(domain, linkup)
-    competitors = await discover_run(profile, linkup)
+    competitors, _ = await discover_run(profile, linkup)
     return competitors
 
 

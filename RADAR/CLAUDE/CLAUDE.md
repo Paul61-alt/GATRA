@@ -274,6 +274,23 @@ python scripts/precompute_demo.py  # à créer en semaine 3
 
 ---
 
+## 📚 Doc sync — ARCHITECTURE.md
+
+`RADAR/docs/Learning/ARCHITECTURE.md` est la source de vérité du pipeline pour Paul (non-dev).
+
+**Règle obligatoire** : à chaque modification de
+- Pipeline phases (UNDERSTAND/DISCOVER/ENRICH/TRANSFORM)
+- Endpoints Linkup utilisés (ajout/retrait/changement de paramètres)
+- Models Pydantic (CompanyProfile, CompetitorProfile, RadarOutput)
+- Clients (`linkup_client`, `claude_client`) — nouvelle méthode ou cost model
+- Budget/guards (caps, env vars, ledger)
+
+→ **Update `ARCHITECTURE.md` dans la même tâche**. Format markdown lisible, pas de code Python brut. Cible la lecture par Paul (entrepreneur) — analogies du monde réel autorisées.
+
+Si la modification touche aussi le frontend (RadarOutput shape) → mentionner l'impact dans `ARCHITECTURE.md` ET mettre à jour les types TS dans `frontend/src/types/`.
+
+---
+
 ## 🎨 Design System (Intelligence Ops)
 
 RADAR a un design system formel — Palantir corporate × Perplexity transparency. Audience cible : VCs et corporate strategy. Toute UI doit s'y conformer.

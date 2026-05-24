@@ -26,7 +26,7 @@ logger = logging.getLogger(__name__)
 from clients import ClaudeClient, LinkupClient
 from generate_data_js import generate_data_js
 from models import PipelineRun, PipelineStatus
-from pipeline import discover, enrich, understand
+from pipeline import discover, enrich, synthesize, understand
 from pipeline.transform import pipeline_run_to_radar_output
 from utils import cache_get, cache_set
 
@@ -109,9 +109,11 @@ async def analyze(request: Request, req: AnalyzeRequest) -> dict:
         async with app.state.pipeline_sem:
             company_profile = await understand.run(domain, linkup, run_id)
 
-            competitor_dicts = await discover.run(company_profile, linkup)
+            competitor_dicts, discover_sources = await discover.run(company_profile, linkup)
 
             competitor_profiles = await enrich.run(competitor_dicts, linkup, run_id)
+
+            radar_scores = synthesize.run(company_profile, competitor_profiles)
 
         run = PipelineRun(
             id=run_id,
@@ -121,6 +123,8 @@ async def analyze(request: Request, req: AnalyzeRequest) -> dict:
             completed_at=datetime.now(timezone.utc).isoformat(),
             company_profile=company_profile,
             competitors=competitor_profiles,
+            discover_source_urls=discover_sources,
+            radar_scores=radar_scores,
         )
 
         result = run.model_dump(mode="json")
@@ -165,8 +169,9 @@ async def scan(request: Request, req: AnalyzeRequest) -> dict:
 
         async with app.state.pipeline_sem:
             company_profile = await understand.run(domain, linkup, run_id)
-            competitor_dicts = await discover.run(company_profile, linkup)
+            competitor_dicts, discover_sources = await discover.run(company_profile, linkup)
             competitor_profiles = await enrich.run(competitor_dicts, linkup, run_id)
+            radar_scores = synthesize.run(company_profile, competitor_profiles)
 
         run = PipelineRun(
             id=run_id,
@@ -176,6 +181,8 @@ async def scan(request: Request, req: AnalyzeRequest) -> dict:
             completed_at=datetime.now(timezone.utc).isoformat(),
             company_profile=company_profile,
             competitors=competitor_profiles,
+            discover_source_urls=discover_sources,
+            radar_scores=radar_scores,
         )
 
         radar_output = pipeline_run_to_radar_output(run)
@@ -227,12 +234,16 @@ async def scan_stream(request: Request, req: AnalyzeRequest) -> StreamingRespons
                     await queue.put({"phase": "UNDERSTAND", "status": "ok", "name": company_profile.name})
 
                     await queue.put({"phase": "DISCOVER", "status": "start"})
-                    competitor_dicts = await discover.run(company_profile, linkup, event_cb=emit)
+                    competitor_dicts, discover_sources = await discover.run(company_profile, linkup, event_cb=emit)
                     await queue.put({"phase": "DISCOVER", "status": "ok", "count": len(competitor_dicts)})
 
                     await queue.put({"phase": "ENRICH", "status": "start"})
                     competitor_profiles = await enrich.run(competitor_dicts, linkup, run_id, event_cb=emit)
                     await queue.put({"phase": "ENRICH", "status": "ok", "count": len(competitor_profiles)})
+
+                    await queue.put({"phase": "SYNTHESIZE", "status": "start"})
+                    radar_scores = synthesize.run(company_profile, competitor_profiles)
+                    await queue.put({"phase": "SYNTHESIZE", "status": "ok", "count": len(radar_scores)})
 
                 run = PipelineRun(
                     id=run_id,
@@ -242,6 +253,8 @@ async def scan_stream(request: Request, req: AnalyzeRequest) -> StreamingRespons
                     completed_at=datetime.now(timezone.utc).isoformat(),
                     company_profile=company_profile,
                     competitors=competitor_profiles,
+                    discover_source_urls=discover_sources,
+                    radar_scores=radar_scores,
                 )
                 radar_output = pipeline_run_to_radar_output(run)
                 result = radar_output.model_dump(by_alias=True, mode="json", exclude_none=True)

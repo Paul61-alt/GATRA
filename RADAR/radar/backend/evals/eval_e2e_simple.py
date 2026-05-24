@@ -65,8 +65,8 @@ async def main(url: str, no_cache: bool = False) -> None:
 
         # ── 2. DISCOVER ────────────────────────────────────────────
         _sep("PHASE 2 — DISCOVER")
-        competitors = await discover.run(company_profile, linkup)
-        print(f"✓ {len(competitors)} competitors found")
+        competitors, discover_sources = await discover.run(company_profile, linkup)
+        print(f"✓ {len(competitors)} competitors found, {len(discover_sources)} sources")
         for i, c in enumerate(competitors[:5]):
             print(f"  [{i}] {c.get('name')} — {c.get('website')}")
 

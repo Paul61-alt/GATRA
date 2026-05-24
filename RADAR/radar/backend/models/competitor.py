@@ -74,6 +74,9 @@ class CompetitorProfile(BaseModel):
     founder_linkedin_urls: List[str] = []
     recent_linkedin_signals: List[LinkedInSignal] = []
 
+    # ── Sources ───────────────────────────────────────────────────
+    source_urls: List[str] = []
+
     # ── Meta ──────────────────────────────────────────────────────
     pipeline_run_id: str
     analysis_version: str = "4.0"

@@ -49,7 +49,7 @@ async def bench_one(domain: str, run_idx: int, linkup: LinkupClient) -> dict[str
     timings["understand"] = time.monotonic() - t
 
     t = time.monotonic()
-    competitor_dicts = await discover.run(company_profile, linkup)
+    competitor_dicts, _discover_sources = await discover.run(company_profile, linkup)
     timings["discover"] = time.monotonic() - t
 
     t = time.monotonic()

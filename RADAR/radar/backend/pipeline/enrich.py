@@ -1,16 +1,18 @@
 """Phase 3 — ENRICH: deep competitor profiling via Linkup /research.
 
-Cap: only the top MAX_ENRICH competitors are enriched (top-1 at depth M,
-positions 2..MAX_ENRICH at depth S). The remaining competitors are returned
-as minimal stubs built from the discover payload — no Linkup call.
+Two modes (RADAR_ENRICH_MODE):
+  - "batched" (default): ONE /research call with a structured schema covering
+    ALL competitors. Single billing event (€1.50 vs N×€1.50), uniform enrichment
+    across the cohort instead of top-K cap + empty stubs.
+  - "legacy": N calls capped at MAX_ENRICH, tail returned as stubs.
 
-Override for demo/test: RADAR_MAX_ENRICH=1 env var caps to 1 competitor.
-Default is 5. Production unaffected when env var is unset.
+Override for demo/test: RADAR_MAX_ENRICH=1 caps legacy mode to 1 competitor.
 """
 import asyncio
 import json
 import logging
 import os
+import re
 import time
 from datetime import datetime, timezone
 from typing import Literal
@@ -31,13 +33,16 @@ from models.competitor import (
     PricingTier,
     RecentSignal,
 )
+from utils.dedup import normalize_domain
 from utils.geocoding import geocode
 
 logger = logging.getLogger(__name__)
 
+ENRICH_MODE = os.environ.get("RADAR_ENRICH_MODE", "batched").lower()
 MAX_ENRICH = int(os.environ.get("RADAR_MAX_ENRICH", "5"))
 DEPTH_TOP: Literal["M"] = "M"
 DEPTH_REST: Literal["S"] = "S"
+DEPTH_BATCH: Literal["M"] = "M"  # Single call, mid-depth covers cohort breadth
 
 COMPETITOR_SCHEMA = {
     "type": "object",
@@ -150,6 +155,15 @@ def _parse_result(
         data = {}
     sources = output.get("sources", []) if isinstance(output, dict) else []
     src_url = sources[0].get("url") if sources else None
+    # Dedup all source URLs — propagated to CompetitorProfile.source_urls
+    _seen: set[str] = set()
+    source_urls: list[str] = []
+    for s in sources:
+        if isinstance(s, dict):
+            u = s.get("url")
+            if u and u not in _seen:
+                _seen.add(u)
+                source_urls.append(u)
 
     # ── Pricing ───────────────────────────────────────────────────
     pricing_raw = data.get("pricing") or {}
@@ -248,6 +262,7 @@ def _parse_result(
         linkedin_url=data.get("linkedin_url"),
         founder_linkedin_urls=data.get("founder_linkedin_urls", []),
         recent_linkedin_signals=linkedin_signals,
+        source_urls=source_urls,
         pipeline_run_id=run_id,
     )
 
@@ -302,13 +317,143 @@ async def _enrich_one(
     run_id: str,
     now: str,
     coords,
+    event_cb=None,
 ) -> CompetitorProfile:
-    query = _research_query(
-        competitor.get("name") or competitor.get("website", ""),
-        competitor.get("website", ""),
+    name = competitor.get("name") or competitor.get("website", "")
+    query = _research_query(name, competitor.get("website", ""))
+
+    async def _on_poll(state: dict) -> None:
+        if event_cb is None:
+            return
+        await event_cb({
+            "phase": "ENRICH",
+            "status": "polling",
+            "competitor": name,
+            "website": competitor.get("website", ""),
+            "elapsed": state.get("elapsed", 0),
+            "research_status": state.get("status"),
+            "job_id": state.get("job_id"),
+        })
+
+    result = await linkup.research_and_wait(
+        query, depth=depth, structured_schema=schema, on_poll=_on_poll
     )
-    result = await linkup.research_and_wait(query, depth=depth, structured_schema=schema)
     return _parse_result(result, competitor, now, run_id, coords)
+
+
+def _normalize_name_key(s: str) -> str:
+    return re.sub(r"[^a-z0-9]", "", (s or "").lower())
+
+
+def _batched_query(competitors: list[dict]) -> str:
+    listed = "\n".join(
+        f"{i+1}. {c.get('name','?')} — {c.get('website','?')}"
+        for i, c in enumerate(competitors)
+    )
+    return (
+        f"You are a competitive intelligence analyst. For EACH of the following "
+        f"{len(competitors)} companies, build a deep benchmark profile. For EACH company "
+        "separately, search their domain, /pricing, /plans, Crunchbase, LinkedIn, G2, "
+        "Capterra, TechCrunch, and recent news.\n\n"
+        f"Companies (return data for ALL {len(competitors)} of them, preserving the same names):\n"
+        f"{listed}\n\n"
+        "For EACH company extract:\n"
+        "- name (exact match from the list above — CRITICAL for matching)\n"
+        "- website, linkedin_url, hq_city, hq_country, founded_year, employee_count\n"
+        "- funding_stage, funding_total_usd, last_round_amount_usd, last_round_date, last_round_type, key_investors\n"
+        "- one_liner, key_differentiators, target_segment, notable_customers, weaknesses\n"
+        "- pricing: free_plan (bool), tiers [{name, price_monthly_usd, price_annual_usd, features, target}], recent_changes\n"
+        "- founder_linkedin_urls\n"
+        "- recent_signals: array of {date, headline, source_url, type ∈ funding/product/hiring/partnership/press} — last 6 months\n"
+        "- recent_linkedin_signals: array of {date, author, signal, source_url} from founders/execs — last 6 months\n\n"
+        "Return as 'competitors' array with one object per company. "
+        f"You MUST return all {len(competitors)} companies, in the SAME order as listed above. "
+        "If you cannot find data for a field, omit it — do not guess."
+    )
+
+
+async def _enrich_batch(
+    competitors: list[dict],
+    linkup: LinkupClient,
+    run_id: str,
+    now: str,
+    coords_map: dict[int, tuple],
+    depth: Literal["S", "M", "L", "XL"] = DEPTH_BATCH,
+    event_cb=None,
+) -> list[CompetitorProfile]:
+    """Single batched /research call covering all competitors.
+
+    Falls back to _stub for any competitor the model failed to return data for.
+    """
+    batched_schema = {
+        "type": "object",
+        "properties": {
+            "competitors": {
+                "type": "array",
+                "items": COMPETITOR_SCHEMA,
+            }
+        },
+    }
+
+    query = _batched_query(competitors)
+
+    async def _on_poll(state: dict) -> None:
+        if event_cb is None:
+            return
+        await event_cb({
+            "phase": "ENRICH",
+            "status": "polling",
+            "competitor": f"batch of {len(competitors)}",
+            "elapsed": state.get("elapsed", 0),
+            "research_status": state.get("status"),
+            "job_id": state.get("job_id"),
+        })
+
+    raw = await linkup.research_and_wait(
+        query, depth=depth, structured_schema=batched_schema, on_poll=_on_poll
+    )
+
+    output = raw.get("output", {}) if isinstance(raw, dict) else {}
+    data = output.get("data") or output or {}
+    if not isinstance(data, dict):
+        data = {}
+    items = data.get("competitors", []) if isinstance(data, dict) else []
+    sources = output.get("sources", []) if isinstance(output, dict) else []
+
+    # Index returned items by normalized name and normalized domain
+    by_key: dict[str, dict] = {}
+    for item in items:
+        if not isinstance(item, dict):
+            continue
+        kn = _normalize_name_key(item.get("name", ""))
+        kw = normalize_domain(item.get("website", ""))
+        if kn:
+            by_key.setdefault(kn, item)
+        if kw:
+            by_key.setdefault(kw, item)
+
+    profiles: list[CompetitorProfile] = []
+    matched_count = 0
+    for i, c in enumerate(competitors):
+        kn = _normalize_name_key(c.get("name", ""))
+        kw = normalize_domain(c.get("website", ""))
+        matched = by_key.get(kn) or by_key.get(kw)
+        if matched:
+            # Reuse _parse_result by wrapping the matched item as if it were a raw /research payload.
+            # Shared sources attach per-competitor — accurate at run level, not per-item.
+            fake_raw = {"output": {"data": matched, "sources": sources}}
+            profiles.append(_parse_result(fake_raw, c, now, run_id, coords_map.get(i)))
+            matched_count += 1
+        else:
+            profiles.append(_stub(c, run_id, now))
+
+    logger.info(
+        "phase=ENRICH mode=batched returned=%d matched=%d stubbed=%d",
+        len(items),
+        matched_count,
+        len(competitors) - matched_count,
+    )
+    return profiles
 
 
 async def run(
@@ -319,8 +464,49 @@ async def run(
 ) -> list[CompetitorProfile]:
     t0 = time.monotonic()
     now = datetime.now(timezone.utc).isoformat()
+
+    if not competitors:
+        return []
+
+    # ── Batched mode (default) ────────────────────────────────────
+    if ENRICH_MODE == "batched":
+        logger.info(
+            "phase=ENRICH mode=batched status=start total=%d depth=%s",
+            len(competitors), DEPTH_BATCH,
+        )
+        estimated = RESEARCH_COST_EUR.get(DEPTH_BATCH, 1.5)
+        cumul = estimate_today_cost_eur()
+        if cumul + estimated > DAILY_HARD_CAP_EUR:
+            raise BudgetExceededError(
+                f"scan would exceed daily cap €{DAILY_HARD_CAP_EUR:.2f} "
+                f"(today={cumul:.2f} + scan={estimated:.2f})"
+            )
+        if cumul + estimated > DAILY_WARN_CAP_EUR:
+            logger.warning(
+                "daily linkup spend nearing cap: today=%.2f + scan=%.2f", cumul, estimated
+            )
+
+        coords_map = await _geocode_all(competitors)
+        profiles = await _enrich_batch(
+            competitors, linkup, run_id, now, coords_map, depth=DEPTH_BATCH, event_cb=event_cb,
+        )
+
+        if event_cb:
+            await event_cb({
+                "phase": "ENRICH",
+                "status": "batch_complete",
+                "count": len(profiles),
+                "mode": "batched",
+            })
+        logger.info(
+            "phase=ENRICH mode=batched status=ok total=%d duration=%.1fs",
+            len(profiles), time.monotonic() - t0,
+        )
+        return profiles
+
+    # ── Legacy per-competitor mode (RADAR_ENRICH_MODE=legacy) ─────
     logger.info(
-        "phase=ENRICH status=start total=%d enriching=%d stubs=%d",
+        "phase=ENRICH mode=legacy status=start total=%d enriching=%d stubs=%d",
         len(competitors),
         min(len(competitors), MAX_ENRICH),
         max(0, len(competitors) - MAX_ENRICH),
@@ -329,7 +515,6 @@ async def run(
     to_enrich = competitors[:MAX_ENRICH]
     tail = competitors[MAX_ENRICH:]
 
-    # ── Budget guard ──────────────────────────────────────────────
     if to_enrich:
         estimated = RESEARCH_COST_EUR[DEPTH_TOP] + max(0, len(to_enrich) - 1) * RESEARCH_COST_EUR[DEPTH_REST]
         cumul = estimate_today_cost_eur()
@@ -349,7 +534,9 @@ async def run(
     jobs = []
     for i, c in enumerate(to_enrich):
         depth = DEPTH_TOP if i == 0 else DEPTH_REST
-        jobs.append(_enrich_one(c, depth, schema, linkup, run_id, now, coords_map.get(i)))
+        jobs.append(
+            _enrich_one(c, depth, schema, linkup, run_id, now, coords_map.get(i), event_cb=event_cb)
+        )
 
     results = await asyncio.gather(*jobs, return_exceptions=True)
 
@@ -372,11 +559,12 @@ async def run(
                 "count": len(profiles),
                 "enriched": len(enriched),
                 "stubs": len(stubs),
+                "mode": "legacy",
             }
         )
 
     logger.info(
-        "phase=ENRICH status=ok total=%d enriched=%d stubs=%d duration=%.1fs",
+        "phase=ENRICH mode=legacy status=ok total=%d enriched=%d stubs=%d duration=%.1fs",
         len(profiles),
         len(enriched),
         len(stubs),

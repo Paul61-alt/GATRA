@@ -8,20 +8,21 @@ project:
   context: "Hackathon Linkup — ship > perfect"
   demo_date: 2026-05-29          # remplir
   cut_line_date: 2026-05-25      # J-3 démo, freeze features
-  updated_at: 2026-05-18
+  updated_at: 2026-05-19
 
 # ─────────────────────────────────────────────────────────────
 # HEALTH — état global, scan rapide
 # ─────────────────────────────────────────────────────────────
 health:
-  pipeline_e2e:     "❌ Jamais run bout-en-bout sur vraie URL"
-  backend_code:     "✅ 3 phases codées, FastAPI complet, cache + rate limit + kill switch"
-  frontend_code:    "✅ Pages + design-system (12 docs) + components (CompanyCard, Grid, Map, Feed)"
-  tests_e2e:        "❌ Aucun smoke test validé. Evals Braintrust par phase uniquement"
-  perf_target:      "⚠️ 137–200s total vs cible <90s (bench 4 domains)"
+  pipeline_e2e:     "✅ E2E run sur indy.fr (52.3s, 2026-05-19) — mais data quality issues sur tail concurrents"
+  backend_code:     "✅ 3 phases codées, FastAPI complet, cache + rate limit + kill switch. Synthesize phase manquante."
+  frontend_code:    "⚠️ Pages + design-system OK, mais prod ≠ vision prototype (cf G10)"
+  tests_e2e:        "⚠️ E2E indy.fr OK structurellement, mais 10/15 concurrents stubs vides + scores radar placeholder"
+  perf_target:      "✅ 52.3s sur indy.fr <90s. Bench 4 domains restent 91–193s (à re-mesurer après batched research)"
   deploy:           "❌ 0 setup (Vercel frontend + Railway/Render backend prévus)"
-  pre_cache_demo:   "❌ 0/5 boîtes pré-computées (Doctolib, Notion, Slite, Alan, Pennylane)"
+  pre_cache_demo:   "❌ 0/5 boîtes pré-computées (Doctolib, Notion, Slite, Alan, Pennylane). À faire APRÈS fix data layer."
   design_system:    "✅ Source-of-truth tokens.ts + tailwind.preset.ts + 12 specs markdown"
+  data_quality:     "❌ Source tracking cassé (sourcesScanned=0), scores radar hardcodés 50/50, dedup incomplet"
 
 # ─────────────────────────────────────────────────────────────
 # COMPONENTS — par fichier-clé, état + dernière mesure
@@ -42,9 +43,14 @@ components:
       issue: "5× trop lent. Investiguer Linkup /tasks batch async vs séquentiel"
     pipeline_enrich:
       path: radar/backend/pipeline/enrich.py
-      status: "✅ Codé, dans la cible"
+      status: "⚠️ MAX_ENRICH=5 cap, 10/15 concurrents en stubs vides. Refactor batched /research nécessaire."
       last_bench_s: "17–22s sur 4 domains"
       target_s: 60
+      issue: "Tail enrichment skipped → features/pricing/capabilities/funding vides. Voir G6."
+    pipeline_synthesize:
+      path: radar/backend/pipeline/synthesize.py
+      status: "❌ Phase manquante. Scores radar hardcodés [50,50,50,50,50,50] dans transform.py:192. Voir G7."
+      target_s: 5
     main_api:
       path: radar/backend/main.py
       status: "✅ FastAPI routes + CORS + rate limit + kill switch + cache"
@@ -123,6 +129,13 @@ bench_results:
     discover_s: 59.36
     enrich_s: 22.72
     total_s: 91.73
+  - domain: indy.fr
+    understand_s: null            # breakdown phase non capturé pour ce run
+    discover_s: null
+    enrich_s: null
+    total_s: 52.3
+    scanned_at: 2026-05-19
+    note: "E2E full run. Data quality issues: 5/15 enrichis, scores hardcodés, sourcesScanned=0, duplicate Freebe."
 
 # ─────────────────────────────────────────────────────────────
 # NEXT MILESTONES — dérivés de BACKLOG.md (référence IDs)
@@ -130,24 +143,57 @@ bench_results:
 next_milestones:
   - id: S0.1
     label: Smoke test Phase 1 (understand)
-    blocker: true
-    eta: "30 min"
-    started: 2026-05-17
-    command: "cd RADAR/radar/backend && python -m pipeline.understand 'doctolib.fr'"
-    dod: "CompanyProfile JSON valide, <20s, logs propres"
+    status: done
+    completed: 2026-05-19
   - id: S0.2
     label: Smoke test Phase 2 (discover)
-    eta: "30 min"
-    note: "Attention bottleneck 107–132s à investiguer"
+    status: done
+    completed: 2026-05-19
+    note: "Bottleneck 107–132s sur autres domains à re-mesurer post-batched-research"
   - id: S0.3
     label: Smoke test Phase 3 (enrich)
-    eta: "1h"
+    status: done
+    completed: 2026-05-19
   - id: S0.4
-    label: End-to-end via FastAPI (<90s)
-    eta: "1–2h"
+    label: End-to-end via FastAPI
+    status: done
+    completed: 2026-05-19
+    note: "52.3s sur indy.fr. Data quality issues identifiées (G6-G9)."
   - id: S0.5
     label: End-to-end via frontend
+    status: done
+    completed: 2026-05-19
+    note: "Frontend prod affiche mais ne match pas vision prototype (G10)"
+  - id: S0.6
+    label: Source tracking propagation (G8)
+    blocker: true
     eta: "1–2h"
+    rationale: "Coeur narrative démo 'sources tracées, mémo défensible'"
+    dod: "sourcesScanned > 20 sur indy.fr. Chaque CompetitorProfile a source_urls non-vide."
+  - id: S0.7
+    label: Dedup fix (G9)
+    eta: "30 min"
+    rationale: "Quick win qualité"
+    dod: "Pas de duplicate dans competitors[] (vs 2× Freebe actuel)"
+  - id: S0.8
+    label: Synthesize phase implémentation (G7)
+    blocker: true
+    eta: "2–3h"
+    rationale: "Sans scores réels, radar chart et Compare montrent placeholder"
+    dod: "radar.scores distincts par competitor, max-min ≥20 sur ≥2 axes"
+  - id: S0.9
+    label: Batched /research + output schema Linkup (G6)
+    blocker: true
+    eta: "3–4h"
+    rationale: "Enrichit 15/15 sans exploser budget. Aligné memory radar_linkup_cost_trap."
+    dod: "features/pricing/capabilities non-vides pour ≥12/15 concurrents. Coût ≤ 1€/scan."
+  - id: S1.0
+    label: Re-run E2E sur indy.fr + validation critères acceptation
+    eta: "30 min"
+  - id: S1.1
+    label: Décision UI port prototype vs current Next.js (G10)
+    eta: "TBD"
+    note: "Discussion produit après data layer fixé"
 
 # ─────────────────────────────────────────────────────────────
 # GAPS — trous identifiés
@@ -155,16 +201,17 @@ next_milestones:
 gaps:
   - id: G1
     label: "Test E2E jamais validé"
-    severity: BLOCKER
-    fix: "Run S0.1 → S0.5 dans l'ordre"
+    severity: RESOLVED
+    resolved_at: 2026-05-19
+    fix: "E2E run sur indy.fr OK structurellement. Data quality issues séparées en G6-G9."
   - id: G2
     label: "Discover bottleneck 5× trop lent (107–132s vs 20s cible)"
     severity: HIGH
-    fix: "Vérifier parallélisation Linkup /tasks vs calls séquentiels"
+    fix: "À re-mesurer post-batched-research (S0.9). Pattern calls séquentiels suspecté."
   - id: G3
     label: "Pre-cache démo 0/5"
     severity: HIGH
-    fix: "Créer scripts/precompute_demo.py (E2 dans BACKLOG)"
+    fix: "Créer scripts/precompute_demo.py. À faire APRÈS data layer fixé (sinon pre-cache de la merde)."
   - id: G4
     label: "Deploy 0 setup"
     severity: MEDIUM
@@ -173,6 +220,36 @@ gaps:
     label: "Types Pydantic ↔ TypeScript sync manuelle"
     severity: LOW
     fix: "Acceptable hackathon. Long terme: codegen depuis Pydantic"
+  - id: G6
+    label: "Tail enrichment skipped — MAX_ENRICH=5 cap laisse 10/15 stubs vides"
+    severity: BLOCKER
+    fix: "S0.9 — batched /research avec output schema unique pour 15/15 concurrents"
+    detected: 2026-05-19
+    evidence: "radar_indy.fr_2026-05-19.json — 10 concurrents avec notable=[], pricing model='X stage', features=[]"
+  - id: G7
+    label: "Synthesize phase non implémentée — scores radar tous [50,50,50,50,50,50]"
+    severity: BLOCKER
+    fix: "S0.8 — nouveau module radar/backend/pipeline/synthesize.py avec heuristiques explicites"
+    detected: 2026-05-19
+    evidence: "transform.py:192 hardcode placeholder. Compare/Radar UI affichera scores identiques."
+  - id: G8
+    label: "Source tracking cassé — sourcesScanned=0 hardcodé"
+    severity: HIGH
+    fix: "S0.6 — propager sources[] depuis Linkup client jusqu'à transform + champ source_urls dans CompetitorProfile"
+    detected: 2026-05-19
+    evidence: "transform.py:213 hardcode 0. Coeur narrative 'sources tracées, mémo défensible' invalidé."
+  - id: G9
+    label: "Dedup incomplet — duplicate Freebe dans output"
+    severity: MEDIUM
+    fix: "S0.7 — normaliser URL (strip protocol/www/path) dans dedup.py avant compare. Fuzzy name en 2nd pass si besoin."
+    detected: 2026-05-19
+    evidence: "radar_indy.fr cache contient 2× freebe.me (id collision)"
+  - id: G10
+    label: "Frontend prod ≠ vision prototype"
+    severity: HIGH
+    fix: "Décision produit hors scope cette itération (S1.1). Compare/Timeline/Radar chart absents du Next.js prod. Prototype HTML standalone existe mais pas servi."
+    detected: 2026-05-19
+    evidence: "frontend-prototype/ a 9 screens, frontend/ a 1 page de cards"
 
 # ─────────────────────────────────────────────────────────────
 # CUT-LINE — règle freeze démo

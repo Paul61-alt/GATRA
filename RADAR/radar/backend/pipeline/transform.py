@@ -183,13 +183,20 @@ def pipeline_run_to_radar_output(run: PipelineRun) -> RadarOutput:
             run.company_profile.funding.rounds
         )
 
-    # Empty pricing tiers — populated by synthesize phase
+    # Empty pricing tiers — populated by synthesize phase (still pending for tiers)
     pricing_dict: dict[str, list[PricingTier]] = {cid: [] for cid in all_ids}
 
-    # Neutral radar scores (50/100 on all axes) — overwritten by synthesize phase
+    # Radar scores: from synthesize phase if available, else neutral 50/100 fallback
+    if run.radar_scores:
+        scores_dict = {
+            cid: run.radar_scores.get(cid, [50.0] * len(_DEFAULT_RADAR_AXES))
+            for cid in all_ids
+        }
+    else:
+        scores_dict = {cid: [50.0] * len(_DEFAULT_RADAR_AXES) for cid in all_ids}
     radar = RadarConfig(
         axes=_DEFAULT_RADAR_AXES,
-        scores={cid: [50] * len(_DEFAULT_RADAR_AXES) for cid in all_ids},
+        scores=scores_dict,
         defs=_DEFAULT_RADAR_DEFS,
     )
 
@@ -204,13 +211,24 @@ def pipeline_run_to_radar_output(run: PipelineRun) -> RadarOutput:
         except (ValueError, TypeError):
             pass
 
+    # Aggregate unique source URLs across all phases (understand + discover + enrich)
+    _all_sources: set[str] = set()
+    if run.company_profile.source_urls:
+        _all_sources.update(run.company_profile.source_urls)
+    if run.discover_source_urls:
+        _all_sources.update(run.discover_source_urls)
+    for c in run.competitors:
+        if c.source_urls:
+            _all_sources.update(c.source_urls)
+    sources_scanned = len(_all_sources)
+
     return RadarOutput(
         query=ScanQuery(
             url=run.company_domain,
             name=run.company_profile.name,
             scanned_at=scanned_at,
             duration_ms=duration_ms,
-            sources_scanned=0,
+            sources_scanned=sources_scanned,
         ),
         subject=subject,
         competitors=competitors,

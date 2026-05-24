@@ -42,8 +42,8 @@ async def run(
     profile: CompanyProfile,
     linkup: LinkupClient,
     event_cb: Optional[EventCallback] = None,
-) -> list[dict]:
-    """Return list of up to 15 deduplicated competitor dicts."""
+) -> tuple[list[dict], list[str]]:
+    """Return (competitor dicts, source URLs consulted)."""
     t0 = time.monotonic()
     domain = profile.domain
     logger.info("phase=DISCOVER company=%s status=start", domain)
@@ -92,6 +92,17 @@ async def run(
     elif isinstance(data, list):
         raw_list = data
 
+    # Capture source URLs Linkup consulted — dedup preserving order
+    sources_raw: list = raw.get("sources", [])
+    _seen: set[str] = set()
+    source_urls: list[str] = []
+    for s in sources_raw:
+        if isinstance(s, dict):
+            u = s.get("url")
+            if u and u not in _seen:
+                _seen.add(u)
+                source_urls.append(u)
+
     competitors = dedup_by_website(raw_list)[:15]
 
     # Rank by competitive threat so enrich phase spends depth M on the top-1.
@@ -128,8 +139,11 @@ async def run(
                 "payload": {"name": c_name, "website": c_website},
             })
 
-    logger.info("phase=DISCOVER company=%s status=ok count=%d duration=%.1fs", domain, len(competitors), time.monotonic() - t0)
-    return competitors
+    logger.info(
+        "phase=DISCOVER company=%s status=ok count=%d sources=%d duration=%.1fs",
+        domain, len(competitors), len(source_urls), time.monotonic() - t0,
+    )
+    return competitors, source_urls
 
 
 if __name__ == "__main__":
@@ -150,5 +164,5 @@ if __name__ == "__main__":
     domain = sys.argv[1].strip().lower()
     stub = CompanyProfile(name=domain, domain=domain, pipeline_run_id="cli-test")
     client = LinkupClient()
-    result = asyncio.run(run(stub, client))
-    print(json.dumps(result, indent=2, ensure_ascii=False))
+    competitors, sources = asyncio.run(run(stub, client))
+    print(json.dumps({"competitors": competitors, "source_urls": sources}, indent=2, ensure_ascii=False))

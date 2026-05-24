@@ -154,7 +154,7 @@ async def probe(domain: str, understand_strategy: str, force: bool) -> None:
         print(f"  [discover] calling Linkup (depth=deep)…")
         linkup = LinkupClient()
         t0 = time.monotonic()
-        competitors = await discover_run(profile, linkup)
+        competitors, _discover_sources = await discover_run(profile, linkup)
         discover_duration = time.monotonic() - t0
         _cache_save(domain, "discover", {
             "competitors": competitors,

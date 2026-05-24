@@ -15,10 +15,16 @@ LINKUP_BASE = "https://api.linkup.so/v1"
 _MAX_RETRIES = 3
 _RETRY_STATUSES = {429, 500, 502, 503}
 
-# Cost model for /research depth tiers (EUR per call)
-RESEARCH_COST_EUR: dict[str, float] = {"S": 0.23, "M": 0.46, "L": 0.92, "XL": 1.84}
-DAILY_HARD_CAP_EUR = 15.0
-DAILY_WARN_CAP_EUR = 18.0
+# Cost model based on observed Linkup billing (2026-05 wallet export).
+# /research is flat €1.50 regardless of depth (was previously underestimated).
+# /search standard = €0.006, /search deep or with structured output = €0.055.
+# /fetch = €0.001-0.005.
+RESEARCH_COST_EUR: dict[str, float] = {"S": 1.50, "M": 1.50, "L": 1.50, "XL": 1.50}
+SEARCH_COST_EUR: dict[str, float] = {"standard": 0.006, "deep": 0.055, "structured": 0.055}
+FETCH_COST_EUR = 0.005
+# Env-overridable so a scan can be sandboxed below the default cap.
+DAILY_HARD_CAP_EUR = float(os.environ.get("RADAR_DAILY_HARD_CAP_EUR", "5.0"))
+DAILY_WARN_CAP_EUR = float(os.environ.get("RADAR_DAILY_WARN_CAP_EUR", "3.0"))
 
 
 class BudgetExceededError(RuntimeError):
@@ -208,10 +214,18 @@ class LinkupClient:
             body["includeSources"] = True
         if from_date:
             body["fromDate"] = from_date
-        return await self._post("/search", body)
+
+        # Cost: structured output billed as "deep" tier (€0.055) per Linkup pricing.
+        if schema:
+            cost = SEARCH_COST_EUR["structured"]
+        elif depth == "deep":
+            cost = SEARCH_COST_EUR["deep"]
+        else:
+            cost = SEARCH_COST_EUR["standard"]
+        return await self._post("/search", body, cost_eur=cost)
 
     async def fetch(self, url: str, render_js: bool = False) -> dict:
-        return await self._post("/fetch", {"url": url, "renderJs": render_js})
+        return await self._post("/fetch", {"url": url, "renderJs": render_js}, cost_eur=FETCH_COST_EUR)
 
     async def fetch_with_fallback(self, url: str) -> dict:
         """fetch URL; on CloudflareError/FetchError fall back to text search."""
@@ -228,8 +242,13 @@ class LinkupClient:
             raise
 
     async def tasks(self, requests_payload: list[dict]) -> list[dict]:
-        """Submit batch tasks, poll until done, return results."""
-        created = await self._post("/tasks", requests_payload)
+        """Submit batch tasks, poll until done, return results.
+
+        Each task in batch billed individually; approximate as one /research per task.
+        """
+        per_task_cost = RESEARCH_COST_EUR.get("S", 1.50)
+        total_cost = per_task_cost * len(requests_payload)
+        created = await self._post("/tasks", requests_payload, cost_eur=total_cost)
         task_ids = [t["id"] for t in created]
         logger.info("linkup tasks_created=%d", len(task_ids))
 
@@ -269,11 +288,16 @@ class LinkupClient:
         return await self._post("/research", body, cost_eur=cost)
 
     async def wait_for_research(
-        self, job_id: str, max_wait: int = 600, interval: int = 7
+        self,
+        job_id: str,
+        max_wait: int = 600,
+        interval: int = 7,
+        on_poll=None,
     ) -> dict:
         """Poll /research/{id} until status in {completed, failed} or max_wait elapsed.
 
         Polling GETs are budget-exempt (see _check_daily_budget).
+        Optional on_poll(dict) async callback fires each iteration (for SSE progress).
         """
         elapsed = 0
         while elapsed < max_wait:
@@ -281,6 +305,11 @@ class LinkupClient:
             status = result.get("status")
             if status in {"completed", "failed"}:
                 return result
+            if on_poll is not None:
+                try:
+                    await on_poll({"elapsed": elapsed, "status": status, "job_id": job_id})
+                except Exception as e:
+                    logger.warning("on_poll callback failed error=%s", e)
             await asyncio.sleep(interval)
             elapsed += interval
         raise TimeoutError(f"research job {job_id} not done after {max_wait}s")
@@ -292,13 +321,16 @@ class LinkupClient:
         structured_schema: Optional[dict] = None,
         max_wait: int = 600,
         interval: int = 7,
+        on_poll=None,
     ) -> dict:
         """Submit + poll. Raises if the job fails or times out."""
         submitted = await self.research(query, depth=depth, structured_schema=structured_schema)
         job_id = submitted.get("id")
         if not job_id:
             raise RuntimeError(f"research submit returned no id: {submitted}")
-        result = await self.wait_for_research(job_id, max_wait=max_wait, interval=interval)
+        result = await self.wait_for_research(
+            job_id, max_wait=max_wait, interval=interval, on_poll=on_poll
+        )
         if result.get("status") == "failed":
             raise RuntimeError(f"research job {job_id} failed: {result.get('error')}")
         return result

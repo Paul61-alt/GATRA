@@ -90,6 +90,9 @@ class CompanyProfile(BaseModel):
     growth_signals: List[str] = []
     recent_news: List[NewsItem] = []
 
+    # Sources
+    source_urls: List[str] = []
+
     # Pipeline meta
     pipeline_run_id: str
     analysis_version: str = "4.0"

@@ -244,6 +244,15 @@ async def run(
     data: dict = raw.get("data") or raw.get("answer") or raw.get("output") or {}
     sources: list = raw.get("sources", [])
     src_url = sources[0].get("url") if sources else None
+    # Dedup + filter empties — preserves order of first occurrence
+    _seen: set[str] = set()
+    source_urls: list[str] = []
+    for s in sources:
+        if isinstance(s, dict):
+            u = s.get("url")
+            if u and u not in _seen:
+                _seen.add(u)
+                source_urls.append(u)
 
     # Emit source_consulted for each URL returned by Linkup
     for src in sources:
@@ -421,6 +430,7 @@ async def run(
         key_people=key_people,
         growth_signals=data.get("growth_signals") or [],
         recent_news=recent_news,
+        source_urls=source_urls,
         pipeline_run_id=run_id,
     )
 

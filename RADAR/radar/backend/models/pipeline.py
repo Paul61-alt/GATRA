@@ -22,4 +22,6 @@ class PipelineRun(BaseModel):
     error: Optional[str] = None
     company_profile: Optional[CompanyProfile] = None
     competitors: List[CompetitorProfile] = []
+    discover_source_urls: List[str] = []
+    radar_scores: dict[str, List[float]] = {}
     from_cache: bool = False
