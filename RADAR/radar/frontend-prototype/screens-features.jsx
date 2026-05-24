@@ -1,7 +1,7 @@
 // screens-features.jsx â capability matrix
 const { useState: _uS_feat } = React;
 
-function FeaturesScreen({ data }) {
+function FeaturesScreen({ data, onOpenCompany }) {
   const { features, capabilities, subject, competitors } = data;
   const all = [subject, ...competitors];
 
@@ -16,7 +16,7 @@ function FeaturesScreen({ data }) {
 
   // Coverage stats
   const coverage = all.map(c => {
-    const caps = capabilities[c.id];
+    const caps = capabilities[c.id] || [];
     const full = caps.filter(x => x === "full").length;
     const part = caps.filter(x => x === "part").length;
     return {
@@ -78,12 +78,15 @@ function FeaturesScreen({ data }) {
               <tr>
                 <th style={{minWidth: 220, background:"var(--bg-2)"}}>Capability</th>
                 {all.map(c => (
-                  <th key={c.id} style={{
-                    textAlign:"center", padding:"10px 4px", minWidth: 64,
-                    background: c.isSubject ? "var(--accent-bg)" : "var(--bg-2)",
-                  }}>
+                  <th key={c.id}
+                    onClick={() => !c.isSubject && onOpenCompany && onOpenCompany(c.id)}
+                    style={{
+                      textAlign:"center", padding:"10px 4px", minWidth: 64,
+                      background: c.isSubject ? "var(--accent-bg)" : "var(--bg-2)",
+                      cursor: c.isSubject ? "default" : "pointer",
+                    }}>
                     <div style={{display:"flex", flexDirection:"column", alignItems:"center", gap:4}}>
-                      <LogoMark name={c.name} subject={c.isSubject} size="sm"/>
+                      <LogoMark name={c.name} domain={c.domain} subject={c.isSubject} size="sm"/>
                       <span style={{
                         fontWeight: c.isSubject ? 600 : 500,
                         color: c.isSubject ? "var(--accent)" : "var(--fg-2)",
@@ -115,12 +118,12 @@ function FeaturesScreen({ data }) {
                     </td>
                   </tr>
                   {items.map(f => {
-                    const subjectCap = capabilities[subject.id][f.index];
+                    const subjectCap = (capabilities[subject.id] || [])[f.index];
                     return (
                       <tr key={f.index}>
                         <td style={{paddingLeft: 20, fontWeight: 400, color:"var(--fg-2)"}}>{f.label}</td>
                         {all.map(c => {
-                          const cap = capabilities[c.id][f.index];
+                          const cap = (capabilities[c.id] || [])[f.index];
                           const isGap = highlightDelta && !c.isSubject &&
                                         ((subjectCap === "full" && cap !== "full") ||
                                          (cap === "full" && subjectCap !== "full"));

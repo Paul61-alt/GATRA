@@ -1,9 +1,9 @@
 // screens-compare.jsx â radar chart comparison
 const { useState: _uS_cmp, useMemo: _uM_cmp } = React;
 
-function CompareScreen({ data }) {
+function CompareScreen({ data, onOpenCompany }) {
   const { subject, competitors, radar } = data;
-  const [selected, setSelected] = _uS_cmp(["vex", "ferrum", "pylon"]); // 3 default
+  const [selected, setSelected] = _uS_cmp(competitors.slice(0, 3).map(c => c.id));
 
   const toggleCompetitor = (id) => {
     setSelected(s => s.includes(id) ? s.filter(x => x !== id) : [...s, id].slice(-4));
@@ -11,12 +11,13 @@ function CompareScreen({ data }) {
 
   // Subject is always shown
   const shown = [
-    { ...subject, scores: radar.scores.linq, color: "var(--accent)", isSubject: true },
+    { ...subject, scores: radar.scores[subject.id] || [], color: "var(--accent)", isSubject: true },
     ...selected.map((id, i) => {
       const c = competitors.find(x => x.id === id);
+      if (!c) return null;
       const palette = ["#3a576b", "#5a6b4a", "#6b5a4a", "#4a5a6b"];
-      return { ...c, scores: radar.scores[id], color: palette[i % palette.length] };
-    }),
+      return { ...c, scores: radar.scores[id] || [], color: palette[i % palette.length] };
+    }).filter(Boolean),
   ];
 
   return (
@@ -68,7 +69,7 @@ function CompareScreen({ data }) {
               borderBottom:"1px solid var(--accent-bg-2)",
             }}>
               <span style={{width:10, height:10, borderRadius:2, background:"var(--accent)"}}></span>
-              <LogoMark name={subject.name} subject={true} size="sm" />
+              <LogoMark name={subject.name} domain={subject.domain} subject={true} size="sm" />
               <span style={{fontWeight:500, color:"var(--accent-fg)"}}>{subject.name}</span>
               <span className="tag subject mono" style={{marginLeft:"auto", fontSize:9}}>PINNED</span>
             </div>
@@ -77,7 +78,6 @@ function CompareScreen({ data }) {
               const checked = selected.includes(c.id);
               return (
                 <div key={c.id}
-                     onClick={() => toggleCompetitor(c.id)}
                      style={{
                        display:"flex", alignItems:"center", gap:10,
                        padding:"8px 14px",
@@ -85,18 +85,21 @@ function CompareScreen({ data }) {
                        opacity: checked ? 1 : 0.6,
                        cursor:"default",
                      }}>
-                  <span style={{
+                  <span onClick={() => toggleCompetitor(c.id)} style={{
                     width:14, height:14, borderRadius:3,
                     border: "1.5px solid " + (checked ? "var(--fg)" : "var(--fg-4)"),
                     background: checked ? "var(--fg)" : "transparent",
-                    display:"grid", placeItems:"center",
+                    display:"grid", placeItems:"center", flexShrink:0, cursor:"pointer",
                   }}>
                     {checked && <span style={{color:"#fff"}}>{Icons.check}</span>}
                   </span>
-                  <LogoMark name={c.name} size="sm" />
-                  <div style={{minWidth:0, flex:1}}>
-                    <div style={{fontWeight:500, fontSize:12.5}}>{c.name}</div>
-                    <div className="mono dim" style={{fontSize:10}}>{c.subCategory}</div>
+                  <div onClick={() => onOpenCompany && onOpenCompany(c.id)}
+                    style={{display:"flex", alignItems:"center", gap:8, flex:1, minWidth:0, cursor:"pointer"}}>
+                    <LogoMark name={c.name} domain={c.domain} size="sm" />
+                    <div style={{minWidth:0, flex:1}}>
+                      <div style={{fontWeight:500, fontSize:12.5}}>{c.name}</div>
+                      <div className="mono dim" style={{fontSize:10}}>{c.subCategory}</div>
+                    </div>
                   </div>
                   <ThreatTag level={c.threat} />
                 </div>
@@ -124,14 +127,14 @@ function CompareScreen({ data }) {
             </thead>
             <tbody>
               {shown.filter(e => !e.isSubject).map(e => {
-                const subjectScores = radar.scores.linq;
+                const subjectScores = radar.scores[subject.id] || [];
                 const deltas = e.scores.map((s, i) => subjectScores[i] - s);
                 const net = deltas.reduce((a, b) => a + b, 0);
                 return (
-                  <tr key={e.id}>
+                  <tr key={e.id} onClick={() => onOpenCompany && onOpenCompany(e.id)} style={{cursor:"pointer"}}>
                     <td>
                       <div className="name-cell">
-                        <LogoMark name={e.name} size="sm" />
+                        <LogoMark name={e.name} domain={e.domain} size="sm" />
                         <span className="nm">{e.name}</span>
                       </div>
                     </td>

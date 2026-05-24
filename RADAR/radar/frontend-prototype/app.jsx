@@ -1,24 +1,24 @@
-// app.jsx â top-level wiring: workspace tabs (New scan / Home / Current scan) + Tweaks
+// app.jsx — top-level wiring: workspace tabs + dynamic company tabs
 const { useState: _uS_app, useEffect: _uE_app } = React;
 
 const SCAN_TABS = [
-  { key: "overview",  label: "Overview",   icon: "overview" },
-  { key: "list",      label: "Competitors", icon: "list",     count: 8 },
-  { key: "compare",   label: "Compare",    icon: "compare" },
-  { key: "map",       label: "Map",        icon: "map" },
-  { key: "features",  label: "Features",   icon: "features" },
-  { key: "pricing",   label: "Pricing",    icon: "pricing" },
-  { key: "timeline",  label: "Timeline",   icon: "timeline" },
+  { key: "overview",  label: "Overview",    icon: "overview" },
+  { key: "list",      label: "Competitors", icon: "list",    count: 8 },
+  { key: "compare",   label: "Compare",     icon: "compare" },
+  { key: "map",       label: "Map",         icon: "map" },
+  { key: "features",  label: "Features",    icon: "features" },
+  { key: "pricing",   label: "Pricing",     icon: "pricing" },
+  { key: "timeline",  label: "Timeline",    icon: "timeline" },
 ];
 
 function App() {
   const [tweaks, setTweak] = useTweaks(window.RADAR_TWEAK_DEFAULTS);
   const [data, setData] = _uS_app(window.RADAR_DATA);
-  // Boot into "new" when no scan data exists yet
-  const [view, setView] = _uS_app(data ? "home" : "new");
+  const [view, setView] = _uS_app("new");
   const [activeTab, setActiveTab] = _uS_app("overview");
+  // Array of company IDs with open tabs (preserves order)
+  const [openCompanyIds, setOpenCompanyIds] = _uS_app([]);
 
-  // Persist density on root via data attribute
   _uE_app(() => {
     document.documentElement.setAttribute("data-density", tweaks.density);
   }, [tweaks.density]);
@@ -29,11 +29,42 @@ function App() {
     setView("current");
   };
 
+  const openCompany = (id) => {
+    setOpenCompanyIds(prev => prev.includes(id) ? prev : [...prev, id]);
+    setActiveTab("company:" + id);
+  };
+
+  const closeCompany = (id) => {
+    setOpenCompanyIds(prev => {
+      const next = prev.filter(x => x !== id);
+      // If closing the active tab, move to the previous company tab or "list"
+      if (activeTab === "company:" + id) {
+        const idx = prev.indexOf(id);
+        const fallback = next[idx - 1] ? "company:" + next[idx - 1] : next[idx] ? "company:" + next[idx] : "list";
+        setActiveTab(fallback);
+      }
+      return next;
+    });
+  };
+
+  // Build tab list: static + one tab per open company
+  const companyTabs = openCompanyIds.map(id => {
+    const all = data ? [data.subject, ...(data.competitors || [])] : [];
+    const company = all.find(c => c.id === id);
+    return {
+      key: "company:" + id,
+      label: company?.name || id,
+      icon: null,
+      onClose: () => closeCompany(id),
+    };
+  });
+  const tabs = [...SCAN_TABS, ...companyTabs];
+
   return (
     <div className="app" data-screen-label={
-      view === "new"     ? "01 New scan"   :
-      view === "home"    ? "02 Home"       :
-                           "03 Current scan"
+      view === "new"  ? "01 New scan" :
+      view === "home" ? "02 Home"     :
+                        "03 Current scan"
     }>
       <Sidebar
         view={view}
@@ -42,9 +73,7 @@ function App() {
       />
 
       <div className="main">
-        {view === "new" && (
-          <SearchScreen onComplete={handleScanComplete} />
-        )}
+        {view === "new" && <SearchScreen onComplete={handleScanComplete} />}
 
         {view === "home" && (
           <HomeScreen
@@ -56,52 +85,44 @@ function App() {
         {view === "current" && data && (
           <>
             <Topbar subject={data.subject} />
-            <Tabs tabs={SCAN_TABS} active={activeTab} onTab={setActiveTab} />
+            <Tabs tabs={tabs} active={activeTab} onTab={setActiveTab} />
             <div className="content">
-              {activeTab === "overview" && <OverviewScreen data={data} />}
-              {activeTab === "list"     && <ListScreen data={data} />}
-              {activeTab === "compare"  && <CompareScreen data={data} />}
-              {activeTab === "map"      && <MapScreen data={data} />}
-              {activeTab === "features" && <FeaturesScreen data={data} />}
-              {activeTab === "pricing"  && <PricingScreen data={data} />}
-              {activeTab === "timeline" && <TimelineScreen data={data} />}
+              {activeTab === "overview"  && <OverviewScreen  data={data} onOpenCompany={openCompany} />}
+              {activeTab === "list"      && <ListScreen      data={data} onOpenCompany={openCompany} />}
+              {activeTab === "compare"   && <CompareScreen   data={data} onOpenCompany={openCompany} />}
+              {activeTab === "map"       && <MapScreen       data={data} onOpenCompany={openCompany} />}
+              {activeTab === "features"  && <FeaturesScreen  data={data} onOpenCompany={openCompany} />}
+              {activeTab === "pricing"   && <PricingScreen   data={data} onOpenCompany={openCompany} />}
+              {activeTab === "timeline"  && <TimelineScreen  data={data} onOpenCompany={openCompany} />}
+              {openCompanyIds.map(id => (
+                activeTab === "company:" + id && (
+                  <CompanyScreen key={id} data={data} companyId={id} onOpenCompany={openCompany} />
+                )
+              ))}
             </div>
           </>
         )}
       </div>
 
-      <RadarTweaksPanel
-        t={tweaks}
-        setTweak={setTweak}
-        onJumpToSearch={() => setView("new")}
-      />
+      <RadarTweaksPanel t={tweaks} setTweak={setTweak} onJumpToSearch={() => setView("new")} />
     </div>
   );
 }
 
-// âââ Tweaks Panel âââââââââââââââââââââââââââââââââââââââââââââ
+// ─── Tweaks Panel ─────────────────────────────────────────────────────────────
 function RadarTweaksPanel({ t, setTweak, onJumpToSearch }) {
   return (
     <TweaksPanel>
       <TweakSection label="Display" />
-      <TweakRadio
-        label="Density"
-        value={t.density}
-        options={["compact", "comfortable"]}
-        onChange={(v) => setTweak("density", v)}
-      />
-
+      <TweakRadio label="Density" value={t.density} options={["compact", "comfortable"]}
+        onChange={(v) => setTweak("density", v)} />
       <TweakSection label="Brand accent" />
-      <TweakColor
-        label="Subject highlight"
-        value={t.accent}
+      <TweakColor label="Subject highlight" value={t.accent}
         options={["#b34a1f", "#1f6b3d", "#1a3a6b", "#5a3d8a", "#0a0a0a"]}
         onChange={(v) => {
           setTweak("accent", v);
-          // Live update CSS variables
           const root = document.documentElement;
           root.style.setProperty("--accent", v);
-          // Derive softer companions from the chosen accent
           const map = {
             "#b34a1f": ["#c2541f", "#fdf2ea", "#f7e5d4", "#6b2811"],
             "#1f6b3d": ["#1f7547", "#eaf3ed", "#d4e7da", "#0e3a20"],
@@ -116,19 +137,10 @@ function RadarTweaksPanel({ t, setTweak, onJumpToSearch }) {
           root.style.setProperty("--accent-fg", fg);
         }}
       />
-
       <TweakSection label="Navigation" />
-      {onJumpToSearch && (
-        <TweakButton onClick={onJumpToSearch}>
-          Re-run scan from URL
-        </TweakButton>
-      )}
-
+      {onJumpToSearch && <TweakButton onClick={onJumpToSearch}>Re-run scan from URL</TweakButton>}
       <TweakSection label="About" />
-      <div style={{
-        fontSize: 11, color: "var(--fg-3)", lineHeight: 1.5,
-        padding: "0 2px",
-      }}>
+      <div style={{ fontSize: 11, color: "var(--fg-3)", lineHeight: 1.5, padding: "0 2px" }}>
         Radar is a prototype for VC due-diligence competitive scans.
         Compact mode tightens the table density to investor-deck levels.
       </div>
@@ -136,7 +148,7 @@ function RadarTweaksPanel({ t, setTweak, onJumpToSearch }) {
   );
 }
 
-// âââ Apply persisted accent on first render ââââââââââââââââââ
+// ─── Apply persisted accent on first render ───────────────────────────────────
 (function applyInitialAccent() {
   const t = window.RADAR_TWEAK_DEFAULTS;
   const root = document.documentElement;

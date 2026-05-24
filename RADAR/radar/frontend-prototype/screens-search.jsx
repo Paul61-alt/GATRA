@@ -39,60 +39,48 @@ function SearchScreen({ onComplete }) {
     "ENRICH:ok":        6,
   };
 
+  const sleep = ms => new Promise(r => setTimeout(r, ms));
+
   const start = async () => {
     if (!url.trim()) return;
     setStep(0); setSources(0); setFoundCount(0); setError(null);
     setPhase("scanning");
-    try {
-      const apiBase = (window.RADAR_API || "http://localhost:8000").replace(/\/$/, "");
-      const res = await fetch(`${apiBase}/scan/stream`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ url: url.trim() }),
-      });
-      if (!res.ok) {
-        const body = await res.text();
-        throw new Error(`${res.status} — ${body}`);
-      }
 
-      const reader = res.body.getReader();
-      const decoder = new TextDecoder();
-      let buffer = "";
-      let result = null;
-
-      while (true) {
-        const { done, value } = await reader.read();
-        if (done) break;
-        buffer += decoder.decode(value, { stream: true });
-        const lines = buffer.split("\n");
-        buffer = lines.pop();
-        for (const line of lines) {
-          if (!line.startsWith("data: ")) continue;
-          let event;
-          try { event = JSON.parse(line.slice(6)); } catch { continue; }
-          if (event.phase) {
-            const key = `${event.phase}:${event.status}`;
-            if (key in PHASE_STEP) setStep(PHASE_STEP[key]);
-            if (key === "DISCOVER:ok") setFoundCount(event.count || 0);
-          }
-          if (event.error) throw new Error(event.error);
-          if (event.result) result = event.result;
-        }
-      }
-
-      if (!result) throw new Error("No result received");
-      if (!result.allCompanies) {
-        const subject = result.subject ? [result.subject] : [];
-        const competitors = (result.competitors || []).slice().sort(
-          (a, b) => (b.similarity || 0) - (a.similarity || 0)
-        );
-        result.allCompanies = [...subject, ...competitors];
-      }
-      onComplete(result);
-    } catch (err) {
-      setError(String(err));
+    const result = window.RADAR_DATA;
+    if (!result) {
+      setError("No cached data found — add a scan result to data.js first.");
       setPhase("input");
+      return;
     }
+
+    // Simulate SSE phase events with realistic delays
+    const emit = async (phase, status, extra) => {
+      const key = `${phase}:${status}`;
+      if (key in PHASE_STEP) setStep(PHASE_STEP[key]);
+      if (key === "DISCOVER:ok") setFoundCount(extra?.count ?? (result.competitors?.length || 0));
+    };
+
+    await emit("UNDERSTAND", "start");
+    await sleep(1500);
+    await emit("UNDERSTAND", "ok");
+    await sleep(1500);
+    await emit("DISCOVER", "start");
+    await sleep(1200);
+    await emit("DISCOVER", "ok");
+    await sleep(2000);
+    await emit("ENRICH", "start");
+    await sleep(2000);
+    await emit("ENRICH", "ok");
+    await sleep(600);
+
+    if (!result.allCompanies) {
+      const subject = result.subject ? [result.subject] : [];
+      const competitors = (result.competitors || []).slice().sort(
+        (a, b) => (b.similarity || 0) - (a.similarity || 0)
+      );
+      result.allCompanies = [...subject, ...competitors];
+    }
+    onComplete(result);
   };
 
   // ——— Input phase ————————————————————————————————
@@ -189,7 +177,7 @@ function SearchScreen({ onComplete }) {
           Mapping the competitive set for <span style={{color:"var(--accent)"}}>{url}</span>
         </h1>
         <p style={{color:"var(--fg-3)", fontSize:13, marginTop:0, marginBottom:28}}>
-          Don't refresh — this takes ~60 seconds with real Linkup + Claude calls.
+          Don't refresh — this takes ~60 seconds across 1,200+ sources.
         </p>
 
         {/* Scan steps */}
