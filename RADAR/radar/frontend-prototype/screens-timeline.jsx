@@ -132,7 +132,13 @@ function TimelineScreen({ data, onOpenCompany }) {
           </button>
         ))}
 
-        <span style={{marginLeft:"auto", fontSize:11, color:"var(--fg-4)"}}>Drag to pan</span>
+        <div style={{marginLeft:"auto", display:"flex", alignItems:"center", gap:10}}>
+          <svg width={12} height={12} style={{flexShrink:0}}>
+            <polygon points="6,0 12,6 6,12 0,6" fill="#0ea5e9" fillOpacity={0.85} />
+          </svg>
+          <span style={{fontSize:11, color:"var(--fg-4)"}}>Founded year</span>
+          <span style={{fontSize:11, color:"var(--fg-4)", marginLeft:4}}>· Drag to pan</span>
+        </div>
       </div>
 
       {/* Timeline card */}
@@ -236,20 +242,26 @@ function TimelineScreen({ data, onOpenCompany }) {
                 ))}
               </defs>
 
+              {/* Connector lines — outside clip so they reach off-screen bubbles cleanly */}
+              {enrichedRows.map((c, i) => {
+                const cy  = AXIS_H + i * ROW_H + ROW_H / 2;
+                const isS = c.isSubject;
+                if (c.rounds.length < 2) return null;
+                return (
+                  <polyline key={`line-${c.id}`}
+                    points={c.rounds.map(e => `${toX(e.ms).toFixed(1)},${cy}`).join(" ")}
+                    stroke={isS ? ACCENT : "#9ca3af"}
+                    strokeWidth={isS ? 2.5 : 2}
+                    fill="none" opacity={isS ? 0.85 : 0.75} />
+                );
+              })}
+
               {enrichedRows.map((c, i) => {
                 const cy    = AXIS_H + i * ROW_H + ROW_H / 2;
                 const isS   = c.isSubject;
                 const color = isS ? ACCENT : "#6b7280";
                 return (
                   <g key={c.id} clipPath={`url(#clip-${i})`}>
-                    {/* Connector line */}
-                    {c.rounds.length > 1 && (
-                      <polyline
-                        points={c.rounds.map(e => `${toX(e.ms).toFixed(1)},${cy}`).join(" ")}
-                        stroke={isS ? ACCENT : "#9ca3af"}
-                        strokeWidth={isS ? 2.5 : 2}
-                        fill="none" opacity={isS ? 0.85 : 0.75} />
-                    )}
                     {/* Bubbles */}
                     {c.rounds.map((e, j) => {
                       const x   = toX(e.ms);
@@ -264,8 +276,7 @@ function TimelineScreen({ data, onOpenCompany }) {
                            onMouseLeave={() => setTooltip(null)}>
                           <circle cx={x} cy={cy} r={e.r}
                                   fill={color} fillOpacity={isS ? 0.88 : 0.78}
-                                  stroke={isS ? "rgba(179,74,31,0.35)" : "rgba(255,255,255,0.85)"}
-                                  strokeWidth={2} />
+                                  stroke="none" />
                           {showRound && (
                             <text x={x} y={cy - 5} textAnchor="middle" dominantBaseline="middle"
                                   fontSize={7} fill="rgba(255,255,255,0.75)"
@@ -286,6 +297,22 @@ function TimelineScreen({ data, onOpenCompany }) {
                         </g>
                       );
                     })}
+                  </g>
+                );
+              })}
+
+              {/* Founded year diamonds — rendered last so they appear on top of bubbles */}
+              {enrichedRows.map((c, i) => {
+                if (!c.founded) return null;
+                const cy = AXIS_H + i * ROW_H + ROW_H / 2;
+                const fx = toX(new Date(c.founded, 6, 1).getTime());
+                const s  = 7;
+                return (
+                  <g key={`founded-${c.id}`} clipPath={`url(#clip-${i})`} style={{pointerEvents:"none"}}>
+                    <polygon
+                      points={`${fx},${cy - s} ${fx + s},${cy} ${fx},${cy + s} ${fx - s},${cy}`}
+                      fill="#0ea5e9"
+                      stroke="var(--bg)" strokeWidth={1.5} />
                   </g>
                 );
               })}

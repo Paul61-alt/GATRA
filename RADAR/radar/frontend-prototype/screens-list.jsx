@@ -45,6 +45,26 @@ function ListScreen({ data, onOpenCard, onOpenCompany }) {
     { k: "threat",      label: "Threat",    align: "left" },
   ];
 
+  const exportCSV = () => {
+    const cols = ["Name", "Domain", "Wedge", "HQ", "Founded", "Employees", "Raised", "Similarity", "Threat"];
+    const rows = sorted.map(c => [
+      c.name,
+      c.domain,
+      c.subCategory || "",
+      c.hq || "",
+      c.founded || "",
+      c.employees || 0,
+      c.funding?.total || 0,
+      c.isSubject ? "" : (c.similarity * 100).toFixed(0),
+      c.isSubject ? "subject" : (c.threat || ""),
+    ].map(v => `"${String(v).replace(/"/g, '""')}"`).join(","));
+    const csv = [cols.join(","), ...rows].join("\n");
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(new Blob([csv], { type: "text/csv" }));
+    a.download = "competitors.csv";
+    a.click();
+  };
+
   const toggleSort = (k) => {
     if (sortKey === k) setSortDir(d => d === "asc" ? "desc" : "asc");
     else { setSortKey(k); setSortDir("desc"); }
@@ -52,7 +72,7 @@ function ListScreen({ data, onOpenCard, onOpenCompany }) {
 
   return (
     <div className="screen">
-      <SectionH title="All companies" meta={`${competitors.length + 1} total · 1 subject · ${competitors.length} peers`}>
+      <SectionH title="All companies" meta={`${competitors.length} competitors analyzed`}>
         <div style={{ display: "flex", gap: 6 }}>
           {["all", "high", "medium", "low"].map(t => (
             <button key={t}
@@ -66,8 +86,7 @@ function ListScreen({ data, onOpenCard, onOpenCompany }) {
               {t === "all" ? "All" : <><span className={"dot " + (t === "medium" ? "med" : t)}></span> {t}</>}
             </button>
           ))}
-          <button className="tb-btn">{Icons.filter}<span>Filter</span></button>
-          <button className="tb-btn">{Icons.download}</button>
+          <button className="tb-btn" onClick={exportCSV}>{Icons.download}<span>CSV Export</span></button>
         </div>
       </SectionH>
 
@@ -150,9 +169,9 @@ function ListScreen({ data, onOpenCard, onOpenCompany }) {
 
       {/* Profile cards */}
       <div style={{ height: 28 }}></div>
-      <SectionH title="Profile cards" meta="Compact one-pager per company" />
+      <SectionH title="Profile cards" meta={`${sorted.length} shown`} />
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(360px, 1fr))", gap: 14 }}>
-        {[subject, ...competitors].map(c => (
+        {sorted.map(c => (
           <ProfileCard key={c.id} c={c} data={data} onOpenCompany={onOpenCompany} />
         ))}
       </div>

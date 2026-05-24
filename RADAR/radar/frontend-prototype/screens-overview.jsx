@@ -24,75 +24,168 @@ function TaglineCollapse({ text }) {
   );
 }
 
-function OverviewScreen({ data, onOpenCompany }) {
+function OverviewScreen({ data, onOpenCompany, loadingPhase = 2 }) {
   const { subject, competitors } = data;
 
   const totalRaised = competitors.reduce((s, c) => s + (c.funding?.total || 0), 0);
-  const totalEmployees = competitors.reduce((s, c) => s + (c.employees || 0), 0);
-  const avgFunding = competitors.length ? totalRaised / competitors.length : 0;
-
   const highCount   = competitors.filter(c => c.threat === "high").length;
   const medCount    = competitors.filter(c => c.threat === "medium").length;
   const lowCount    = competitors.filter(c => c.threat === "low").length;
-
   const mostFunded  = [...competitors].sort((a, b) => (b.funding?.total || 0) - (a.funding?.total || 0))[0];
-  const subjectRankBySize = [...competitors, subject]
-    .sort((a, b) => (b.employees || 0) - (a.employees || 0))
-    .findIndex(c => c.id === subject.id) + 1;
+  const topThreats  = competitors.slice().sort((a, b) => b.similarity - a.similarity).slice(0, 4);
 
-  const topThreats = competitors
-    .sort((a, b) => b.similarity - a.similarity)
-    .slice(0, 3);
+  const subjectReady    = loadingPhase >= 1;
+  const competitorsReady = loadingPhase >= 2;
 
   return (
     <div className="screen">
 
       {/* ── Header ── */}
-      <div style={{display:"flex", alignItems:"flex-start", gap: 20, marginBottom: 28}}>
-        <LogoMark name={subject.name} domain={subject.domain} subject={true} size="lg" />
-        <div style={{flex:1, minWidth:0}}>
-          <div style={{display:"flex", alignItems:"baseline", gap:10, flexWrap:"wrap"}}>
-            <h1 style={{fontFamily:"var(--font-serif)", fontSize: 32, fontWeight: 500, letterSpacing:"-0.02em", margin:0}}>
-              {subject.name}
-            </h1>
-            <span className="mono muted" style={{fontSize:12.5}}>{subject.domain} {Icons.ext}</span>
-            <span className="tag subject mono">SUBJECT</span>
-          </div>
-          <TaglineCollapse text={subject.tagline} />
-          <div style={{display:"flex", gap:16, marginTop:14, flexWrap:"wrap", color:"var(--fg-3)", fontSize:12}}>
-            <span className="row" style={{gap:6}}>{Icons.building} {subject.category} · {subject.subCategory}</span>
-            <span className="row" style={{gap:6}}>{Icons.pin} {subject.hq}</span>
-            <span className="row" style={{gap:6}}>{Icons.users} {subject.employees} employees · <span className="mono" style={{color:"var(--positive)"}}>+{fmtPct(subject.employeeGrowth)}</span> YoY</span>
-            <span className="row" style={{gap:6}}>{Icons.cash} {fmtMoney((subject.funding?.total || 0))} raised · {(subject.funding?.lastRound || "—")}</span>
-          </div>
+      <div style={{marginBottom:28}}>
+        <div style={{display:"flex", alignItems:"center", gap:14, flexWrap:"wrap"}}>
+          {subjectReady
+            ? <LogoMark name={subject.name} domain={subject.domain} subject={true} size="lg" />
+            : <Skel w={40} h={40} radius={8} />
+          }
+          {subjectReady
+            ? <h1 style={{fontFamily:"var(--font-serif)", fontSize:32, fontWeight:500, letterSpacing:"-0.02em", margin:0}}>{subject.name}</h1>
+            : <Skel w={180} h={28} radius={6} />
+          }
+          {/* Domain always visible */}
+          <a href={`https://${subject.domain}`} target="_blank" rel="noopener noreferrer"
+            className="mono muted"
+            style={{fontSize:12.5, color:"inherit", textDecoration:"none"}}
+            onClick={e => e.stopPropagation()}>
+            {subject.domain} {Icons.ext}
+          </a>
+          {subjectReady && <span className="tag subject mono">SUBJECT</span>}
+        </div>
+        <div style={{marginTop:10}}>
+          {subjectReady
+            ? <TaglineCollapse text={subject.tagline} />
+            : <><Skel w="80%" h={12} radius={4} style={{marginBottom:6}} /><Skel w="60%" h={12} radius={4} /></>
+          }
+        </div>
+        <div style={{display:"flex", gap:16, marginTop:10, flexWrap:"wrap", color:"var(--fg-3)", fontSize:12}}>
+          {subjectReady ? (
+            <>
+              <span className="row" style={{gap:6}}>{Icons.building} {subject.category} · {subject.subCategory}</span>
+              <span className="row" style={{gap:6}}>{Icons.pin} {subject.hq}</span>
+            </>
+          ) : (
+            <><Skel w={160} h={11} radius={3} /><Skel w={100} h={11} radius={3} /></>
+          )}
         </div>
       </div>
 
       {/* ── Subject stat row ── */}
-      <div className="card" style={{marginBottom: 20}}>
+      <div className="card" style={{marginBottom:20}}>
         <div className="stat-row">
-          <div className="stat">
-            <div className="lbl">Founded</div>
-            <div className="val" style={{fontFamily:"var(--font-serif)"}}>{subject.founded}</div>
-            <div className="delta">{subject.hq?.split(",")[0]}</div>
-          </div>
-          <div className="stat">
-            <div className="lbl">Employees</div>
-            <div className="val">{(subject.employees || 0).toLocaleString()}</div>
-            <div className="delta"><span style={{color:"var(--positive)"}}>+{fmtPct(subject.employeeGrowth)}</span> YoY</div>
-          </div>
-          <div className="stat">
-            <div className="lbl">Total raised</div>
-            <div className="val">{fmtMoney(subject.funding?.total || 0)}</div>
-            <div className="delta">{subject.funding?.lastRound} · {fmtDate(subject.funding?.lastRoundAt || "")}</div>
-          </div>
-          <div className="stat">
-            <div className="lbl">ARR</div>
-            <div className="val">{subject.arr ? fmtMoney(subject.arr) : "—"}</div>
-            <div className="delta">{subject.customers ? fmtNum(subject.customers) + " customers" : "—"}</div>
-          </div>
+          {subjectReady ? (
+            <>
+              <div className="stat">
+                <div className="lbl">Founded</div>
+                <div className="val" style={{fontFamily:"var(--font-serif)"}}>{subject.founded}</div>
+                <div className="delta">{subject.hq?.split(",")[0]}</div>
+              </div>
+              <div className="stat">
+                <div className="lbl">Employees</div>
+                <div className="val">{(subject.employees || 0).toLocaleString()}</div>
+                <div className="delta"><span style={{color:"var(--positive)"}}>+{fmtPct(subject.employeeGrowth)}</span> YoY</div>
+              </div>
+              <div className="stat">
+                <div className="lbl">Total raised</div>
+                <div className="val">{fmtMoney(subject.funding?.total || 0)}</div>
+                <div className="delta">{subject.funding?.lastRound} · {fmtDate(subject.funding?.lastRoundAt || "")}</div>
+              </div>
+              <div className="stat">
+                <div className="lbl">ARR</div>
+                <div className="val">{subject.arr ? fmtMoney(subject.arr) : "—"}</div>
+                <div className="delta">{subject.customers ? fmtNum(subject.customers) + " customers" : "—"}</div>
+              </div>
+            </>
+          ) : (
+            [0,1,2,3].map(i => (
+              <div className="stat" key={i}>
+                <Skel w={60} h={9} radius={3} style={{marginBottom:8}} />
+                <Skel w={80} h={22} radius={4} style={{marginBottom:6}} />
+                <Skel w={100} h={9} radius={3} />
+              </div>
+            ))
+          )}
         </div>
       </div>
+
+      {/* ── Notable customers ── */}
+      {subjectReady && subject.notable_customers && subject.notable_customers.length > 0 && (
+        <div className="card" style={{marginBottom:20}}>
+          <div className="card-h">
+            <h3>Notable customers</h3>
+            <span className="meta">{subject.notable_customers.length} highlighted</span>
+          </div>
+          <div style={{
+            display:"flex", alignItems:"center", gap:0,
+            padding:"0",
+            flexWrap:"wrap",
+          }}>
+            {subject.notable_customers.map((c, i) => (
+              <a key={c.domain} href={`https://${c.domain}`} target="_blank" rel="noopener noreferrer"
+                style={{
+                  display:"flex", alignItems:"center", gap:10,
+                  padding:"12px 20px",
+                  flex:"0 0 auto",
+                  textDecoration:"none",
+                  borderRadius:6,
+                  transition:"background .15s",
+                }}
+                onMouseEnter={e => e.currentTarget.style.background = "var(--bg-2)"}
+                onMouseLeave={e => e.currentTarget.style.background = "transparent"}
+              >
+                <img
+                  src={`https://img.logo.dev/${c.domain}?token=pk_OyZO8po6QHG5X9zwE8ayZQ&size=40&format=png`}
+                  width={24} height={24}
+                  alt={c.name}
+                  style={{borderRadius:5, objectFit:"contain", background:"var(--bg-2)"}}
+                  onError={e => { e.target.style.display = "none"; }}
+                />
+                <span style={{fontSize:13, fontWeight:500, color:"var(--fg-2)", whiteSpace:"nowrap"}}>{c.name}</span>
+              </a>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* ── Notable investors ── */}
+      {subjectReady && subject.notable_investors && subject.notable_investors.length > 0 && (
+        <div className="card" style={{marginBottom:20}}>
+          <div className="card-h">
+            <h3>Notable investors</h3>
+            <span className="meta">{subject.notable_investors.length} highlighted</span>
+          </div>
+          <div style={{display:"flex", alignItems:"center", flexWrap:"wrap", padding:"0"}}>
+            {subject.notable_investors.map((c) => (
+              <a key={c.domain} href={`https://${c.domain}`} target="_blank" rel="noopener noreferrer"
+                style={{
+                  display:"flex", alignItems:"center", gap:10,
+                  padding:"12px 20px", flex:"0 0 auto",
+                  textDecoration:"none", borderRadius:6, transition:"background .15s",
+                }}
+                onMouseEnter={e => e.currentTarget.style.background = "var(--bg-2)"}
+                onMouseLeave={e => e.currentTarget.style.background = "transparent"}
+              >
+                <img
+                  src={`https://img.logo.dev/${c.domain}?token=pk_OyZO8po6QHG5X9zwE8ayZQ&size=40&format=png`}
+                  width={24} height={24}
+                  alt={c.name}
+                  style={{borderRadius:5, objectFit:"contain", background:"var(--bg-2)"}}
+                  onError={e => { e.target.style.display = "none"; }}
+                />
+                <span style={{fontSize:13, fontWeight:500, color:"var(--fg-2)", whiteSpace:"nowrap"}}>{c.name}</span>
+              </a>
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* ── Two-col layout ── */}
       <div style={{display:"grid", gridTemplateColumns:"1.4fr 1fr", gap: 20, alignItems:"start"}}>
@@ -103,6 +196,21 @@ function OverviewScreen({ data, onOpenCompany }) {
             <h3>Top threats</h3>
             <span className="meta">By similarity × momentum</span>
           </div>
+          {!competitorsReady ? (
+            <div style={{padding:"8px 0"}}>
+              {[0,1,2,3].map(i => (
+                <div key={i} style={{display:"flex", gap:12, alignItems:"center", padding:"14px 16px", borderBottom: i<3?"1px solid var(--border-dim)":"none"}}>
+                  <Skel w={28} h={28} radius={6} style={{flexShrink:0}} />
+                  <div style={{flex:1}}>
+                    <Skel w={100} h={12} radius={3} style={{marginBottom:6}} />
+                    <Skel w="80%" h={10} radius={3} />
+                  </div>
+                  <Skel w={70} h={10} radius={3} />
+                  <Skel w={50} h={10} radius={3} />
+                </div>
+              ))}
+            </div>
+          ) : (
           <div>
             {topThreats.map((c, i) => (
               <div key={c.id}
@@ -137,6 +245,7 @@ function OverviewScreen({ data, onOpenCompany }) {
               </div>
             ))}
           </div>
+          )}
         </div>
 
         {/* Quick scan summary */}
@@ -145,44 +254,43 @@ function OverviewScreen({ data, onOpenCompany }) {
             <h3>Analyst summary</h3>
             <span className="meta">Auto · {fmtDate(data.query.scannedAt.slice(0,7))}</span>
           </div>
-          <div className="card-b" style={{fontSize: 13.5, lineHeight: 1.6, color:"var(--fg-2)"}}>
-            <p style={{marginTop:0}}>
-              <strong style={{color:"var(--fg)"}}>{subject.name}</strong> operates in
-              {" "}<strong style={{color:"var(--fg)"}}>{subject.category}</strong> — {subject.subCategory}.
-            </p>
-            <p>
-              {subject.employees} employees · {fmtMoney(subject.arr || 0)} ARR ·
-              {" "}{fmtMoney(subject.funding?.total || 0)} raised ({subject.funding?.lastRound}).
-              {" "}{competitors.length} competitors mapped in this space.
-            </p>
-            <p>
-              Closest peers: <em>{topThreats[0]?.name}</em>, <em>{topThreats[1]?.name}</em>, <em>{topThreats[2]?.name}</em>.
-              Most-funded: <strong style={{color:"var(--accent)"}}>{mostFunded?.name}</strong> at {fmtMoney(mostFunded?.funding?.total || 0)}.
-            </p>
-            <hr className="divider" style={{margin:"12px 0"}}/>
-            <div style={{display:"flex", gap:8, flexWrap:"wrap"}}>
-              {subject.notable.map(n => (
-                <span key={n} className="tag" style={{fontSize:11}}>{n}</span>
-              ))}
+          {!competitorsReady ? (
+            <div className="card-b">
+              {[1, 0.7, 0.5].map((w, i) => <Skel key={i} w={`${w*100}%`} h={11} radius={3} style={{marginBottom:8, display:"block"}} />)}
+              <div style={{height:1, background:"var(--border)", margin:"12px 0"}} />
+              <div style={{display:"flex", gap:6, flexWrap:"wrap"}}>
+                {[80,110,90,130,70].map((w,i) => <Skel key={i} w={w} h={22} radius={4} />)}
+              </div>
             </div>
-          </div>
+          ) : (
+            <div className="card-b" style={{fontSize: 13.5, lineHeight: 1.6, color:"var(--fg-2)"}}>
+              <p style={{marginTop:0}}>
+                <strong style={{color:"var(--fg)"}}>{subject.name}</strong> operates in
+                {" "}<strong style={{color:"var(--fg)"}}>{subject.category}</strong> — {subject.subCategory}.
+                {" "}{competitors.length} competitors mapped in this space.
+              </p>
+              <p>
+                Most-funded rival: <strong style={{color:"var(--accent)"}}>{mostFunded?.name}</strong> at {fmtMoney(mostFunded?.funding?.total || 0)}.
+                {" "}{highCount} high-threat · {medCount} medium · {lowCount} low.
+              </p>
+              <hr className="divider" style={{margin:"12px 0"}}/>
+              <div style={{display:"flex", gap:8, flexWrap:"wrap"}}>
+                {subject.notable.map(n => (
+                  <span key={n} className="tag" style={{fontSize:11}}>{n}</span>
+                ))}
+              </div>
+            </div>
+          )}
         </div>
       </div>
 
-      {/* ── Positioning matrix ── */}
-      <div style={{height: 20}}></div>
-      <PositioningMatrix data={data} />
-
-      {/* ── Spectrum: similarity ladder ── */}
-      <div style={{height: 20}}></div>
-      <SimilarityLadder data={data} onOpenCompany={onOpenCompany} />
 
     </div>
   );
 }
 
-// ─── Positioning matrix: logo scatter chart ──────────────────────
-function PositioningMatrix({ data }) {
+// PositioningMatrix moved to screens-positioning.jsx
+function PositioningMatrix({ data, onOpenCompany }) {
   const { subject, competitors } = data;
   const all = [subject, ...competitors];
   const canvasRef = _uR_ov(null);
@@ -206,7 +314,7 @@ function PositioningMatrix({ data }) {
       const datasets = all.map(c => ({
         label: c.name,
         data: [{
-          x: c.isSubject ? 100 : (c.similarity || 0) * 100,
+          x: c.founded || 2000,
           y: Math.max(c.funding?.total || 1, 1e5),
           _company: c,
         }],
@@ -231,16 +339,19 @@ function PositioningMatrix({ data }) {
             const pts = chartRef.current.getElementsAtEventForMode(evt, "nearest", { intersect: false }, false);
             if (!pts.length) { setSelected(null); return; }
             const c = datasets[pts[0].datasetIndex].data[0]._company;
+            if (onOpenCompany && !c.isSubject) { onOpenCompany(c.id); return; }
             setSelected(c);
           },
           scales: {
             x: {
-              title: { display: true, text: "Similarity →", font: { size: 10 }, color: "#bbb" },
-              min: 0, max: 112,
+              title: { display: true, text: "Founded →", font: { size: 10 }, color: "#bbb" },
+              min: Math.min(...all.map(c => c.founded || 2000)) - 2,
+              max: new Date().getFullYear() + 1,
               ticks: {
-                callback: v => v + "%",
+                callback: v => Number.isInteger(v) ? v : null,
                 font: { size: 10 }, color: "#aaa",
-                maxTicksLimit: 6,
+                maxTicksLimit: 8,
+                stepSize: 2,
               },
               grid: { color: "rgba(0,0,0,0.05)" },
             },
@@ -272,7 +383,7 @@ function PositioningMatrix({ data }) {
                   const c = ctx.dataset.data[0]._company;
                   return [
                     c.name,
-                    "Similarity: " + (c.isSubject ? "subject" : (c.similarity * 100).toFixed(0) + "%"),
+                    "Founded: " + (c.founded || "—"),
                     "Funding: " + fmtMoney(c.funding?.total || 0),
                   ];
                 },
@@ -356,7 +467,7 @@ function PositioningMatrix({ data }) {
     <div className="card">
       <div className="card-h">
         <h3>Positioning matrix</h3>
-        <span className="meta">Funding raised (log) × Similarity to {subject.name}</span>
+        <span className="meta">Funding raised (log) × Founded year</span>
       </div>
       <div style={{padding:"16px 16px 8px"}}>
         <canvas ref={canvasRef} />
@@ -387,51 +498,6 @@ function PositioningMatrix({ data }) {
       <div style={{display:"flex", gap:16, padding:"0 16px 12px", fontSize:11, color:"var(--fg-3)"}}>
         <span>Click a logo to inspect</span>
         <span style={{marginLeft:"auto"}}><span style={{display:"inline-block",width:10,height:10,border:"2px solid #b34a1f",borderRadius:2,marginRight:4}}></span>Subject</span>
-      </div>
-    </div>
-  );
-}
-
-// ─── Similarity ladder (1D spectrum) ─────────────────────────────
-function SimilarityLadder({ data, onOpenCompany }) {
-  const { competitors } = data;
-  const sorted = [...competitors].sort((a,b) => b.similarity - a.similarity);
-
-  return (
-    <div className="card">
-      <div className="card-h">
-        <h3>Similarity ladder</h3>
-        <span className="meta">Competitors ranked by overlap with {data.subject.name}</span>
-      </div>
-      <div style={{padding:"4px 0"}}>
-        {sorted.map((c, i) => (
-          <div key={c.id}
-            onClick={() => onOpenCompany && onOpenCompany(c.id)}
-            style={{
-              display:"grid",
-              gridTemplateColumns:"32px 28px 160px 1fr 80px",
-              alignItems:"center", gap:14,
-              padding:"10px 16px",
-              cursor:"pointer",
-            borderBottom: i < sorted.length - 1 ? "1px solid var(--border-dim)" : "none",
-          }}>
-            <span className="mono dim" style={{fontSize:11}}>#{i + 1}</span>
-            <LogoMark name={c.name} domain={c.domain} size="sm" />
-            <div>
-              <div style={{fontWeight:500}}>{c.name}</div>
-              <div className="mono" style={{color:"var(--fg-4)", fontSize:10.5}}>{c.subCategory}</div>
-            </div>
-            <div style={{display:"flex", alignItems:"center", gap:10}}>
-              <Bar value={c.similarity * 100} />
-              <span className="mono" style={{fontSize:11, color:"var(--fg-3)", minWidth:32}}>
-                {(c.similarity * 100).toFixed(0)}%
-              </span>
-            </div>
-            <div style={{textAlign:"right"}}>
-              <ThreatTag level={c.threat} />
-            </div>
-          </div>
-        ))}
       </div>
     </div>
   );

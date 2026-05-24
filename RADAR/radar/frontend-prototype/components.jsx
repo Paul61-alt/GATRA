@@ -63,13 +63,15 @@ const Icons = {
   cash:      <Ic d={<><rect x="3" y="6" width="18" height="12" rx="1"/><circle cx="12" cy="12" r="2.5"/></>} />,
   link:      <Ic d={<><path d="M9 15a4 4 0 0 1 0-6l3-3a4 4 0 1 1 6 6l-1 1"/><path d="M15 9a4 4 0 0 1 0 6l-3 3a4 4 0 1 1-6-6l1-1"/></>} />,
   trend:     <Ic d={<><path d="M3 17 9 11l4 4 8-8"/><path d="M14 4h7v7"/></>} />,
+  trash:     <Ic d={<><path d="M3 6h18M8 6V4h8v2M19 6l-1 14H6L5 6"/></>} />,
+  chevD:     <Ic d={<path d="m6 9 6 6 6-6"/>} />,
 };
 
 // âââ Sidebar ââââââââââââââââââââââââââââââââââââââââââââââââââ
 function Sidebar({ view, onView, currentSubjectName }) {
   const items = [
     { key: "new",     label: "New scan",     icon: "zap" },
-    { key: "home",    label: "Home",         icon: "list", meta: "12" },
+    { key: "home",    label: "Home",         icon: "list" },
     { key: "current", label: "Current scan", icon: "overview", meta: currentSubjectName || null },
   ];
   return (
@@ -87,16 +89,7 @@ function Sidebar({ view, onView, currentSubjectName }) {
           <text x="-3.25px" y="45.5px" style={{fontFamily:"'AvantGardeITCbyBT-Demi','AvantGarde Bk BT',sans-serif",fontWeight:700,fontSize:64,fill:"var(--fg)"}} >radar</text>
         </svg>
       </div>
-
-      <div style={{padding: "10px 12px"}}>
-        <button className="tb-btn" style={{width:"100%", justifyContent:"flex-start", color:"var(--fg-3)"}}>
-          {Icons.search}
-          <span>Quick search</span>
-          <span style={{marginLeft:"auto"}} className="kbd">âK</span>
-        </button>
-      </div>
-
-      <div className="sb-sect">Workspace</div>
+      <div style={{marginTop: 32}} />
       {items.map(it => (
         <div key={it.key}
              className={"sb-item " + (view === it.key ? "active" : "")}
@@ -104,9 +97,7 @@ function Sidebar({ view, onView, currentSubjectName }) {
           <span className="ic">{Icons[it.icon]}</span>
           <span>{it.label}</span>
           {it.meta && (
-            <span className={it.key === "current" ? "sb-meta-name" : "kbd"}>
-              {it.meta}
-            </span>
+            <span className="sb-meta-name">{it.meta}</span>
           )}
         </div>
       ))}
@@ -123,22 +114,238 @@ function Sidebar({ view, onView, currentSubjectName }) {
 }
 
 // âââ Topbar âââââââââââââââââââââââââââââââââââââââââââââââââââ
-function Topbar({ subject }) {
+// ─── Skeleton loader ──────────────────────────────────────────
+function Skel({ w = "100%", h = 14, radius = 4, style = {} }) {
+  return (
+    <div className="skel" style={{width: w, height: h, borderRadius: radius, ...style}} />
+  );
+}
+
+// ─── Print report (all sections, PDF export) ──────────────────
+function PrintReport({ data }) {
+  if (!data) return null;
+  const { subject, competitors = [] } = data;
+  const sorted = [...competitors].sort((a, b) => b.similarity - a.similarity);
+  const totalRaised = competitors.reduce((s, c) => s + (c.funding?.total || 0), 0);
+
+  return (
+    <div className="print-report">
+      <div className="pr-cover">
+        <div className="pr-eyebrow">Competitive Analysis</div>
+        <h1 className="pr-title">{subject.name}</h1>
+        <div className="pr-sub">
+          <a href={`https://${subject.domain}`}>{subject.domain}</a>
+          &nbsp;·&nbsp;{subject.category}&nbsp;·&nbsp;{subject.hq}
+        </div>
+        <div className="pr-meta-row">
+          <div><div className="pr-lbl">Founded</div><div className="pr-val">{subject.founded}</div></div>
+          <div><div className="pr-lbl">Employees</div><div className="pr-val">{(subject.employees||0).toLocaleString()}</div></div>
+          <div><div className="pr-lbl">Total raised</div><div className="pr-val">{fmtMoney(subject.funding?.total||0)}</div></div>
+          <div><div className="pr-lbl">Stage</div><div className="pr-val">{subject.funding?.lastRound||"—"}</div></div>
+          <div><div className="pr-lbl">Competitors mapped</div><div className="pr-val">{competitors.length}</div></div>
+          <div><div className="pr-lbl">Total market raised</div><div className="pr-val">{fmtMoney(totalRaised)}</div></div>
+        </div>
+        <p className="pr-tagline">{subject.tagline}</p>
+      </div>
+
+      <div className="pr-section">
+        <h2 className="pr-h2">Competitor landscape</h2>
+        <table className="pr-table">
+          <thead>
+            <tr>
+              <th>Company</th>
+              <th>Category</th>
+              <th>HQ</th>
+              <th style={{textAlign:"right"}}>Employees</th>
+              <th style={{textAlign:"right"}}>Funding</th>
+              <th>Stage</th>
+              <th style={{textAlign:"right"}}>Similarity</th>
+              <th>Threat</th>
+            </tr>
+          </thead>
+          <tbody>
+            {sorted.map(c => (
+              <tr key={c.id}>
+                <td><strong>{c.name}</strong><div style={{fontSize:10,color:"#888"}}>{c.domain}</div></td>
+                <td style={{fontSize:11}}>{c.subCategory || c.category}</td>
+                <td style={{fontSize:11}}>{c.hq?.split(",")[0]}</td>
+                <td style={{textAlign:"right"}}>{c.employees ? fmtNum(c.employees) : "—"}</td>
+                <td style={{textAlign:"right"}}>{fmtMoney(c.funding?.total||0)}</td>
+                <td style={{fontSize:11}}>{c.funding?.lastRound||"—"}</td>
+                <td style={{textAlign:"right"}}>{c.similarity != null ? (c.similarity*100).toFixed(0)+"%" : "—"}</td>
+                <td><span style={{
+                  padding:"2px 6px", borderRadius:3, fontSize:10, fontWeight:600, textTransform:"uppercase",
+                  background: c.threat==="high"?"#fdecea":c.threat==="medium"?"#fef7e0":"#eaf5ee",
+                  color: c.threat==="high"?"#c0392b":c.threat==="medium"?"#a07000":"#1a7a3e",
+                }}>{c.threat||"—"}</span></td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+
+      <div className="pr-section">
+        <h2 className="pr-h2">Key highlights — {subject.name}</h2>
+        <ul className="pr-list">
+          {(subject.notable||[]).map((n,i) => <li key={i}>{n}</li>)}
+        </ul>
+      </div>
+
+      <div className="pr-section">
+        <h2 className="pr-h2">Top competitors — detail</h2>
+        {sorted.slice(0,5).map(c => (
+          <div key={c.id} className="pr-co-block">
+            <div className="pr-co-head">
+              <strong>{c.name}</strong>
+              <span style={{fontSize:11,color:"#888",marginLeft:8}}>{c.domain}</span>
+              <span style={{marginLeft:"auto",fontSize:11}}>{fmtMoney(c.funding?.total||0)} raised · {c.employees ? fmtNum(c.employees)+" employees" : ""}</span>
+            </div>
+            <p style={{fontSize:12,color:"#444",margin:"4px 0 6px"}}>{c.tagline}</p>
+            <ul className="pr-list">
+              {(c.notable||[]).slice(0,3).map((n,i) => <li key={i}>{n}</li>)}
+            </ul>
+          </div>
+        ))}
+      </div>
+
+      <div className="pr-footer">
+        Generated by Radar · {new Date().toLocaleDateString("en-GB",{day:"numeric",month:"long",year:"numeric"})}
+      </div>
+    </div>
+  );
+}
+
+function Topbar({ subject, data, onDelete, onRescan, isRescanning }) {
+  const [confirmDelete, setConfirmDelete] = useState(false);
+  const [exportOpen, setExportOpen] = useState(false);
+  const exportRef = useRef(null);
+
+  useEffect(() => {
+    if (!exportOpen) return;
+    const h = e => { if (exportRef.current && !exportRef.current.contains(e.target)) setExportOpen(false); };
+    document.addEventListener("mousedown", h);
+    return () => document.removeEventListener("mousedown", h);
+  }, [exportOpen]);
+
+  const exportCSV = () => {
+    setExportOpen(false);
+    const competitors = data?.competitors || [];
+    const rows = [
+      ["Name","Domain","Category","Similarity","Threat","Funding","Last Round","Employees","HQ"],
+      ...competitors.map(c => [
+        c.name, c.domain, c.subCategory || c.category,
+        c.similarity != null ? (c.similarity * 100).toFixed(0) + "%" : "",
+        c.threat || "",
+        c.funding?.total ? "$" + (c.funding.total / 1e6).toFixed(1) + "M" : "",
+        c.funding?.lastRound || "",
+        c.employees || "",
+        c.hq || "",
+      ])
+    ];
+    const csv = rows.map(r => r.map(v => `"${String(v).replace(/"/g,'""')}"`).join(",")).join("\n");
+    const blob = new Blob([csv], { type: "text/csv" });
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(blob);
+    a.download = `${subject.name.toLowerCase().replace(/\s+/g,"-")}-competitive-analysis.csv`;
+    a.click();
+  };
+
+  const exportPDF = () => {
+    setExportOpen(false);
+    // Render the full print report then print
+    const existing = document.getElementById("radar-print-root");
+    if (existing) existing.remove();
+    const el = document.createElement("div");
+    el.id = "radar-print-root";
+    document.body.appendChild(el);
+    ReactDOM.createRoot(el).render(<PrintReport data={data} />);
+    // Give React one frame to render, then print
+    requestAnimationFrame(() => requestAnimationFrame(() => {
+      window.print();
+      setTimeout(() => el.remove(), 1000);
+    }));
+  };
+
   return (
     <header className="tb">
       <div className="tb-crumbs">
-        <span>Scans</span>
-        <span className="sep">/</span>
         <b>{subject.name}</b>
-        <span className="sep">Â·</span>
-        <span className="mono" style={{fontSize:11.5}}>{subject.domain}</span>
-        <span className="tb-pill">SUBJECT</span>
+        <a href={`https://${subject.domain}`} target="_blank" rel="noopener noreferrer"
+          className="mono"
+          style={{fontSize:11.5, color:"var(--fg-4)", textDecoration:"none", marginLeft:8}}
+          onMouseEnter={e => e.target.style.color="var(--fg-2)"}
+          onMouseLeave={e => e.target.style.color="var(--fg-4)"}
+        >{subject.domain}</a>
       </div>
       <div className="tb-spacer"></div>
-      <button className="tb-btn">{Icons.bell}</button>
-      <button className="tb-btn">{Icons.share}<span>Share</span></button>
-      <button className="tb-btn">{Icons.download}<span>Export</span></button>
-      <button className="tb-btn primary">{Icons.zap}<span>Re-scan</span></button>
+
+      {!confirmDelete ? (
+        <button className="tb-btn" style={{color:"var(--negative, #c0392b)"}}
+          onClick={() => setConfirmDelete(true)}>
+          {Icons.trash}<span>Delete</span>
+        </button>
+      ) : (
+        <div style={{display:"flex", alignItems:"center", gap:6, padding:"0 4px"}}>
+          <span style={{fontSize:12, color:"var(--fg-2)"}}>Delete this analysis?</span>
+          <button className="tb-btn" style={{color:"var(--negative,#c0392b)", fontWeight:600}}
+            onClick={() => { setConfirmDelete(false); onDelete && onDelete(); }}>
+            Confirm
+          </button>
+          <button className="tb-btn" onClick={() => setConfirmDelete(false)}>Cancel</button>
+        </div>
+      )}
+
+      <div ref={exportRef} style={{position:"relative"}}>
+        <button className="tb-btn" onClick={() => setExportOpen(v => !v)}>
+          {Icons.download}<span>Export</span>{Icons.chevD}
+        </button>
+        {exportOpen && (
+          <div style={{
+            position:"absolute", right:0, top:"calc(100% + 6px)",
+            background:"var(--surface)", border:"1px solid var(--border)",
+            borderRadius:8, boxShadow:"0 4px 16px rgba(0,0,0,.1)",
+            minWidth:160, zIndex:200, overflow:"hidden",
+          }}>
+            <button onClick={exportPDF} style={{
+              display:"flex", alignItems:"center", gap:10,
+              width:"100%", padding:"10px 14px", border:"none",
+              background:"none", cursor:"pointer", fontSize:12.5,
+              color:"var(--fg)", fontFamily:"var(--font-sans)", textAlign:"left",
+            }}
+              onMouseEnter={e => e.currentTarget.style.background="var(--bg-2)"}
+              onMouseLeave={e => e.currentTarget.style.background="none"}>
+              {Icons.download}
+              <div>
+                <div style={{fontWeight:500}}>PDF report</div>
+                <div style={{fontSize:11, color:"var(--fg-4)", marginTop:1}}>Full analysis, print-ready</div>
+              </div>
+            </button>
+            <div style={{height:1, background:"var(--border)"}} />
+            <button onClick={exportCSV} style={{
+              display:"flex", alignItems:"center", gap:10,
+              width:"100%", padding:"10px 14px", border:"none",
+              background:"none", cursor:"pointer", fontSize:12.5,
+              color:"var(--fg)", fontFamily:"var(--font-sans)", textAlign:"left",
+            }}
+              onMouseEnter={e => e.currentTarget.style.background="var(--bg-2)"}
+              onMouseLeave={e => e.currentTarget.style.background="none"}>
+              {Icons.list}
+              <div>
+                <div style={{fontWeight:500}}>CSV spreadsheet</div>
+                <div style={{fontSize:11, color:"var(--fg-4)", marginTop:1}}>Competitor table, all fields</div>
+              </div>
+            </button>
+          </div>
+        )}
+      </div>
+
+      <button className="tb-btn primary" onClick={onRescan} disabled={isRescanning}
+        style={{opacity: isRescanning ? .6 : 1}}>
+        {isRescanning
+          ? <><span className="dot-pulse" style={{transform:"scale(.75)"}}><i></i><i></i><i></i></span><span>Scanning…</span></>
+          : <>{Icons.zap}<span>Re-scan</span></>
+        }
+      </button>
     </header>
   );
 }
