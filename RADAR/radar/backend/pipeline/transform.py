@@ -39,6 +39,32 @@ def _slug(name: str) -> str:
     return re.sub(r"[^a-z0-9]+", "_", name.lower()).strip("_")
 
 
+def _map_pricing_tiers(profile: CompetitorProfile) -> list[PricingTier]:
+    """Map CompetitorProfile.pricing.tiers → list[radar_output.PricingTier]."""
+    if not profile.pricing:
+        return []
+    tiers: list[PricingTier] = []
+    # Synthesize a Free tier when free_plan=True but no tier records present
+    if profile.pricing.free_plan and not profile.pricing.tiers:
+        tiers.append(PricingTier(name="Free", price="$0", per="month", features=[]))
+    for t in profile.pricing.tiers:
+        if t.price_monthly_usd is not None:
+            price_str = "$0" if t.price_monthly_usd == 0 else f"${t.price_monthly_usd:,.0f}"
+            per = "month"
+        elif t.price_annual_usd is not None:
+            price_str = f"${t.price_annual_usd:,.0f}"
+            per = "year"
+        else:
+            price_str, per = "Custom", "contact"
+        tiers.append(PricingTier(
+            name=t.name or "Plan",
+            price=price_str,
+            per=per,
+            features=(t.features or [])[:6],  # cap at 6 for UI
+        ))
+    return tiers
+
+
 def _parse_domain(website: str) -> str:
     if "://" not in website:
         website = "https://" + website
@@ -183,8 +209,10 @@ def pipeline_run_to_radar_output(run: PipelineRun) -> RadarOutput:
             run.company_profile.funding.rounds
         )
 
-    # Empty pricing tiers — populated by synthesize phase (still pending for tiers)
-    pricing_dict: dict[str, list[PricingTier]] = {cid: [] for cid in all_ids}
+    # Map pricing tiers from enriched competitor profiles
+    pricing_dict: dict[str, list[PricingTier]] = {subject.id: []}
+    for c_profile, c_company in zip(run.competitors, competitors):
+        pricing_dict[c_company.id] = _map_pricing_tiers(c_profile)
 
     # Radar scores: from synthesize phase if available, else neutral 50/100 fallback
     if run.radar_scores:
