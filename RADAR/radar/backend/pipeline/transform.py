@@ -22,6 +22,7 @@ from models.radar_output import (
     RadarConfig,
     RadarOutput,
     ScanQuery,
+    ThreatLevel,
 )
 
 _DEFAULT_RADAR_AXES = ["Breadth", "Depth", "Global", "Developer", "Pricing", "Trust"]
@@ -37,6 +38,33 @@ _DEFAULT_RADAR_DEFS = {
 
 def _slug(name: str) -> str:
     return re.sub(r"[^a-z0-9]+", "_", name.lower()).strip("_")
+
+
+def _compute_similarity(
+    comp_scores: list[float] | None,
+    subject_scores: list[float] | None,
+) -> float:
+    """Cosine similarity between two radar score vectors. Falls back to 0.5."""
+    if not comp_scores or not subject_scores:
+        return 0.5
+    dot = sum(a * b for a, b in zip(comp_scores, subject_scores))
+    mag_c = sum(x ** 2 for x in comp_scores) ** 0.5
+    mag_s = sum(x ** 2 for x in subject_scores) ** 0.5
+    if not mag_c or not mag_s:
+        return 0.5
+    return round(dot / (mag_c * mag_s), 3)
+
+
+def _compute_threat(comp_scores: list[float] | None) -> ThreatLevel:
+    """Threat level derived from mean radar score. Falls back to 'medium'."""
+    if not comp_scores:
+        return "medium"
+    avg = sum(comp_scores) / len(comp_scores)
+    if avg >= 60:
+        return "high"
+    if avg < 35:
+        return "low"
+    return "medium"
 
 
 def _parse_domain(website: str) -> str:
@@ -132,7 +160,11 @@ def _map_subject(profile: CompanyProfile) -> Company:
     )
 
 
-def _map_competitor(profile: CompetitorProfile) -> Company:
+def _map_competitor(
+    profile: CompetitorProfile,
+    radar_scores: dict[str, list[float]] | None = None,
+    subject_scores: list[float] | None = None,
+) -> Company:
     hq_str = _format_hq(profile.hq)
     hq_coords: tuple[float, float] = (
         (profile.hq.lat or 0.0, profile.hq.lng or 0.0)
@@ -162,9 +194,11 @@ def _map_competitor(profile: CompetitorProfile) -> Company:
         investors=[],
         pricing=PricingSummary(model=pricing_model, starts_at=0, mention="Contact sales"),
         notable=profile.recent_signals[:5],
-        # Placeholders — overwritten by synthesize phase once implemented
-        similarity=0.5,
-        threat="medium",
+        # Derive similarity + threat from synthesize radar scores when available
+        similarity=_compute_similarity(
+            (radar_scores or {}).get(_slug(profile.name)), subject_scores
+        ),
+        threat=_compute_threat((radar_scores or {}).get(_slug(profile.name))),
     )
 
 
@@ -173,7 +207,12 @@ def pipeline_run_to_radar_output(run: PipelineRun) -> RadarOutput:
         raise ValueError("PipelineRun.company_profile is None — pipeline did not complete")
 
     subject = _map_subject(run.company_profile)
-    competitors = [_map_competitor(c) for c in run.competitors]
+    _subject_id = _slug(run.company_profile.name)
+    _subject_scores = (run.radar_scores or {}).get(_subject_id)
+    competitors = [
+        _map_competitor(c, radar_scores=run.radar_scores, subject_scores=_subject_scores)
+        for c in run.competitors
+    ]
     all_ids = [subject.id] + [c.id for c in competitors]
 
     # Funding events (subject only; competitors have no round history in current models)
