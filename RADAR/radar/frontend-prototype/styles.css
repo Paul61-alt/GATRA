@@ -56,7 +56,7 @@
 
   /* Type */
   --font-sans: "Roboto", ui-sans-serif, system-ui, sans-serif;
-  --font-serif: "Roboto Slab", Georgia, serif;
+  --font-serif: "Roboto", ui-sans-serif, system-ui, sans-serif;
   --font-mono: "Roboto Mono", ui-monospace, "SF Mono", Menlo, monospace;
 
   --shadow-sm: 0 1px 0 rgba(20,17,13,.04), 0 1px 2px rgba(20,17,13,.04);
