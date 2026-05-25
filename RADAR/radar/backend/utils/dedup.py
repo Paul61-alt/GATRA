@@ -49,3 +49,42 @@ def dedup_by_website(competitors: list[dict]) -> list[dict]:
         if domain or name_key:
             result.append(c)
     return result
+
+
+if __name__ == "__main__":
+    # Run: python -m utils.dedup
+    tests = [
+        # G9: Freebe appeared twice with https+trailing-slash vs bare domain
+        (
+            [{"name": "Freebe", "website": "https://freebe.me/"},
+             {"name": "Freebe", "website": "freebe.me"}],
+            1,
+        ),
+        # www prefix variation → same company
+        (
+            [{"name": "Stripe", "website": "https://stripe.com"},
+             {"name": "Stripe", "website": "http://www.stripe.com"}],
+            1,
+        ),
+        # Different companies → both survive
+        (
+            [{"name": "Alpha", "website": "alpha.io"},
+             {"name": "Beta", "website": "beta.io"}],
+            2,
+        ),
+        # Same name, different URLs → deduplicated by name pass
+        (
+            [{"name": "Freebe", "website": "freebe.me"},
+             {"name": "Freebe", "website": "app.freebe.me"}],
+            1,
+        ),
+    ]
+    all_pass = True
+    for i, (group, expected) in enumerate(tests, 1):
+        result = dedup_by_website(group)
+        ok = len(result) == expected
+        status = "PASS" if ok else f"FAIL (got {len(result)}, want {expected})"
+        print(f"Test {i}: {status}")
+        if not ok:
+            all_pass = False
+    raise SystemExit(0 if all_pass else 1)
