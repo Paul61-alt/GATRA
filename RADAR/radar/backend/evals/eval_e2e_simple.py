@@ -29,7 +29,7 @@ logging.basicConfig(level=logging.INFO, format="%(levelname)s %(name)s %(message
 from clients.claude_client import ClaudeClient
 from clients.linkup_client import BudgetExceededError, LinkupClient
 from models.pipeline import PipelineRun, PipelineStatus
-from pipeline import discover, enrich, understand
+from pipeline import discover, enrich, synthesize, understand
 from pipeline.transform import pipeline_run_to_radar_output
 from utils import cache_set
 
@@ -84,6 +84,13 @@ async def main(url: str, no_cache: bool = False) -> None:
         _sep("PYDANTIC — CompetitorProfile")
         print(json.dumps(competitor.model_dump(mode="json"), indent=2, ensure_ascii=False, default=str))
 
+        # ── 3b. SYNTHESIZE — derive radar scores (free, no API call) ─
+        _sep("PHASE 3b — SYNTHESIZE")
+        radar_scores = synthesize.run(company_profile, profiles)
+        print(f"✓ Radar scores computed for {len(radar_scores)} entities")
+        for eid, sc in radar_scores.items():
+            print(f"  {eid}: {[round(s, 1) for s in sc]}")
+
         # ── 4. VC MEMO ─────────────────────────────────────────────
         _sep("PHASE 4 — VC MEMO (Claude)")
         memo = claude.generate_vc_memo(competitor.model_dump(mode="json"))
@@ -99,6 +106,7 @@ async def main(url: str, no_cache: bool = False) -> None:
             completed_at=datetime.now(timezone.utc).isoformat(),
             company_profile=company_profile,
             competitors=profiles,
+            radar_scores=radar_scores,
         )
         radar_output = pipeline_run_to_radar_output(run)
         radar_dict = radar_output.model_dump(by_alias=True, mode="json", exclude_none=True)
