@@ -351,7 +351,7 @@ function Topbar({ subject, data, onDelete, onRescan, isRescanning }) {
 }
 
 // âââ Tabs âââââââââââââââââââââââââââââââââââââââââââââââââââââ
-function Tabs({ tabs, active, onTab }) {
+function Tabs({ tabs, active, onTab, xopilotOpen, onXopilot }) {
   return (
     <nav className="tabs">
       {tabs.map(t => (
@@ -380,6 +380,9 @@ function Tabs({ tabs, active, onTab }) {
           )}
         </div>
       ))}
+      {onXopilot && (
+        <CopilotTab active={xopilotOpen} onClick={onXopilot} />
+      )}
     </nav>
   );
 }

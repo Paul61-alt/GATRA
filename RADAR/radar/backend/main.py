@@ -23,7 +23,7 @@ load_dotenv()
 logging.basicConfig(level=logging.INFO, format="%(levelname)s %(name)s %(message)s")
 logger = logging.getLogger(__name__)
 
-from clients import ClaudeClient, LinkupClient
+from clients import LinkupClient
 from generate_data_js import generate_data_js
 from models import PipelineRun, PipelineStatus
 from pipeline import discover, enrich, understand
@@ -42,7 +42,6 @@ limiter = Limiter(key_func=get_remote_address, default_limits=["10/minute", "100
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     app.state.linkup = LinkupClient()
-    app.state.claude = ClaudeClient()
     app.state.pipeline_sem = asyncio.Semaphore(
         int(os.environ.get("RADAR_MAX_CONCURRENT", "2"))
     )
@@ -61,6 +60,9 @@ _ALLOWED_ORIGINS = [
     "http://localhost:3000",
     "http://localhost:5173",
     "http://localhost:8080",
+    "http://localhost:5500",
+    "http://127.0.0.1:5500",
+    "null",  # file:// origin
     os.environ.get("FRONTEND_URL", ""),
 ]
 
@@ -281,6 +283,38 @@ async def scan_stream(request: Request, req: AnalyzeRequest) -> StreamingRespons
         media_type="text/event-stream",
         headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
     )
+
+
+class CopilotRequest(BaseModel):
+    query: str
+    context: str = ""
+
+
+@app.post("/copilot")
+@limiter.limit("20/minute")
+async def copilot(request: Request, req: CopilotRequest) -> dict:  # noqa: ARG001
+    _check_kill_switch()
+    query = req.query.strip()
+    if not query:
+        raise HTTPException(status_code=422, detail="query is required")
+
+    # Enrich the query with scan context so Linkup results are grounded
+    full_query = f"{query}\n\nContext: {req.context}" if req.context else query
+
+    linkup: LinkupClient = app.state.linkup
+    result = await linkup.search(query=full_query, depth="standard", output_type="sourcedAnswer")
+
+    # Normalise the Linkup response shape
+    sources = [
+        {
+            "name": s.get("name", ""),
+            "url": s.get("url", ""),
+            "snippet": s.get("snippet", ""),
+            "favicon": s.get("favicon", ""),
+        }
+        for s in (result.get("sources") or [])
+    ]
+    return {"answer": result.get("answer", ""), "sources": sources}
 
 
 @app.get("/health")

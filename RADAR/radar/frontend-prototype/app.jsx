@@ -21,6 +21,7 @@ function App() {
   const [loadingPhase, setLoadingPhase] = _uS_app(2);
   const [activeTab, setActiveTab] = _uS_app("overview");
   const [openCompanyIds, setOpenCompanyIds] = _uS_app([]);
+  const [xopilotOpen, setXopilotOpen] = _uS_app(false);
   // Scan in progress: null | { url, domain, startedAt }
   const [scanInProgress, setScanInProgress] = _uS_app(null);
 
@@ -100,7 +101,7 @@ function App() {
   const tabs = [...SCAN_TABS, ...companyTabs];
 
   return (
-    <div className="app" data-screen-label={
+    <div className={"app" + (xopilotOpen ? " xo-open" : "")} data-screen-label={
       view === "new"  ? "01 New scan" :
       view === "home" ? "02 Home"     :
                         "03 Current scan"
@@ -138,7 +139,8 @@ function App() {
               onRescan={handleRescan}
               isRescanning={isRescanning}
             />
-            <Tabs tabs={tabs} active={activeTab} onTab={setActiveTab} />
+            <Tabs tabs={tabs} active={activeTab} onTab={setActiveTab}
+              xopilotOpen={xopilotOpen} onXopilot={() => setXopilotOpen(v => !v)} />
             <div className="content">
               {activeTab === "overview"  && <OverviewScreen  data={data} onOpenCompany={openCompany} loadingPhase={loadingPhase} />}
               {activeTab === "list"      && <ListScreen      data={data} onOpenCompany={openCompany} />}
@@ -157,6 +159,12 @@ function App() {
           </>
         )}
       </div>
+
+      <CopilotPanel
+        open={xopilotOpen}
+        onClose={() => setXopilotOpen(false)}
+        data={data}
+      />
 
       <RadarTweaksPanel t={tweaks} setTweak={setTweak} onJumpToSearch={() => setView("new")} />
 
