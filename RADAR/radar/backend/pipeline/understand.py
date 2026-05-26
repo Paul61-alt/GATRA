@@ -766,6 +766,7 @@ async def run(
 
 if __name__ == "__main__":
     import sys
+    from pathlib import Path
     from dotenv import load_dotenv
     load_dotenv()
 
@@ -773,7 +774,62 @@ if __name__ == "__main__":
         print("Usage: python -m pipeline.understand <domain>", file=sys.stderr)
         sys.exit(1)
 
+    _domain = sys.argv[1].strip().lower()
     client = LinkupClient()
     claude_client = ClaudeClient()
-    result = asyncio.run(run(sys.argv[1].strip().lower(), client, claude=claude_client))
+    result = asyncio.run(run(_domain, client, claude=claude_client))
+
+    # 1. Print JSON to stdout (pipe-safe, unchanged)
     print(result.model_dump_json(indent=2))
+
+    # 2. Save to cache/understand_{domain}.json (overwrite → always latest run)
+    _cache_dir = Path(__file__).resolve().parents[2] / "cache"
+    _cache_dir.mkdir(parents=True, exist_ok=True)
+    _cache_file = _cache_dir / f"understand_{_domain}.json"
+    _cache_file.write_text(result.model_dump_json(indent=2))
+    print(f"\n📁 Saved → {_cache_file}", file=sys.stderr)
+
+    # 3. Fill summary table → stderr
+    def _dp_val(dp):
+        return str(dp.value)[:30] if dp and dp.value is not None else "null"
+
+    _fields = {
+        "name":            result.name or "null",
+        "website":         result.website or "null",
+        "summary":         f"({len(result.summary)} chars)" if result.summary else "null",
+        "founded_year":    str(result.founded_year) if result.founded_year else "null",
+        "hq.city":         result.hq.city if result.hq and result.hq.city else "null",
+        "hq.country":      result.hq.country if result.hq and result.hq.country else "null",
+        "geo_coverage":    result.geo_coverage or "null",
+        "employees":       _dp_val(result.employees),
+        "funding.total":   _dp_val(result.funding.total_raised_eur) if result.funding else "null",
+        "funding.stage":   result.funding_stage or "null",
+        "funding.rounds#": str(len(result.funding.rounds)) if result.funding else "0",
+        "investors#":      str(len(result.notable_investors)),
+        "arr_usd":         _dp_val(result.arr_usd),
+        "customer_count":  _dp_val(result.customer_count),
+        "positioning":     f"({len(result.positioning)} chars)" if result.positioning else "null",
+        "markets#":        str(len(result.markets)),
+        "target_segment":  _dp_val(result.target_segment),
+        "business_model":  _dp_val(result.business_model),
+        "gtm_motion":      _dp_val(result.gtm_motion),
+        "pricing_model":   _dp_val(result.pricing_model),
+        "differentiator":  _dp_val(result.key_differentiator),
+        "features#":       str(len(result.top_3_features)),
+        "customers#":      str(len(result.notable_customers)),
+        "tech_stack#":     str(len(result.tech_stack)),
+        "key_people#":     str(len(result.key_people)),
+        "growth_signals#": str(len(result.growth_signals)),
+        "recent_news#":    str(len(result.recent_news)),
+        "equity_story":    f"({len(result.equity_story)} chars)" if result.equity_story else "null",
+    }
+
+    _null = ("null", "0", "—")
+    _filled = sum(1 for v in _fields.values() if v not in _null)
+    _total = len(_fields)
+
+    print(f"\n─── fill: {_filled}/{_total} ({int(_filled / _total * 100)}%) ───", file=sys.stderr)
+    for _f, _v in _fields.items():
+        _icon = "✓" if _v not in _null else "✗"
+        print(f"  {_icon} {_f:<20} {_v}", file=sys.stderr)
+    print("─" * 45, file=sys.stderr)
