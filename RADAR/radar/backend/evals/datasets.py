@@ -12,6 +12,7 @@ PROBE_DOMAINS = [
 # Well-known startups — easy to sanity-check outputs manually.
 # No expected outputs: we use LLM-as-judge scoring.
 UNDERSTAND_DOMAINS = [
+    "makipeople.com",   # primary demo company — all fields ground-truthed in CONTRACT.md
     "linear.app",
     "notion.so",
     "mistral.ai",

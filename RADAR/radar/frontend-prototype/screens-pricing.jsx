@@ -1,5 +1,5 @@
 // screens-pricing.jsx â pricing tiers comparison
-function PricingScreen({ data }) {
+function PricingScreen({ data, onOpenCompany }) {
   const { subject, competitors, pricing } = data;
   const all = [subject, ...competitors];
 
@@ -28,10 +28,12 @@ function PricingScreen({ data }) {
             </thead>
             <tbody>
               {all.map(c => (
-                <tr key={c.id} className={c.isSubject ? "subject-row" : ""}>
+                <tr key={c.id} className={c.isSubject ? "subject-row" : ""}
+                  onClick={() => !c.isSubject && onOpenCompany && onOpenCompany(c.id)}
+                  style={{cursor: c.isSubject ? "default" : "pointer"}}>
                   <td>
                     <div className="name-cell">
-                      <LogoMark name={c.name} subject={c.isSubject} size="sm" />
+                      <LogoMark name={c.name} domain={c.domain} subject={c.isSubject} size="sm" />
                       <span className="nm">{c.name}</span>
                     </div>
                   </td>
@@ -52,23 +54,26 @@ function PricingScreen({ data }) {
       <SectionH title="Tier breakdown" meta={`${all.length} pricing pages parsed`} />
       <div style={{display:"flex", flexDirection:"column", gap: 14}}>
         {all.map(c => (
-          <PricingCompany key={c.id} c={c} tiers={pricing[c.id]} />
+          <PricingCompany key={c.id} c={c} tiers={pricing[c.id]} onOpenCompany={onOpenCompany} />
         ))}
       </div>
     </div>
   );
 }
 
-function PricingCompany({ c, tiers }) {
+function PricingCompany({ c, tiers, onOpenCompany }) {
   return (
     <div className="card" style={{
       borderColor: c.isSubject ? "var(--accent-bg-2)" : "var(--border)",
     }}>
-      <div className="card-h" style={{
-        background: c.isSubject ? "var(--accent-bg)" : "transparent",
-        borderColor: c.isSubject ? "var(--accent-bg-2)" : "var(--border)",
-      }}>
-        <LogoMark name={c.name} subject={c.isSubject} size="sm" />
+      <div className="card-h"
+        onClick={() => !c.isSubject && onOpenCompany && onOpenCompany(c.id)}
+        style={{
+          background: c.isSubject ? "var(--accent-bg)" : "transparent",
+          borderColor: c.isSubject ? "var(--accent-bg-2)" : "var(--border)",
+          cursor: c.isSubject ? "default" : "pointer",
+        }}>
+        <LogoMark name={c.name} domain={c.domain} subject={c.isSubject} size="sm" />
         <h3 style={{color: c.isSubject ? "var(--accent-fg)" : "var(--fg)"}}>{c.name}</h3>
         {c.isSubject && <span className="tag subject mono" style={{fontSize:9}}>SUBJECT</span>}
         <span className="muted" style={{fontSize:11.5}}>Â· {c.pricing.model}</span>

@@ -6,7 +6,7 @@
 <title>Radar — Competitive Analysis</title>
 <link rel="preconnect" href="https://fonts.googleapis.com" />
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@300;400;500;600;700&family=IBM+Plex+Serif:wght@400;500;600&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet" />
+<link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;600;700&family=Roboto+Slab:wght@400;500;600&family=Roboto+Mono:wght@400;500;600&display=swap" rel="stylesheet" />
 <link rel="stylesheet" href="styles.css" />
 
 <script src="https://unpkg.com/react@18.3.1/umd/react.development.js" integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L" crossorigin="anonymous"></script>
@@ -31,6 +31,9 @@ window.RADAR_DATA = null;
 window.RADAR_API = "http://localhost:8000";
 </script>
 
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" crossorigin=""/>
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin=""></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
 <script src="data.js"></script>
 <script type="text/babel" src="tweaks-panel.jsx"></script>
 <script type="text/babel" src="components.jsx"></script>
@@ -40,9 +43,12 @@ window.RADAR_API = "http://localhost:8000";
 <script type="text/babel" src="screens-list.jsx"></script>
 <script type="text/babel" src="screens-compare.jsx"></script>
 <script type="text/babel" src="screens-map.jsx"></script>
+<script type="text/babel" src="screens-positioning.jsx"></script>
 <script type="text/babel" src="screens-features.jsx"></script>
 <script type="text/babel" src="screens-pricing.jsx"></script>
 <script type="text/babel" src="screens-timeline.jsx"></script>
+<script type="text/babel" src="screens-company.jsx"></script>
 <script type="text/babel" src="app.jsx"></script>
 </body>
 </html>
+<!-- vercel-git-test -->

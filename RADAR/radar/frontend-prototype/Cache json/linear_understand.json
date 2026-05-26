@@ -1,0 +1,189 @@
+{
+  "profile": {
+    "name": "Linear Orbit, Inc.",
+    "domain": "linear.app",
+    "website": "https://linear.app/",
+    "summary": "Linear is a purpose-built tool for tracking issues, managing sprints, and organizing project roadmaps in software development teams. Founded in 2019, it focuses on speed, efficiency, and a clean user experience to empower product teams to do their best work. Linear has become the tool of choice for over 25,000 companies including OpenAI, Coinbase, and Ramp, and operates as a profitable, high-growth, remote-first company.",
+    "founded_year": 2019,
+    "hq": {
+      "city": "San Francisco",
+      "country": "United States",
+      "lat": 37.7879363,
+      "lng": -122.4075201
+    },
+    "geo_coverage": "Global",
+    "employees": {
+      "value": 178,
+      "confidence": "high",
+      "source_url": "https://getlatka.com/companies/linear.app",
+      "evidence": null,
+      "extracted_at": "2026-05-13T21:07:58.390988+00:00"
+    },
+    "funding": {
+      "total_raised_eur": {
+        "value": 134200000,
+        "confidence": "high",
+        "source_url": "https://www.crunchbase.com/organization/linear-app",
+        "evidence": null,
+        "extracted_at": "2026-05-13T21:07:58.390988+00:00"
+      },
+      "last_round": "Series C",
+      "last_round_date": "2025-06-10",
+      "rounds": [
+        {
+          "round": "Seed",
+          "amount_eur": 4200000,
+          "date": "2019-11-22",
+          "lead": "Sequoia Capital"
+        },
+        {
+          "round": "Series A",
+          "amount_eur": 13000000,
+          "date": "2020-12",
+          "lead": "Sequoia Capital"
+        },
+        {
+          "round": "Series B",
+          "amount_eur": 35000000,
+          "date": "2023-09-14",
+          "lead": "Accel"
+        },
+        {
+          "round": "Series C",
+          "amount_eur": 82000000,
+          "date": "2025-06-10",
+          "lead": "Accel"
+        }
+      ]
+    },
+    "funding_stage": "Series C",
+    "notable_investors": [
+      "Accel",
+      "Sequoia Capital",
+      "01 Advisors",
+      "Seven Seven Six",
+      "Designer Fund",
+      "Indie.vc",
+      "TK Ventures",
+      "Soleio",
+      "Jeff Weinstein",
+      "Ilkka Paananen",
+      "Lauren & Vlad Loktev",
+      "Index Ventures"
+    ],
+    "positioning": "Linear is a high-performance, elegant issue tracking and project management tool designed specifically for software development teams, emphasizing speed, clarity, and user delight to empower product teams to build better software faster.",
+    "markets": [
+      {
+        "id": "software-development",
+        "label": "Software Development",
+        "primary": true
+      },
+      {
+        "id": "project-management",
+        "label": "Project Management",
+        "primary": false
+      }
+    ],
+    "target_segment": {
+      "value": "Mixed",
+      "confidence": "high",
+      "source_url": "https://linear.app/about",
+      "evidence": "Used by startups and large enterprises including OpenAI, Coinbase, Ramp, and Fortune 20 companies.",
+      "extracted_at": "2026-05-13T21:07:58.390988+00:00"
+    },
+    "target_verticals": [
+      "Technology",
+      "Software Development",
+      "SaaS",
+      "Startups",
+      "Enterprise Software"
+    ],
+    "business_model": {
+      "value": "B2B",
+      "confidence": "high",
+      "source_url": "https://linear.app/",
+      "evidence": null,
+      "extracted_at": "2026-05-13T21:07:58.390988+00:00"
+    },
+    "gtm_motion": {
+      "value": "product-led",
+      "confidence": "high",
+      "source_url": "https://sacra.com/c/linear/",
+      "evidence": null,
+      "extracted_at": "2026-05-13T21:07:58.390988+00:00"
+    },
+    "pricing_model": {
+      "value": "Subscription",
+      "confidence": "high",
+      "source_url": "https://linear.app/pricing",
+      "evidence": null,
+      "extracted_at": "2026-05-13T21:07:58.390988+00:00"
+    },
+    "key_differentiator": {
+      "value": "Combines UI elegance with world-class performance and speed, designed specifically for software teams to streamline workflows and enhance productivity.",
+      "confidence": "high",
+      "source_url": "https://linear.app/about",
+      "evidence": null,
+      "extracted_at": "2026-05-13T21:07:58.390988+00:00"
+    },
+    "top_3_features": [
+      "Issue tracking with custom fields and automated workflows",
+      "Sprint and project roadmap management",
+      "AI-powered triage and automation"
+    ],
+    "notable_customers": [
+      "OpenAI",
+      "Coinbase",
+      "Ramp",
+      "Cash App",
+      "Supercell"
+    ],
+    "key_people": [
+      {
+        "name": "Karri Saarinen",
+        "role": "Co-founder and CEO",
+        "background": "Former principal designer and co-creator of design systems at Airbnb and founding designer at Coinbase; Y Combinator alumnus.",
+        "linkedin": "https://www.linkedin.com/in/karrisaarinen/"
+      },
+      {
+        "name": "Tuomas Artman",
+        "role": "Co-founder and CTO",
+        "background": "20+ years software engineer with experience at Uber and Groupon, responsible for technology strategy and engineering architecture at Linear.",
+        "linkedin": "https://www.linkedin.com/in/tuomasartman/"
+      },
+      {
+        "name": "Jori Lallo",
+        "role": "Co-founder",
+        "background": "Co-founder of Linear, involved in product and company founding.",
+        "linkedin": ""
+      }
+    ],
+    "growth_signals": [
+      "Reached $100M ARR in 2025",
+      "Employee count grew to 178 by late 2025",
+      "Expanded internationally with distributed team across North America and Europe",
+      "Raised $82M Series C in 2025 at $1.25B valuation",
+      "Introduced AI-powered features and agent integrations"
+    ],
+    "recent_news": [
+      {
+        "date": "2026-04-06",
+        "headline": "Post mortem on Linear security incident on March 24th, 2026",
+        "source_url": "https://linear.app/now/linear-incident-on-mar-24th-2026"
+      },
+      {
+        "date": "2025-06-10",
+        "headline": "Linear raises $82 million Series C at $1.25 billion valuation",
+        "source_url": "https://www.reuters.com/business/atlassian-competitor-linear-raises-funding-125-billion-valuation-2025-06-10/"
+      },
+      {
+        "date": "2023-09-14",
+        "headline": "Linear raises $35 million Series B led by Accel",
+        "source_url": "https://www.forbes.com/sites/alexkonrad/2023/09/14/linear-developer-tools-raises-35-million-series-b/"
+      }
+    ],
+    "pipeline_run_id": "c04465e7-a166-429a-8e1b-6d03305afe4b",
+    "analysis_version": "4.0"
+  },
+  "duration": 31.23999754199758
+}

@@ -15,11 +15,11 @@ LINKUP_BASE = "https://api.linkup.so/v1"
 _MAX_RETRIES = 3
 _RETRY_STATUSES = {429, 500, 502, 503}
 
-# Cost model based on observed Linkup billing (2026-05 wallet export).
-# /research is flat €1.50 regardless of depth (was previously underestimated).
+# Cost model per Linkup official pricing (2026-05 docs).
+# /research: S=€0.25, M=€0.50, L=€1.50, XL=€2.50 (depth-tiered).
 # /search standard = €0.006, /search deep or with structured output = €0.055.
 # /fetch = €0.001-0.005.
-RESEARCH_COST_EUR: dict[str, float] = {"S": 1.50, "M": 1.50, "L": 1.50, "XL": 1.50}
+RESEARCH_COST_EUR: dict[str, float] = {"S": 0.25, "M": 0.50, "L": 1.50, "XL": 2.50}
 SEARCH_COST_EUR: dict[str, float] = {"standard": 0.006, "deep": 0.055, "structured": 0.055}
 FETCH_COST_EUR = 0.005
 # Env-overridable so a scan can be sandboxed below the default cap.

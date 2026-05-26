@@ -50,6 +50,46 @@ class NewsItem(BaseModel):
     source_url: Optional[str] = None
 
 
+class CustomerExample(BaseModel):
+    """A named customer with size/segment classification."""
+    name: str
+    domain: Optional[str] = None    # e.g. "openai.com" — used for logo lookup
+    segment: Optional[Literal["Grand compte", "ETI", "PME", "Startup", "Consumer"]] = None
+    industry: Optional[str] = None
+    evidence: Optional[str] = None  # e.g. "10-day time-to-hire reduction"
+
+
+class Investor(BaseModel):
+    """An investor with optional domain for logo lookup."""
+    name: str
+    domain: Optional[str] = None    # e.g. "sequoiacap.com"
+
+
+class AcquisitionInfo(BaseModel):
+    acquired: bool = False
+    acquirer: Optional[str] = None
+    amount_eur: Optional[int] = None
+    year: Optional[int] = None
+    source_url: Optional[str] = None
+
+
+class PricingTier(BaseModel):
+    name: Optional[str] = None
+    price_monthly_usd: Optional[float] = None
+    price_annual_usd: Optional[float] = None
+    features: List[str] = []
+    target: Optional[str] = None  # target customer segment for this tier
+
+
+class PricingDetail(BaseModel):
+    """Detailed pricing — used by CompanyProfile (UNDERSTAND phase)."""
+    free_plan: Optional[bool] = None
+    tiers: List[PricingTier] = []
+    recent_changes: Optional[str] = None
+    source_url: Optional[str] = None
+    extracted_at: Optional[str] = None
+
+
 class CompanyProfile(BaseModel):
     # Identity
     name: str
@@ -62,11 +102,18 @@ class CompanyProfile(BaseModel):
     hq: Optional[HQ] = None
     geo_coverage: Optional[str] = None
     employees: Optional[DataPoint] = None
+    employee_growth_yoy: Optional[float] = None  # e.g. 0.12 for +12% YoY
 
     # Funding
     funding: Optional[Funding] = None
     funding_stage: Optional[str] = None
-    notable_investors: List[str] = []
+    notable_investors: List[Investor] = []
+    equity_story: Optional[str] = None          # narrative: seed → rounds → strategic rationale
+    acquisition: Optional[AcquisitionInfo] = None
+
+    # Revenue & traction
+    arr_usd: Optional[DataPoint] = None          # Annual Recurring Revenue if disclosed
+    customer_count: Optional[DataPoint] = None   # e.g. "25k customers"
 
     # Product & market
     positioning: Optional[str] = None
@@ -75,12 +122,13 @@ class CompanyProfile(BaseModel):
     target_verticals: List[str] = []
     business_model: Optional[DataPoint] = None
     gtm_motion: Optional[DataPoint] = None
-    pricing_model: Optional[DataPoint] = None
+    pricing_model: Optional[DataPoint] = None   # high-level type (Subscription/Freemium/…)
+    pricing: Optional[PricingDetail] = None     # detailed tiers
 
     # Differentiation
     key_differentiator: Optional[DataPoint] = None
     top_3_features: List[str] = []
-    notable_customers: List[str] = []
+    notable_customers: List[CustomerExample] = []
     tech_stack: List[str] = []
 
     # Team

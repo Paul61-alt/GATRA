@@ -25,12 +25,12 @@ from clients.linkup_client import (
     LinkupClient,
     estimate_today_cost_eur,
 )
-from models.company import DataPoint, HQ
+from models.company import AcquisitionInfo, CustomerExample, DataPoint, HQ, PricingTier
+from pipeline.understand import _norm_segment
 from models.competitor import (
     CompetitorProfile,
     LinkedInSignal,
     PricingSignal,
-    PricingTier,
     RecentSignal,
 )
 from utils.dedup import normalize_domain
@@ -63,7 +63,28 @@ COMPETITOR_SCHEMA = {
         "one_liner": {"type": "string"},
         "key_differentiators": {"type": "array", "items": {"type": "string"}},
         "target_segment": {"type": "string"},
-        "notable_customers": {"type": "array", "items": {"type": "string"}},
+        "notable_customers": {
+            "type": "array",
+            "items": {
+                "type": "object",
+                "properties": {
+                    "name":     {"type": "string"},
+                    "segment":  {"type": "string", "enum": ["Grand compte", "ETI", "PME", "Startup", "Consumer"]},
+                    "industry": {"type": "string"},
+                    "evidence": {"type": "string"},
+                },
+            },
+        },
+        "acquisition": {
+            "type": "object",
+            "properties": {
+                "acquired":    {"type": "boolean"},
+                "acquirer":    {"type": "string"},
+                "amount_eur":  {"type": "integer"},
+                "year":        {"type": "integer"},
+                "source_url":  {"type": "string"},
+            },
+        },
         "pricing": {
             "type": "object",
             "properties": {
@@ -135,7 +156,12 @@ def _research_query(name: str, domain: str) -> str:
         f"SIGNALS: Search news and press from the last 6 months about {name}. "
         "For each item extract: date, headline, signal type (funding/product/hiring/partnership/press), source URL.\n\n"
         f"POSITIONING: List key differentiators of {name} vs alternatives. "
-        "Identify primary target customer segment. List up to 5 publicly known customer names.\n\n"
+        "Identify primary target customer segment. "
+        "List up to 5 publicly known customers — for each, classify: "
+        "'Grand compte' (CAC40/Fortune500), 'ETI' (mid-size 250-5000 employees), "
+        "'PME' (<250 employees), 'Startup', or 'Consumer'. Include industry and any concrete result.\n\n"
+        f"ACQUISITION: Find whether {name} has been acquired. "
+        "If yes: acquirer name, amount in EUR, year, source URL. If not acquired, return acquired=false.\n\n"
         f"WEAKNESSES: Search G2, Capterra, Reddit, Hacker News for user complaints or limitations of {name}. "
         "List the most recurring themes."
     )
@@ -227,6 +253,29 @@ def _parse_result(
 
     differentiators = data.get("key_differentiators", [])
 
+    notable_customers = [
+        CustomerExample(
+            name=c.get("name", ""),
+            domain=c.get("domain"),
+            segment=_norm_segment(c.get("segment")),
+            industry=c.get("industry"),
+            evidence=c.get("evidence"),
+        )
+        for c in (data.get("notable_customers") or [])
+        if isinstance(c, dict) and c.get("name")
+    ]
+
+    acquisition_raw = data.get("acquisition") or {}
+    acquisition = None
+    if acquisition_raw and isinstance(acquisition_raw, dict):
+        acquisition = AcquisitionInfo(
+            acquired=acquisition_raw.get("acquired", False),
+            acquirer=acquisition_raw.get("acquirer"),
+            amount_eur=acquisition_raw.get("amount_eur"),
+            year=acquisition_raw.get("year"),
+            source_url=acquisition_raw.get("source_url"),
+        )
+
     return CompetitorProfile(
         name=data.get("name") or competitor.get("name", ""),
         website=data.get("website") or competitor.get("website", ""),
@@ -254,7 +303,8 @@ def _parse_result(
         differentiator=differentiators[0] if differentiators else competitor.get("differentiator"),
         key_differentiators=differentiators,
         target_segment=data.get("target_segment"),
-        notable_customers=data.get("notable_customers", []),
+        notable_customers=notable_customers,
+        acquisition=acquisition,
         weaknesses=data.get("weaknesses", []),
         pricing=pricing,
         recent_signals=[s.headline for s in structured_signals][:5],  # compat with transform.py
@@ -361,7 +411,9 @@ def _batched_query(competitors: list[dict]) -> str:
         "- name (exact match from the list above — CRITICAL for matching)\n"
         "- website, linkedin_url, hq_city, hq_country, founded_year, employee_count\n"
         "- funding_stage, funding_total_usd, last_round_amount_usd, last_round_date, last_round_type, key_investors\n"
-        "- one_liner, key_differentiators, target_segment, notable_customers, weaknesses\n"
+        "- one_liner, key_differentiators, target_segment, weaknesses\n"
+        "- notable_customers: array of {name, segment (Grand compte/ETI/PME/Startup/Consumer), industry, evidence}\n"
+        "- acquisition: {acquired (bool), acquirer, amount_eur, year, source_url} — return acquired=false if not acquired\n"
         "- pricing: free_plan (bool), tiers [{name, price_monthly_usd, price_annual_usd, features, target}], recent_changes\n"
         "- founder_linkedin_urls\n"
         "- recent_signals: array of {date, headline, source_url, type ∈ funding/product/hiring/partnership/press} — last 6 months\n"
