@@ -41,6 +41,13 @@ class NamedEntity(BaseModel):
     domain: Optional[str] = None
 
 
+class KeyPerson(BaseModel):
+    """Founder/executive for Overview display. snake_case JSON."""
+    name: str
+    role: Optional[str] = None
+    linkedin: Optional[str] = None  # full URL: https://linkedin.com/in/...
+
+
 class Company(_CamelModel):
     id: str
     name: str
@@ -67,6 +74,9 @@ class Company(_CamelModel):
     )
     notable_investors: list[NamedEntity] = Field(
         default_factory=list, serialization_alias="notable_investors"
+    )
+    key_people: list[KeyPerson] = Field(
+        default_factory=list, serialization_alias="key_people"
     )
     is_subject: bool = False
     similarity: Optional[float] = None

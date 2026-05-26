@@ -155,6 +155,58 @@ function OverviewScreen({ data, onOpenCompany, loadingPhase = 2 }) {
         </div>
       )}
 
+      {/* ── Founders & Leadership ── */}
+      {subjectReady && subject.key_people && subject.key_people.length > 0 && (
+        <div className="card" style={{marginBottom:20}}>
+          <div className="card-h">
+            <h3>Founders & leadership</h3>
+            <span className="meta">{subject.key_people.length} highlighted</span>
+          </div>
+          <div style={{display:"flex", alignItems:"center", flexWrap:"wrap", padding:"0"}}>
+            {subject.key_people.map((p) => {
+              const initials = p.name.split(/\s+/).slice(0, 2).map(w => w[0]).join("").toUpperCase();
+              const hasLink = !!p.linkedin;
+              const Tag = hasLink ? "a" : "div";
+              const tagProps = hasLink
+                ? { href: p.linkedin, target: "_blank", rel: "noopener noreferrer" }
+                : {};
+              const hue = (p.name.charCodeAt(0) * 37 + (p.name.charCodeAt(1) || 0) * 11) % 360;
+              return (
+                <Tag key={p.name} {...tagProps}
+                  style={{
+                    display:"flex", alignItems:"center", gap:12,
+                    padding:"12px 20px", flex:"0 0 auto",
+                    textDecoration:"none", borderRadius:6,
+                    cursor: hasLink ? "pointer" : "default",
+                    transition:"background .15s",
+                  }}
+                  onMouseEnter={e => { if (hasLink) e.currentTarget.style.background = "var(--bg-2)"; }}
+                  onMouseLeave={e => e.currentTarget.style.background = "transparent"}
+                >
+                  <div style={{
+                    width:32, height:32, borderRadius:"50%",
+                    background: `hsl(${hue}, 35%, 78%)`,
+                    color:"#222", fontSize:11, fontWeight:600, letterSpacing:0.3,
+                    display:"flex", alignItems:"center", justifyContent:"center",
+                    flexShrink:0,
+                  }}>{initials}</div>
+                  <div style={{display:"flex", flexDirection:"column", gap:1}}>
+                    <span style={{fontSize:13, fontWeight:500, color:"var(--fg-2)", whiteSpace:"nowrap"}}>
+                      {p.name}
+                    </span>
+                    {p.role && (
+                      <span style={{fontSize:11, color:"var(--fg-4)", whiteSpace:"nowrap"}}>
+                        {p.role}
+                      </span>
+                    )}
+                  </div>
+                </Tag>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
       {/* ── Notable investors ── */}
       {subjectReady && subject.notable_investors && subject.notable_investors.length > 0 && (
         <div className="card" style={{marginBottom:20}}>

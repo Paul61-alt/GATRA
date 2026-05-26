@@ -17,6 +17,7 @@ from models.radar_output import (
     Feature,
     FundingEvent,
     FundingInfo,
+    KeyPerson,
     NamedEntity,
     PricingSummary,
     PricingTier,
@@ -166,6 +167,11 @@ def _map_subject(profile: CompanyProfile) -> Company:
             NamedEntity(name=i.name, domain=i.domain)
             for i in profile.notable_investors
             if i.name
+        ],
+        key_people=[
+            KeyPerson(name=p.name, role=p.role, linkedin=p.linkedin)
+            for p in (profile.key_people or [])[:5]
+            if p.name
         ],
         is_subject=True,
     )
