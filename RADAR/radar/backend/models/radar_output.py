@@ -34,6 +34,13 @@ class PricingSummary(_CamelModel):
     mention: str
 
 
+class NamedEntity(BaseModel):
+    """Logo-ready entity: name + domain for img.logo.dev lookup.
+    Plain BaseModel (no _CamelModel) — fields stay snake_case in JSON."""
+    name: str
+    domain: Optional[str] = None
+
+
 class Company(_CamelModel):
     id: str
     name: str
@@ -54,6 +61,13 @@ class Company(_CamelModel):
     customers: Optional[int] = None
     avg_contract: Optional[float] = None
     notable: list[str] = Field(default_factory=list)
+    # Frontend reads these in snake_case (overrides _CamelModel default)
+    notable_customers: list[NamedEntity] = Field(
+        default_factory=list, serialization_alias="notable_customers"
+    )
+    notable_investors: list[NamedEntity] = Field(
+        default_factory=list, serialization_alias="notable_investors"
+    )
     is_subject: bool = False
     similarity: Optional[float] = None
     threat: Optional[ThreatLevel] = None

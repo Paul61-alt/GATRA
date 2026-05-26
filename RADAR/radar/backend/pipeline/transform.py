@@ -17,6 +17,7 @@ from models.radar_output import (
     Feature,
     FundingEvent,
     FundingInfo,
+    NamedEntity,
     PricingSummary,
     PricingTier,
     RadarConfig,
@@ -156,11 +157,78 @@ def _map_subject(profile: CompanyProfile) -> Company:
         arr=float(profile.arr_usd.value) if profile.arr_usd and profile.arr_usd.value else None,
         customers=int(profile.customer_count.value) if profile.customer_count and profile.customer_count.value else None,
         notable=profile.growth_signals[:5],
+        notable_customers=[
+            NamedEntity(name=c.name, domain=c.domain)
+            for c in profile.notable_customers
+            if c.name
+        ],
+        notable_investors=[
+            NamedEntity(name=i.name, domain=i.domain)
+            for i in profile.notable_investors
+            if i.name
+        ],
         is_subject=True,
     )
 
 
-def _map_competitor(profile: CompetitorProfile) -> Company:
+def _threat_from_score(score: int) -> str:
+    """Map 0-100 threat score → ThreatLevel string."""
+    if score >= 70:
+        return "high"
+    elif score >= 40:
+        return "medium"
+    return "low"
+
+
+_STOPWORDS = frozenset({
+    "with", "that", "this", "from", "into", "their", "have", "been",
+    "more", "than", "your", "will", "about", "which", "when", "what",
+    "also", "using", "based", "platform", "software", "solution",
+    "tool", "tools", "system", "helps", "help", "make",
+})
+
+
+def _compute_similarity(subject: CompanyProfile, competitor: CompetitorProfile) -> float:
+    """Heuristic similarity score 0.0–1.0 based on keyword overlap.
+
+    Compares subject positioning/markets vs competitor one_liner/differentiators.
+    Jaccard similarity scaled to 0.50–1.00 range (all listed competitors are
+    at least partially related).
+    """
+    subj_text = " ".join(filter(None, [
+        subject.positioning or "",
+        " ".join(m.label for m in (subject.markets or [])),
+        subject.summary or "",
+        " ".join(subject.top_3_features or []),
+    ])).lower()
+
+    comp_text = " ".join(filter(None, [
+        competitor.one_liner or "",
+        competitor.differentiator or "",
+        " ".join(competitor.key_differentiators or []),
+        competitor.target_segment or "",
+    ])).lower()
+
+    subj_words = {w for w in re.findall(r"\b[a-z]{4,}\b", subj_text) if w not in _STOPWORDS}
+    comp_words = {w for w in re.findall(r"\b[a-z]{4,}\b", comp_text) if w not in _STOPWORDS}
+
+    if not subj_words or not comp_words:
+        return 0.5
+
+    intersection = len(subj_words & comp_words)
+    union = len(subj_words | comp_words)
+    jaccard = intersection / union if union else 0.0
+
+    # Scale: typical jaccard for competitive pairs ≈ 0.02–0.15
+    # Map to 0.50–1.00 so UI always shows a meaningful bar.
+    return round(min(1.0, 0.5 + jaccard * 4), 2)
+
+
+def _map_competitor(
+    profile: CompetitorProfile,
+    threat_score: int = 50,
+    similarity: float = 0.5,
+) -> Company:
     hq_str = _format_hq(profile.hq)
     hq_coords: tuple[float, float] = (
         (profile.hq.lat or 0.0, profile.hq.lng or 0.0)
@@ -190,9 +258,8 @@ def _map_competitor(profile: CompetitorProfile) -> Company:
         investors=[],
         pricing=PricingSummary(model=pricing_model, starts_at=0, mention="Contact sales"),
         notable=profile.recent_signals[:5],
-        # Placeholders — overwritten by synthesize phase once implemented
-        similarity=0.5,
-        threat="medium",
+        similarity=similarity,
+        threat=_threat_from_score(threat_score),
     )
 
 
@@ -201,7 +268,18 @@ def pipeline_run_to_radar_output(run: PipelineRun) -> RadarOutput:
         raise ValueError("PipelineRun.company_profile is None — pipeline did not complete")
 
     subject = _map_subject(run.company_profile)
-    competitors = [_map_competitor(c) for c in run.competitors]
+
+    # Build threat score lookup keyed by normalized domain
+    # discover.py stores scores keyed by bare domain (e.g. "testgorilla.com")
+    threat_scores: dict[str, int] = run.threat_scores or {}
+
+    competitors: list[Company] = []
+    for c_profile in run.competitors:
+        domain_key = _parse_domain(c_profile.website)  # strips scheme + www
+        threat_score = threat_scores.get(domain_key, 50)
+        similarity = _compute_similarity(run.company_profile, c_profile)
+        competitors.append(_map_competitor(c_profile, threat_score=threat_score, similarity=similarity))
+
     all_ids = [subject.id] + [c.id for c in competitors]
 
     # Funding events (subject only; competitors have no round history in current models)

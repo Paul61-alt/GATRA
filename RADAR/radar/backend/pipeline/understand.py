@@ -68,18 +68,62 @@ def _norm_segment(raw: str | None) -> str | None:
     return None
 
 
-# ── EXTERNAL SEARCH SCHEMA ─────────────────────────────────────────────────────
-# Only fields sourced from external databases (Crunchbase, LinkedIn, press).
-# Page-sourced fields (HQ, GTM, team…) come from _extract_from_pages() via Claude.
-_EXTERNAL_SCHEMA = {
+# ── LINKEDIN SCHEMA (Lane 2) ───────────────────────────────────────────────────
+# LinkedIn = source of truth for employees, growth, key people, founded, HQ.
+_LINKEDIN_SCHEMA = {
     "type": "object",
     "properties": {
-        # ── COMPANY BASICS (fallback when page fetch fails) ───────────
-        "hq_city":    {"type": "string"},
-        "hq_country": {"type": "string"},
+        "employees": {
+            "type": "object",
+            "properties": {
+                "value":      {"type": "integer"},
+                "confidence": {"type": "string", "enum": ["high", "medium", "low"]},
+                "source_url": {"type": "string"},
+                "evidence":   {"type": "string"},
+            },
+        },
+        "employee_growth_yoy": {"type": "number"},  # fraction: 0.12 = +12%
+        "founded_year":        {"type": "integer"},
+        "hq_city":             {"type": "string"},
+        "hq_country":          {"type": "string"},
+        "key_people": {
+            "type": "array",
+            "items": {
+                "type": "object",
+                "properties": {
+                    "name":       {"type": "string"},
+                    "role":       {"type": "string"},
+                    "background": {"type": "string"},
+                    "linkedin":   {"type": "string"},
+                },
+            },
+        },
+        "recent_posts": {
+            "type": "array",
+            "items": {
+                "type": "object",
+                "properties": {
+                    "date":       {"type": "string"},
+                    "headline":   {"type": "string"},
+                    "url":        {"type": "string"},
+                },
+            },
+        },
+    },
+}
+
+
+# ── NEWS / PRESS / CRUNCHBASE SCHEMA (Lane 3) ─────────────────────────────────
+# Press, financial data, ARR, customers, recent news with full source attribution.
+_NEWS_SCHEMA = {
+    "type": "object",
+    "properties": {
+        # ── COMPANY BASICS (fallback if LinkedIn lane fails) ──────────
+        "hq_city":      {"type": "string"},
+        "hq_country":   {"type": "string"},
         "founded_year": {"type": "integer"},
 
-        # ── SIZE ──────────────────────────────────────────────────────
+        # ── SIZE (fallback) ───────────────────────────────────────────
         "employees": {
             "type": "object",
             "properties": {
@@ -88,7 +132,7 @@ _EXTERNAL_SCHEMA = {
                 "source_url": {"type": "string"},
             },
         },
-        "employee_growth_yoy": {"type": "number"},  # fraction: 0.12 = +12%
+        "employee_growth_yoy": {"type": "number"},
 
         # ── FUNDING ───────────────────────────────────────────────────
         "funding_total_eur": {
@@ -198,6 +242,7 @@ _EXTERNAL_SCHEMA = {
                 "properties": {
                     "date":       {"type": "string"},
                     "headline":   {"type": "string"},
+                    "source":     {"type": "string"},  # "TechCrunch", "Les Echos"…
                     "source_url": {"type": "string"},
                 },
             },
@@ -269,7 +314,10 @@ Key rules:
 - GTM: find the PRIMARY call-to-action button on the homepage.
   "Request demo" / "Book a demo" / "Talk to sales" / "Contact us" → sales-led (return exact text as evidence).
   "Start free" / "Sign up" / "Try free" / "Get started" (no sales mention) → product-led.
-- Customers: only include those explicitly shown on website (logos, testimonials, case studies visible on pages).
+- Customers: scan the entire page for customer mentions — look for image alt-text
+  (e.g. ![H&M](...) or alt="Capgemini"), testimonials with company names, case study
+  links, "Trusted by …" sections, customer success quotes. Include any company name
+  found in these contexts even without an explicit logo description.
 - Key people: extract from /team or /about. Include LinkedIn URL only if directly linked on the page.
 - Pricing: extract from /pricing page only. null if page not available or enterprise/contact-sales only.
 - Set any field to null if not found on these pages — do not guess or hallucinate."""
@@ -285,13 +333,16 @@ def _extract_from_pages(
 
     sections = []
     if pages.get("homepage"):
-        sections.append(f"=== HOMEPAGE ({domain}/) ===\n{pages['homepage'][:3000]}")
+        # Customer logos / "Trusted by" sections often appear deep in the page (≥10k chars)
+        sections.append(f"=== HOMEPAGE ({domain}/) ===\n{pages['homepage'][:18000]}")
     if pages.get("about"):
-        sections.append(f"=== ABOUT PAGE ({domain}/about) ===\n{pages['about'][:2500]}")
+        sections.append(f"=== ABOUT PAGE ({domain}/about) ===\n{pages['about'][:6000]}")
+    if pages.get("company"):
+        sections.append(f"=== COMPANY PAGE ({domain}/company) ===\n{pages['company'][:6000]}")
     if pages.get("team"):
-        sections.append(f"=== TEAM PAGE ({domain}/team) ===\n{pages['team'][:2000]}")
+        sections.append(f"=== TEAM PAGE ({domain}/team) ===\n{pages['team'][:4000]}")
     if pages.get("pricing"):
-        sections.append(f"=== PRICING PAGE ({domain}/pricing) ===\n{pages['pricing'][:2000]}")
+        sections.append(f"=== PRICING PAGE ({domain}/pricing) ===\n{pages['pricing'][:4000]}")
 
     user = (
         f"Company domain: {domain}\n\n"
@@ -323,81 +374,127 @@ Return this JSON (null for any field not found):
     )
 
     try:
-        return claude.extract_json(_PAGE_EXTRACT_SYSTEM, user, max_tokens=2048)
+        return claude.extract_json(_PAGE_EXTRACT_SYSTEM, user, max_tokens=3072)
     except Exception as e:
         logger.warning("understand extract_from_pages failed domain=%s error=%s", domain, e)
         return {}
 
 
-# ── STEP 3: EXTERNAL SEARCH QUERY ─────────────────────────────────────────────
+# ── STEP 3: SEARCH QUERIES ────────────────────────────────────────────────────
 
-def _external_search_query(domain: str, company_name: str | None = None) -> str:
-    """Focused external-only search. Company pages already fetched — don't re-crawl them."""
+def _linkedin_query(domain: str, company_name: str | None = None) -> str:
+    """LinkedIn-focused search (Lane 2). Source of truth for employees + growth."""
     name = company_name or domain
     return (
-        f"Research {name} ({domain}) using ONLY external sources.\n"
-        f"Do NOT crawl {domain} directly — those pages have already been read.\n\n"
-        "Target high-quality sources (examples, not exclusive): "
-        "Crunchbase, Pitchbook, Dealroom, LinkedIn company page, TechCrunch, "
-        "EU Startups, Les Echos, VentureBeat, press releases, financial filings.\n\n"
+        f"Find data about {name} ({domain}) from LinkedIn ONLY.\n"
+        "Primary sources: linkedin.com/company/* (company page) and "
+        "linkedin.com/in/* (people profiles). Do NOT use Crunchbase, press, or other sites.\n\n"
         "Find:\n"
-        "HQ: Founding city and country from Crunchbase or Dealroom (NOT LinkedIn office address).\n"
-        "FOUNDED: Year the company was founded.\n"
-        "EMPLOYEES: Current headcount and YoY growth percentage from LinkedIn company page.\n"
+        f"EMPLOYEES: Current headcount of {name} from LinkedIn company page header "
+        "(e.g. '122 employees on LinkedIn'). Return integer.\n"
+        f"GROWTH: Employee count change for {name} over last 12 months as percentage "
+        "(e.g. +12% YoY). Use LinkedIn's 'Employee insights' section or compare to "
+        "older snapshots if visible. Return decimal: 0.12 = +12%.\n"
+        f"FOUNDED: Year {name} was founded — from LinkedIn 'About' section.\n"
+        f"HQ: Headquarters city + country from LinkedIn 'About' section. "
+        "Prefer founding city if multiple offices listed.\n"
+        f"KEY PEOPLE: Top 5 founders/executives at {name} — name, role, full LinkedIn "
+        "profile URL (linkedin.com/in/...). Source: LinkedIn People tab.\n"
+        f"RECENT POSTS: 3-5 most recent posts from {name}'s company page — date, headline, "
+        "full URL (linkedin.com/posts/...)."
+    )
+
+
+def _news_query(domain: str, company_name: str | None = None) -> str:
+    """News + press + financial data search (Lane 3). Source of truth for ARR + funding."""
+    name = company_name or domain
+    return (
+        f"Find press coverage, financial data, and traction signals for {name} ({domain}).\n"
+        f"Do NOT crawl {domain} (already fetched) or LinkedIn (handled separately).\n\n"
+        "Target sources: Crunchbase, Pitchbook, Dealroom, TechCrunch, EU Startups, "
+        "Les Echos, La Tribune, BFM Business, VentureBeat, Sifted, official press releases, "
+        "financial filings, public earning calls.\n\n"
+        "Find:\n"
         f"FUNDING: All investment rounds for {name} — amount in EUR, date, lead investor, "
         "total raised, current stage (Seed/Series A/B/C+/Public/Bootstrapped).\n"
-        "INVESTORS: All notable investors — VCs, angels, corporate funds.\n"
-        "TRACTION: ARR or revenue milestones announced in press or interviews. "
-        "Customer count if publicly announced.\n"
-        "ACQUISITION: Whether the company has been acquired — acquirer, amount EUR, year.\n"
-        "TECH STACK: Technologies inferred from job postings, BuiltWith, engineering blog.\n"
-        "TEAM: Founders and executives — LinkedIn profile URLs (linkedin.com/in/...), background.\n"
-        "NEWS: Last 3 significant news items (funding, product launch, partnership) with date and URL.\n"
-        "SIGNALS: Growth indicators — new offices, hiring surges, geo expansion, product launches.\n"
-        "CUSTOMERS: Enterprise customers mentioned in press, case studies, or analyst reports "
-        "(complementing what is shown on the website)."
+        f"INVESTORS: All notable investors in {name} — VCs, angels, corporate funds. "
+        "List of names only.\n"
+        f"ARR: Annual Recurring Revenue for {name} ONLY if explicitly disclosed in a "
+        "funding announcement, press release, podcast or interview "
+        "(e.g. 'Linear hit $100M ARR before Series C', 'crossed €50M ARR'). "
+        "Do NOT estimate from valuation or headcount. Return null if not publicly stated.\n"
+        f"CUSTOMER COUNT: Total customer count for {name} if announced "
+        "(e.g. '25,000 companies', '500 enterprise customers').\n"
+        f"NOTABLE CUSTOMERS: List 5-10 enterprise customers of {name} mentioned in any "
+        "press release, case study, blog post, analyst report, podcast, or LinkedIn post. "
+        "Also check the company's own homepage 'Trusted by' section if cached in search results. "
+        "For each: name + domain (e.g. {'name': 'OpenAI', 'domain': 'openai.com'}). "
+        "Skip if no public customers can be confirmed.\n"
+        f"ACQUISITION: Whether {name} has been acquired — acquirer, amount EUR, year.\n"
+        f"TECH STACK: Technologies used by {name}, inferred from job postings, BuiltWith, engineering blog.\n"
+        f"GROWTH SIGNALS: Hiring surges, new offices, product launches, milestones for {name} (3-5 items).\n"
+        f"RECENT NEWS: 5-10 most significant news items about {name} — date, headline, "
+        "source name (e.g. 'TechCrunch', 'Les Echos'), full source URL."
     )
 
 
 # ── STEP 4: MERGE ─────────────────────────────────────────────────────────────
 
-def _merge_data(page_data: dict, search_data: dict) -> dict:
-    """Merge page-extracted and external-search data.
+def _merge_data(page_data: dict, linkedin_data: dict, news_data: dict) -> dict:
+    """3-source merge with explicit priority lanes.
 
-    Page data wins: HQ, GTM, founded_year, summary, positioning, markets,
-                    key_people names/roles, pricing (tiers), customers visible on site.
-    Search data wins: funding, investors, employees, tech_stack, news, ARR, acquisition.
-    Merge: key_people (page names + search LinkedIn URLs), customers (union, page wins per-customer).
+    Priority order per field:
+    - PAGES   wins for: HQ, GTM, positioning, summary, markets, pricing, key_differentiator
+    - LINKEDIN wins for: employees, growth, founded_year (LinkedIn About > others)
+    - NEWS    wins for: funding, ARR, recent_news, customers, signals
+    Fallback: if winner has no value, fall back to other sources.
     """
     merged: dict = {}
 
-    # Fields where page data is authoritative
     _PAGE_WINS = [
-        "name", "website", "summary", "founded_year",
-        "hq_city", "hq_country", "geo_coverage",
+        "name", "website", "summary", "geo_coverage",
         "positioning", "markets", "target_segment", "target_verticals",
         "business_model", "gtm_motion", "pricing_model",
         "key_differentiator", "top_3_features", "pricing",
     ]
-    # Fields where external search is authoritative
-    _SEARCH_WINS = [
+    _LI_WINS = [
         "employees", "employee_growth_yoy",
+    ]
+    _NEWS_WINS = [
         "funding_total_eur", "funding_stage", "funding_last_round",
         "funding_last_round_date", "funding_rounds", "notable_investors",
         "arr_usd", "customer_count", "acquisition",
         "tech_stack", "growth_signals", "recent_news",
+        # HQ + founded: News (Crunchbase/press) more reliable than LinkedIn
+        # (LinkedIn shows current office, may differ from founding city)
+        "hq_city", "hq_country", "founded_year",
     ]
 
     def _has_value(v) -> bool:
         return v is not None and v != [] and v != {} and v != ""
 
-    for field in _PAGE_WINS:
-        val = page_data.get(field)
-        merged[field] = val if _has_value(val) else search_data.get(field)
+    def _first_value(*sources):
+        for s in sources:
+            if _has_value(s):
+                return s
+        return None
 
-    for field in _SEARCH_WINS:
-        val = search_data.get(field)
-        merged[field] = val if _has_value(val) else page_data.get(field)
+    for field in _PAGE_WINS:
+        merged[field] = _first_value(page_data.get(field), linkedin_data.get(field), news_data.get(field))
+
+    for field in _LI_WINS:
+        merged[field] = _first_value(linkedin_data.get(field), page_data.get(field), news_data.get(field))
+
+    for field in _NEWS_WINS:
+        merged[field] = _first_value(news_data.get(field), linkedin_data.get(field), page_data.get(field))
+
+    # Carry through LinkedIn-only field
+    if _has_value(linkedin_data.get("recent_posts")):
+        merged["recent_posts"] = linkedin_data["recent_posts"]
+
+    # Reframe: search_data for the union-merge sections below = LI ∪ News
+    search_data = {**news_data, **{k: v for k, v in linkedin_data.items() if _has_value(v)}}
+    page_data = page_data  # explicit
 
     # key_people: page has names/roles → search adds LinkedIn URLs + background
     page_people = page_data.get("key_people") or []
@@ -465,7 +562,7 @@ async def run(
             except Exception as _e:
                 logger.debug("understand emit error ignored: %s", _e)
 
-    logger.info("phase=UNDERSTAND company=%s status=start arch=fetch_first", domain)
+    logger.info("phase=UNDERSTAND company=%s status=start arch=3_lanes", domain)
 
     # ── STEP 1: Parallel fetch company pages ──────────────────────────────────
     pages = await _fetch_company_pages(domain, linkup, emit)
@@ -480,16 +577,30 @@ async def run(
             domain, sum(1 for v in page_data.values() if v is not None),
         )
 
-    # ── STEP 3: External search (funding, investors, news…) ───────────────────
-    ext_raw = await linkup.search(
-        depth="deep",
-        query=_external_search_query(domain, page_data.get("name")),
-        schema=_EXTERNAL_SCHEMA,
+    # ── STEP 3: TWO parallel deep searches — LinkedIn + News ──────────────────
+    _company_name = page_data.get("name") or domain
+    linkedin_raw, news_raw = await asyncio.gather(
+        linkup.search(
+            depth="deep",
+            query=_linkedin_query(domain, _company_name),
+            schema=_LINKEDIN_SCHEMA,
+        ),
+        linkup.search(
+            depth="deep",
+            query=_news_query(domain, _company_name),
+            schema=_NEWS_SCHEMA,
+        ),
     )
-    ext_data: dict = ext_raw.get("data") or ext_raw.get("answer") or ext_raw.get("output") or {}
+    linkedin_data: dict = linkedin_raw.get("data") or linkedin_raw.get("answer") or {}
+    news_data: dict = news_raw.get("data") or news_raw.get("answer") or {}
+    logger.info(
+        "understand searches done linkedin_fields=%d news_fields=%d",
+        sum(1 for v in linkedin_data.values() if v is not None),
+        sum(1 for v in news_data.values() if v is not None),
+    )
 
-    # Collect + dedup source URLs
-    sources: list = ext_raw.get("sources", [])
+    # Collect + dedup source URLs from BOTH searches
+    sources: list = (linkedin_raw.get("sources") or []) + (news_raw.get("sources") or [])
     _seen: set[str] = set()
     source_urls: list[str] = []
     for s in sources:
@@ -513,8 +624,8 @@ async def run(
                 "payload": {"url": src_url[:100], "domain": src_domain[:100]},
             })
 
-    # ── STEP 4: Merge page + search data ─────────────────────────────────────
-    data = _merge_data(page_data, ext_data)
+    # ── STEP 4: Merge 3 sources (pages + LinkedIn + news) ────────────────────
+    data = _merge_data(page_data, linkedin_data, news_data)
     first_src_url = source_urls[0] if source_urls else None
 
     # ── HELPERS ───────────────────────────────────────────────────────────────
