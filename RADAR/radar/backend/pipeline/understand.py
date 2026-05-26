@@ -383,25 +383,37 @@ Return this JSON (null for any field not found):
 # ── STEP 3: SEARCH QUERIES ────────────────────────────────────────────────────
 
 def _linkedin_query(domain: str, company_name: str | None = None) -> str:
-    """LinkedIn-focused search (Lane 2). Source of truth for employees + growth."""
+    """LinkedIn-focused search (Lane 2) — follows Linkup official LinkedIn pattern.
+
+    Per docs.linkup.so/.../search/best-practices#linkedin-data-extraction:
+    - /fetch fails on LinkedIn (login wall) — must use /search
+    - Exact URL required: linkedin.com/company/{slug} or linkedin.com/in/{slug}
+    - Multi-step pattern: 'First find URL, then scrape, return X'
+    - Mode 'deep' handles URL discovery + extraction in a single call.
+    """
     name = company_name or domain
+    # Slug hint derived from domain (e.g. makipeople.com → makipeople, linear.app → linear)
+    _slug_hint = domain.split(".")[0]
     return (
-        f"Find data about {name} ({domain}) from LinkedIn ONLY.\n"
-        "Primary sources: linkedin.com/company/* (company page) and "
-        "linkedin.com/in/* (people profiles). Do NOT use Crunchbase, press, or other sites.\n\n"
-        "Find:\n"
-        f"EMPLOYEES: Current headcount of {name} from LinkedIn company page header "
-        "(e.g. '122 employees on LinkedIn'). Return integer.\n"
-        f"GROWTH: Employee count change for {name} over last 12 months as percentage "
-        "(e.g. +12% YoY). Use LinkedIn's 'Employee insights' section or compare to "
-        "older snapshots if visible. Return decimal: 0.12 = +12%.\n"
-        f"FOUNDED: Year {name} was founded — from LinkedIn 'About' section.\n"
-        f"HQ: Headquarters city + country from LinkedIn 'About' section. "
-        "Prefer founding city if multiple offices listed.\n"
-        f"KEY PEOPLE: Top 5 founders/executives at {name} — name, role, full LinkedIn "
-        "profile URL (linkedin.com/in/...). Source: LinkedIn People tab.\n"
-        f"RECENT POSTS: 3-5 most recent posts from {name}'s company page — date, headline, "
-        "full URL (linkedin.com/posts/...)."
+        f"First, find the exact LinkedIn company page URL for {name} ({domain}). "
+        f"It likely follows the pattern linkedin.com/company/{_slug_hint} or a close variant. "
+        f"Then scrape that URL and return the following structured data:\n\n"
+        f"- EMPLOYEES: Total employee count shown in the company page header "
+        f"(e.g. '122 employees'). Return as integer.\n"
+        f"- EMPLOYEE_GROWTH_YOY: Year-over-year employee count change as decimal "
+        f"(e.g. +12% → 0.12, -5% → -0.05). Compute from LinkedIn's 'Employee insights' "
+        f"section if visible, or from headcount history if accessible.\n"
+        f"- FOUNDED_YEAR: Year the company was founded, from the LinkedIn 'About' section.\n"
+        f"- HQ_CITY, HQ_COUNTRY: Headquarters location from LinkedIn 'About'. "
+        f"If multiple offices listed, prefer the original founding location.\n\n"
+        f"Then, find the LinkedIn profile URLs (linkedin.com/in/...) for the top 5 "
+        f"founders and executives at {name} (CEO, CTO, CPO, co-founders, VP-level). "
+        f"Return for each: name, role, exact LinkedIn URL, short background (1 sentence).\n\n"
+        f"Finally, return the 3-5 most recent public posts from the company page. "
+        f"For each: date, headline (first 150 chars), and full post URL "
+        f"(linkedin.com/posts/...).\n\n"
+        f"If any field cannot be retrieved from LinkedIn, return null for that field. "
+        f"Do not fabricate values or pull from other sources."
     )
 
 
