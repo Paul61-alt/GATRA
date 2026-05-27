@@ -248,6 +248,16 @@ function CopilotPanel({ open, onClose, data }) {
           <Ic d={<><path d="M22 2L11 13"/><path d="M22 2L15 22 11 13 2 9l20-7z"/></>} sz={14} />
         </button>
       </div>
+      <div style={{
+        display: "flex", alignItems: "center", justifyContent: "center", gap: 5,
+        padding: "6px 0 10px",
+        opacity: 0.45,
+      }}>
+        <img src="https://www.linkup.so/favicon.ico" alt="" width={11} height={11} style={{borderRadius: 2}} />
+        <span style={{ fontSize: 10, fontFamily: "var(--font-mono)", letterSpacing: "0.02em" }}>
+          Powered by Linkup
+        </span>
+      </div>
     </div>
   );
 }
