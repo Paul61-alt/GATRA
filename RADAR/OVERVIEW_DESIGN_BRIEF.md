@@ -46,6 +46,89 @@ Goal: re-architect Overview around **what's unique to the subject**, surface the
 
 ---
 
+## Stack constraint (read first)
+
+Current prototype = `index.html` + inline Babel + CDN React 18 + plain `styles.css` (CSS custom properties). **No build step, no Tailwind, no npm deps.** shadcn requires Tailwind v4 + Radix UI + a bundler.
+
+Three paths if we adopt shadcn:
+
+| Path | What it costs | What it gives |
+|---|---|---|
+| **A. Visual reference only** | 0 — copy markup/structure into existing JSX + plain CSS | Pattern parity, zero stack churn. Hackathon-friendly. |
+| **B. Port primitives by hand** | ~1d — re-implement HoverCard/Item/Badge in plain CSS, keep radix-ui via UMD if needed | Component API parity, no Tailwind. Mid-effort. |
+| **C. Migrate to Vite + Tailwind + shadcn** | ~2–3d — full frontend rebuild (deleted `frontend/` showed prior intent) | Real shadcn install, accessibility wins, future-proof. |
+
+**Recommendation: Path A for the hackathon push, Path C post-MVP.** Below mapping assumes Path A — components are referenced for their *patterns and API*, not as install targets.
+
+---
+
+## shadcn → zone mapping
+
+| Zone | shadcn primitive(s) | Why |
+|---|---|---|
+| **A. Hero ribbon** | `card` (subtle bg), `avatar` (logo+fallback), `badge` (SUBJECT pill), `button` variant=ghost (⟳ rescan) | Existing LogoMark already covers avatar role; badge replaces inline `.tag.subject` |
+| **B. At-a-glance bar** | `item` (`ItemMedia` + `ItemContent` + `ItemActions`), `badge` (confidence dot via small rounded `Badge variant="outline"`), `hover-card` (citation popover on each cell), `separator` between cells | `item` API is exactly the KV row shape we need (label / value / confidence indicator) |
+| **C. The Moat** | `card`, `badge` (tech-stack chips, `variant="outline"`), `separator`, `hover-card` on `key_differentiator` for evidence | Chip cloud = `<Badge variant="outline">` flex-wrapped |
+| **D. News & Momentum** | `card`, `hover-card` for "N sources" → popover lists outlets, `badge` count chip, `collapsible` for "show older news" | hover-card-demo pattern matches the dedup-sources interaction 1:1 |
+| **E. Funding timeline** | `item` (one per round), `badge` (round letter chip "S"/"A"), `separator` divider, `button` variant=link for press URL | Vertical stack of `Item variant="outline"` = Wellfound funding pattern |
+| **F. Team** | `tabs` (Founders / Execs / All), `avatar`, `hover-card` on each person for background bio, `item` for row layout | tabs replaces the hardcoded "co-founders only" filter |
+| **G. Footprint** | `scroll-area` for overflowing logo rows, `avatar`, `badge` (verticals chips, geo chip), `tooltip` for industry on hover | scroll-area handles 12+ customer logos without wrap |
+
+### Cross-cutting primitives
+
+| Primitive | Use |
+|---|---|
+| `tooltip` | Short hints (icons, abbreviations) |
+| `hover-card` | Rich citation popover — the central UX for confidence/evidence/source_url everywhere |
+| `sonner` | Toast on rescan success/error |
+| `skeleton` | Already used in current prototype — keep API shape |
+| `tabs` | Future: Overview / Funding / Team / Competitive top-level navigation if Overview gets crowded |
+| `sidebar` (variant `sidebar-14`, right-side) | Optional persistent identity rail à la Wellfound — only if Path C |
+| `progress` | Existing `Bar` component → can swap for shadcn `progress` (Path B/C) |
+
+### Concrete component reference snippets
+
+**Hover-card for confidence tooltip** (Zone B/C/D — pattern from `hover-card-demo`):
+
+```tsx
+<HoverCard>
+  <HoverCardTrigger asChild>
+    <span className="confidence-dot confidence-high" />
+  </HoverCardTrigger>
+  <HoverCardContent className="w-80">
+    <div className="space-y-1">
+      <p className="text-sm">{evidence}</p>
+      <a href={source_url} className="text-xs text-muted-foreground">{source_url}</a>
+      <div className="text-xs text-muted-foreground">extracted {relativeTime}</div>
+    </div>
+  </HoverCardContent>
+</HoverCard>
+```
+
+**Item for at-a-glance KV cell** (Zone B — pattern from `item-demo`):
+
+```tsx
+<Item variant="outline" size="sm">
+  <ItemContent>
+    <ItemTitle className="text-xs uppercase text-muted">Total raised</ItemTitle>
+    <ItemDescription className="text-lg font-mono">€33.8M</ItemDescription>
+  </ItemContent>
+  <ItemActions>
+    <ConfidenceDot level="high" sourceUrl={url} evidence={text} />
+  </ItemActions>
+</Item>
+```
+
+**Badge for round chip & tech stack** (Zone E/C — pattern from `badge-demo`):
+
+```tsx
+<Badge className="h-5 w-5 rounded-full font-mono">A</Badge>   // round letter
+<Badge variant="outline">AI-driven conversational agents</Badge>   // tech-stack chip
+<Badge variant="secondary">5 sources</Badge>                       // news dedup count
+```
+
+---
+
 ## Mobbin pattern library — what to lean on
 
 | Pattern | Source | Apply to |
@@ -162,13 +245,15 @@ Below hero: small chip `🕐 Scanned 2h ago · Pipeline 3f21038e · Analysis v4.
 
 ## Suggested next step
 
-Pick the 2–3 zones you want to prototype first. My recommendation, in priority order:
+Pick the 2–3 zones you want to prototype first. Recommended order:
 
-1. **Zone C (The Moat)** — highest signal-to-cost; surfaces `positioning` + `key_differentiator` + `top_3_features` + `tech_stack`. These are the fields that justify the scan vs. a Google search.
-2. **Zone D-news (dedup'd recent_news)** — visible momentum; one of the most polished patterns to copy from Fey.
-3. **Zone E (funding timeline)** — replaces a single number with a story; uses the Wellfound pattern directly.
+1. **Zone C (The Moat)** — highest signal-to-cost; surfaces `positioning` + `key_differentiator` + `top_3_features` + `tech_stack`. Uses `card` + `badge` only — cheap to implement.
+2. **Zone D-news (dedup'd recent_news)** — visible momentum; uses `hover-card` for source popover (Fey pattern). Direct ROI on existing cache.
+3. **Zone E (funding timeline)** — replaces a single number with a story. Uses `item` + `badge` (Wellfound pattern).
 
-Then iterate Zone B (at-a-glance bar + confidence dots) as the trust foundation across the screen.
+Then iterate **Zone B** (at-a-glance bar + confidence dots) as the trust foundation across the screen — this is where `item` + `hover-card` shine.
+
+Before implementation: pick Path A vs B vs C (see "Stack constraint" above). Path A unblocks all 7 zones without stack churn.
 
 ---
 
