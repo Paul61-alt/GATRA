@@ -253,7 +253,7 @@ function CopilotPanel({ open, onClose, data }) {
         padding: "6px 0 10px",
         opacity: 0.45,
       }}>
-        <img src="https://www.linkup.so/favicon.ico" alt="" width={11} height={11} style={{borderRadius: 2}} />
+        <img src="https://www.google.com/s2/favicons?domain=linkup.so&sz=32" alt="" width={11} height={11} style={{borderRadius: 2}} />
         <span style={{ fontSize: 10, fontFamily: "var(--font-mono)", letterSpacing: "0.02em" }}>
           Powered by Linkup
         </span>
