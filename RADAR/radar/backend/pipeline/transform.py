@@ -159,7 +159,12 @@ def _map_subject(profile: CompanyProfile) -> Company:
         customers=int(profile.customer_count.value) if profile.customer_count and profile.customer_count.value else None,
         notable=profile.growth_signals[:5],
         notable_customers=[
-            NamedEntity(name=c.name, domain=c.domain)
+            NamedEntity(
+                name=c.name,
+                domain=c.domain,
+                segment=c.segment,
+                evidence=c.evidence,
+            )
             for c in profile.notable_customers
             if c.name
         ],
@@ -169,11 +174,21 @@ def _map_subject(profile: CompanyProfile) -> Company:
             if i.name
         ],
         key_people=[
-            KeyPerson(name=p.name, role=p.role, linkedin=p.linkedin)
+            KeyPerson(
+                name=p.name,
+                role=p.role,
+                linkedin=p.linkedin,
+                background=p.background,
+            )
             for p in (profile.key_people or [])[:5]
             if p.name
         ],
         is_subject=True,
+        business_model=profile.business_model.value if profile.business_model else None,
+        gtm_motion=profile.gtm_motion.value if profile.gtm_motion else None,
+        pricing_model_kind=profile.pricing_model.value if profile.pricing_model else None,
+        target_segment=profile.target_segment.value if profile.target_segment else None,
+        geo_coverage=profile.geo_coverage,
     )
 
 

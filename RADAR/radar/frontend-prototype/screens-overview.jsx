@@ -117,10 +117,13 @@ function OverviewScreen({ data, onOpenCompany, loadingPhase = 2 }) {
       </div>
 
       {/* ── Notable customers ── */}
-      {subjectReady && subject.notable_customers && subject.notable_customers.length > 0 && (
+      {subjectReady && subject.notable_customers && subject.notable_customers.length > 0 && (() => {
+        const segments = subject.notable_customers.map(c => c.segment).filter(Boolean);
+        const allGrandCompte = segments.length > 0 && segments.every(s => s === "Grand compte");
+        return (
         <div className="card" style={{marginBottom:20}}>
           <div className="card-h">
-            <h3>Notable customers</h3>
+            <h3>Notable customers{allGrandCompte && <span style={{fontWeight:400, color:"var(--fg-4)", marginLeft:8, fontSize:12}}>· all Grand compte</span>}</h3>
             <span className="meta">{subject.notable_customers.length} highlighted</span>
           </div>
           <div style={{
@@ -129,7 +132,7 @@ function OverviewScreen({ data, onOpenCompany, loadingPhase = 2 }) {
             flexWrap:"wrap",
           }}>
             {subject.notable_customers.map((c, i) => (
-              <a key={c.domain} href={`https://${c.domain}`} target="_blank" rel="noopener noreferrer"
+              <a key={c.domain || c.name} href={c.domain ? `https://${c.domain}` : "#"} target="_blank" rel="noopener noreferrer"
                 style={{
                   display:"flex", alignItems:"center", gap:10,
                   padding:"12px 20px",
@@ -153,17 +156,23 @@ function OverviewScreen({ data, onOpenCompany, loadingPhase = 2 }) {
             ))}
           </div>
         </div>
-      )}
+        );
+      })()}
 
-      {/* ── Founders & Leadership ── */}
-      {subjectReady && subject.key_people && subject.key_people.length > 0 && (
+      {/* ── Co-founders ── */}
+      {subjectReady && subject.key_people && (() => {
+        const cofounders = subject.key_people.filter(p =>
+          p.role && /co[-\s]?founder/i.test(p.role)
+        );
+        if (cofounders.length === 0) return null;
+        return (
         <div className="card" style={{marginBottom:20}}>
           <div className="card-h">
-            <h3>Founders & leadership</h3>
-            <span className="meta">{subject.key_people.length} highlighted</span>
+            <h3>Co-founders</h3>
+            <span className="meta">{cofounders.length} highlighted</span>
           </div>
           <div style={{display:"flex", alignItems:"center", flexWrap:"wrap", padding:"0"}}>
-            {subject.key_people.map((p) => {
+            {cofounders.map((p) => {
               const initials = p.name.split(/\s+/).slice(0, 2).map(w => w[0]).join("").toUpperCase();
               const hasLink = !!p.linkedin;
               const Tag = hasLink ? "a" : "div";
@@ -205,7 +214,8 @@ function OverviewScreen({ data, onOpenCompany, loadingPhase = 2 }) {
             })}
           </div>
         </div>
-      )}
+        );
+      })()}
 
       {/* ── Notable investors ── */}
       {subjectReady && subject.notable_investors && subject.notable_investors.length > 0 && (

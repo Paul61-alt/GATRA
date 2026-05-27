@@ -39,6 +39,8 @@ class NamedEntity(BaseModel):
     Plain BaseModel (no _CamelModel) — fields stay snake_case in JSON."""
     name: str
     domain: Optional[str] = None
+    segment: Optional[str] = None    # customer segment classification
+    evidence: Optional[str] = None   # outcome evidence (e.g. "49% turnover reduction")
 
 
 class KeyPerson(BaseModel):
@@ -46,6 +48,7 @@ class KeyPerson(BaseModel):
     name: str
     role: Optional[str] = None
     linkedin: Optional[str] = None  # full URL: https://linkedin.com/in/...
+    background: Optional[str] = None  # raw bio sentence (parsed for prior companies in UI)
 
 
 class Company(_CamelModel):
@@ -81,6 +84,12 @@ class Company(_CamelModel):
     is_subject: bool = False
     similarity: Optional[float] = None
     threat: Optional[ThreatLevel] = None
+    # GTM ribbon fields — snake_case in JSON
+    business_model: Optional[str] = Field(default=None, serialization_alias="business_model")
+    gtm_motion: Optional[str] = Field(default=None, serialization_alias="gtm_motion")
+    pricing_model_kind: Optional[str] = Field(default=None, serialization_alias="pricing_model_kind")
+    target_segment: Optional[str] = Field(default=None, serialization_alias="target_segment")
+    geo_coverage: Optional[str] = Field(default=None, serialization_alias="geo_coverage")
 
 
 class Feature(_CamelModel):
