@@ -179,6 +179,12 @@ function CopilotPanel({ open, onClose, data }) {
           <AiIcon size={16} />
           <span>Copilot</span>
         </div>
+        {messages.length > 0 && (
+          <button className="xo-new-chat" onClick={() => _setMessages([])} title="New chat">
+            <Ic d={<><path d="M12 5v14M5 12h14"/></>} sz={13} />
+            <span>New chat</span>
+          </button>
+        )}
         <button className="xo-close" onClick={onClose} title="Close">
           <Ic d={<path d="M5 5l14 14M19 5 5 19"/>} sz={14} />
         </button>
