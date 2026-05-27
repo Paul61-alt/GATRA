@@ -82,7 +82,7 @@ function applyClusterOffsets(all) {
   return offsets;
 }
 
-function LeafletMap({ all, hovered, onHover }) {
+function LeafletMap({ all, hovered, onHover, onOpen }) {
   const containerRef = _uR_map(null);
   const mapRef = _uR_map(null);
   const markersRef = _uR_map({});
@@ -127,6 +127,7 @@ function LeafletMap({ all, hovered, onHover }) {
 
       marker.on("mouseover", () => onHover(c.id));
       marker.on("mouseout", () => onHover(null));
+      marker.on("click", () => onOpen && onOpen(c));
 
       markersRef.current[c.id] = { marker, company: c };
     });
@@ -158,7 +159,7 @@ function LeafletMap({ all, hovered, onHover }) {
 }
 
 // ─── Main screen ───────────────────────────────────────────────────────────────
-function MapScreen({ data }) {
+function MapScreen({ data, onOpenCompany }) {
   const { subject, competitors } = data;
   const all = [subject, ...competitors];
   const [hovered, setHovered] = _uS_map(null);
@@ -189,7 +190,7 @@ function MapScreen({ data }) {
             <h3>World map</h3>
             <span className="meta">Click to zoom</span>
           </div>
-          <LeafletMap all={all} hovered={hovered} onHover={setHovered} />
+          <LeafletMap all={all} hovered={hovered} onHover={setHovered} onOpen={c => !c.isSubject && onOpenCompany(c.id)} />
         </div>
 
         {/* Region sidebar */}
@@ -213,11 +214,12 @@ function MapScreen({ data }) {
                   <div key={c.id}
                     onMouseEnter={() => setHovered(c.id)}
                     onMouseLeave={() => setHovered(null)}
+                    onClick={() => !c.isSubject && onOpenCompany(c.id)}
                     style={{
                       display: "flex", alignItems: "center", gap: 10,
                       padding: "7px 14px",
                       background: hovered === c.id ? "var(--bg-2)" : "transparent",
-                      cursor: "default",
+                      cursor: c.isSubject ? "default" : "pointer",
                     }}>
                     <span className={"dot " + (c.isSubject ? "subject" : c.threat === "high" ? "high" : c.threat === "medium" ? "med" : "low")}></span>
                     <LogoMark name={c.name} domain={c.domain} subject={c.isSubject} size="sm" />

@@ -354,7 +354,22 @@ function Topbar({ subject, data, onDelete, onRescan, isRescanning }) {
 function Tabs({ tabs, active, onTab, xopilotOpen, onXopilot }) {
   return (
     <nav className="tabs">
-      {tabs.map(t => (
+      {tabs.map(t => t.comingSoon ? (
+        <div key={t.key}
+             className="tab"
+             title="Coming soon"
+             style={{
+               opacity: 0.38,
+               cursor: "not-allowed",
+               pointerEvents: "none",
+             }}>
+          <svg width="12" height="12" viewBox="0 0 12 12" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <rect x="2" y="5" width="8" height="6" rx="1.2" stroke="currentColor" strokeWidth="1.4"/>
+            <path d="M4 5V3.5a2 2 0 1 1 4 0V5" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round"/>
+          </svg>
+          <span>{t.label}</span>
+        </div>
+      ) : (
         <div key={t.key}
              className={"tab " + (active === t.key ? "active" : "")}
              onClick={() => onTab(t.key)}>

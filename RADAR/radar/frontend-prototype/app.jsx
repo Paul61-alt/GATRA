@@ -2,14 +2,13 @@
 const { useState: _uS_app, useEffect: _uE_app } = React;
 
 const SCAN_TABS = [
-  { key: "overview",  label: "Overview",    icon: "overview" },
-  { key: "list",      label: "Competitors", icon: "list" },
-  // { key: "compare",   label: "Compare",     icon: "compare" },   // hidden
-  { key: "map",       label: "Map",         icon: "map" },
+  { key: "overview",    label: "Overview",    icon: "overview" },
+  { key: "list",        label: "Competitors", icon: "list" },
+  { key: "map",         label: "Map",         icon: "map" },
   { key: "positioning", label: "Positioning", icon: "compare" },
-  // { key: "features",  label: "Features",    icon: "features" },  // hidden
-  { key: "pricing",   label: "Pricing",     icon: "pricing" },
-  { key: "timeline",  label: "Timeline",    icon: "timeline" },
+  { key: "timeline",    label: "Timeline",    icon: "timeline" },
+  { key: "features",    label: "Features",    icon: "features", comingSoon: true },
+  { key: "pricing",     label: "Pricing",     icon: "pricing",  comingSoon: true },
 ];
 
 function App() {
@@ -69,18 +68,21 @@ function App() {
     }
   };
 
+  const [tabBeforeCompany, setTabBeforeCompany] = _uS_app("overview");
+
   const openCompany = (id) => {
+    if (data && id === data.subject.id) return;
     setOpenCompanyIds(prev => prev.includes(id) ? prev : [...prev, id]);
+    setTabBeforeCompany(activeTab.startsWith("company:") ? tabBeforeCompany : activeTab);
     setActiveTab("company:" + id);
   };
 
   const closeCompany = (id) => {
     setOpenCompanyIds(prev => {
       const next = prev.filter(x => x !== id);
-      // If closing the active tab, move to the previous company tab or "list"
       if (activeTab === "company:" + id) {
         const idx = prev.indexOf(id);
-        const fallback = next[idx - 1] ? "company:" + next[idx - 1] : next[idx] ? "company:" + next[idx] : "list";
+        const fallback = next[idx - 1] ? "company:" + next[idx - 1] : next[idx] ? "company:" + next[idx] : tabBeforeCompany;
         setActiveTab(fallback);
       }
       return next;
@@ -98,7 +100,11 @@ function App() {
       onClose: () => closeCompany(id),
     };
   });
-  const tabs = [...SCAN_TABS, ...companyTabs];
+  const tabs = [
+    ...SCAN_TABS.filter(t => !t.comingSoon),
+    ...SCAN_TABS.filter(t =>  t.comingSoon),
+    ...companyTabs,
+  ];
 
   return (
     <div className={"app" + (xopilotOpen ? " xo-open" : "")} data-screen-label={

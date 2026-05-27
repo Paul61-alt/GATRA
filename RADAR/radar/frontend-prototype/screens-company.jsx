@@ -47,7 +47,8 @@ function LandingScreenshot({ domain }) {
         onLoad={() => setStatus("ok")}
         onError={() => setStatus("error")}
         style={{
-          width: "100%", height: "auto", display: status === "ok" ? "block" : "none",
+          width: "100%", height: "auto", maxHeight: 220, objectFit: "cover", objectPosition: "top",
+          display: status === "ok" ? "block" : "none",
           verticalAlign: "bottom",
         }}
       />
@@ -102,7 +103,7 @@ function CompanyScreen({ data, companyId }) {
     <div className="screen">
 
       {/* ── Header: left = identity, right = screenshot ── */}
-      <div style={{ display: "grid", gridTemplateColumns: "1fr 340px", gap: 24, marginBottom: 24, alignItems: "start" }}>
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 460px", gap: 24, marginBottom: 24, alignItems: "start" }}>
 
         {/* Left: logo + name + meta */}
         <div>
@@ -170,45 +171,17 @@ function CompanyScreen({ data, companyId }) {
             <div className="val">{fmtMoney(c.funding?.total || 0)}</div>
             <div className="delta">{c.funding?.lastRound || "—"}</div>
           </div>
-          {!c.isSubject && c.similarity != null && (
-            <div className="stat">
-              <div className="lbl">Similarity</div>
-              <div className="val">{(c.similarity * 100).toFixed(0)}%</div>
-            </div>
-          )}
         </div>
       </div>
 
-      {/* ── Two-col: pricing + positioning ── */}
-      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 20, marginBottom: 20 }}>
-        <div className="card">
-          <div className="card-h"><h3>Pricing</h3></div>
-          <div className="card-b">
-            {pricing.length > 0 ? pricing.map((tier, i) => (
-              <div key={i} style={{
-                display: "flex", justifyContent: "space-between",
-                padding: "7px 10px", background: "var(--bg-2)", borderRadius: 5, marginBottom: 6,
-              }}>
-                <span style={{ fontWeight: 500, fontSize: 13 }}>{tier.name}</span>
-                <span className="mono" style={{ fontSize: 12, color: "var(--fg-2)" }}>{tier.price} / {tier.per}</span>
-              </div>
-            )) : (
-              <div style={{ display: "flex", justifyContent: "space-between", fontSize: 13 }}>
-                <span style={{ color: "var(--fg-2)" }}>{c.pricing?.model || "—"}</span>
-                <span className="mono" style={{ color: "var(--fg-3)" }}>{c.pricing?.mention || "—"}</span>
-              </div>
-            )}
-          </div>
-        </div>
-
-        <div className="card">
-          <div className="card-h"><h3>Positioning</h3></div>
-          <div className="card-b" style={{ fontSize: 13, color: "var(--fg-2)", lineHeight: 1.6 }}>
-            <div className="mono" style={{ fontSize: 9, letterSpacing: "0.08em", textTransform: "uppercase", color: "var(--fg-4)", marginBottom: 3 }}>Category</div>
-            <div style={{ fontWeight: 500, color: "var(--fg)", marginBottom: 10 }}>{c.category || "—"}</div>
-            <div className="mono" style={{ fontSize: 9, letterSpacing: "0.08em", textTransform: "uppercase", color: "var(--fg-4)", marginBottom: 3 }}>Wedge</div>
-            <div>{c.subCategory || "—"}</div>
-          </div>
+      {/* ── Positioning ── */}
+      <div className="card" style={{ marginBottom: 20 }}>
+        <div className="card-h"><h3>Positioning</h3></div>
+        <div className="card-b" style={{ fontSize: 13, color: "var(--fg-2)", lineHeight: 1.6 }}>
+          <div className="mono" style={{ fontSize: 9, letterSpacing: "0.08em", textTransform: "uppercase", color: "var(--fg-4)", marginBottom: 3 }}>Category</div>
+          <div style={{ fontWeight: 500, color: "var(--fg)", marginBottom: 10 }}>{c.category || "—"}</div>
+          <div className="mono" style={{ fontSize: 9, letterSpacing: "0.08em", textTransform: "uppercase", color: "var(--fg-4)", marginBottom: 3 }}>Wedge</div>
+          <div>{c.subCategory || "—"}</div>
         </div>
       </div>
 
