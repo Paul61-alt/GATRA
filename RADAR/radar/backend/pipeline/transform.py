@@ -116,6 +116,40 @@ def _employees_int(raw) -> int | None:
         return None
 
 
+def _coerce_int(raw) -> int | None:
+    """Strip commas, '+', whitespace; accept '25,000+' or '500 customers'."""
+    if raw is None:
+        return None
+    try:
+        match = re.search(r"\d[\d,]*", str(raw))
+        return int(match.group().replace(",", "")) if match else None
+    except (ValueError, TypeError):
+        return None
+
+
+def _coerce_float(raw) -> float | None:
+    """Accept '100M', '$50,000,000', '25.5'. Returns None on garbage."""
+    if raw is None:
+        return None
+    try:
+        s = str(raw).replace(",", "").replace("$", "").replace("€", "").strip()
+        match = re.search(r"-?\d+(?:\.\d+)?", s)
+        if not match:
+            return None
+        value = float(match.group())
+        # Suffix multipliers (M / B / K)
+        rest = s[match.end():].upper().strip()
+        if rest.startswith("B"):
+            value *= 1_000_000_000
+        elif rest.startswith("M"):
+            value *= 1_000_000
+        elif rest.startswith("K"):
+            value *= 1_000
+        return value
+    except (ValueError, TypeError):
+        return None
+
+
 def _map_subject(profile: CompanyProfile) -> Company:
     hq_str = _format_hq(profile.hq)
     hq_coords: tuple[float, float] = (
@@ -132,7 +166,7 @@ def _map_subject(profile: CompanyProfile) -> Company:
     funding_info = None
     if profile.funding:
         f = profile.funding
-        total = float(f.total_raised_eur.value or 0) if f.total_raised_eur else 0.0
+        total = (_coerce_float(f.total_raised_eur.value) or 0.0) if f.total_raised_eur else 0.0
         funding_info = FundingInfo(
             total=total,
             last_round=f.last_round or "Unknown",
@@ -155,8 +189,8 @@ def _map_subject(profile: CompanyProfile) -> Company:
         funding=funding_info,
         investors=[inv.name for inv in profile.notable_investors] if profile.notable_investors else [],
         pricing=PricingSummary(model="Custom", starts_at=0, mention="Contact sales"),
-        arr=float(profile.arr_usd.value) if profile.arr_usd and profile.arr_usd.value else None,
-        customers=int(profile.customer_count.value) if profile.customer_count and profile.customer_count.value else None,
+        arr=_coerce_float(profile.arr_usd.value) if profile.arr_usd else None,
+        customers=_coerce_int(profile.customer_count.value) if profile.customer_count else None,
         notable=profile.growth_signals[:5],
         notable_customers=[
             NamedEntity(

@@ -455,11 +455,16 @@ def _news_query(domain: str, company_name: str | None = None) -> str:
 def _merge_data(page_data: dict, linkedin_data: dict, news_data: dict) -> dict:
     """3-source merge with explicit priority lanes.
 
-    Priority order per field:
-    - PAGES   wins for: HQ, GTM, positioning, summary, markets, pricing, key_differentiator
-    - LINKEDIN wins for: employees, growth, founded_year (LinkedIn About > others)
-    - NEWS    wins for: funding, ARR, recent_news, customers, signals
-    Fallback: if winner has no value, fall back to other sources.
+    Priority order per field (winner shown first; falls back to other sources if empty):
+    - PAGES wins for: name, website, summary, positioning, markets, target_segment,
+      target_verticals, business_model, gtm_motion, pricing_model, key_differentiator,
+      top_3_features, pricing, geo_coverage.
+    - LINKEDIN wins for: employees, employee_growth_yoy.
+    - NEWS wins for: funding (total/stage/rounds/last_round/investors), arr_usd,
+      customer_count, acquisition, tech_stack, growth_signals, recent_news,
+      hq_city, hq_country, founded_year (Crunchbase/press more reliable than
+      LinkedIn current-office or page legal text).
+    Union (no priority): key_people, notable_customers.
     """
     merged: dict = {}
 
@@ -506,7 +511,6 @@ def _merge_data(page_data: dict, linkedin_data: dict, news_data: dict) -> dict:
 
     # Reframe: search_data for the union-merge sections below = LI ∪ News
     search_data = {**news_data, **{k: v for k, v in linkedin_data.items() if _has_value(v)}}
-    page_data = page_data  # explicit
 
     # key_people: page has names/roles → search adds LinkedIn URLs + background
     page_people = page_data.get("key_people") or []

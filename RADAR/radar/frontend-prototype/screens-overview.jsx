@@ -172,14 +172,15 @@ function OverviewScreen({ data, onOpenCompany, loadingPhase = 2 }) {
             <span className="meta">{cofounders.length} highlighted</span>
           </div>
           <div style={{display:"flex", alignItems:"center", flexWrap:"wrap", padding:"0"}}>
-            {cofounders.map((p) => {
-              const initials = p.name.split(/\s+/).slice(0, 2).map(w => w[0]).join("").toUpperCase();
+            {cofounders.filter(p => p && p.name && p.name.trim()).map((p) => {
+              const initials = (p.name.trim().split(/\s+/).slice(0, 2)
+                .map(w => w[0] || "").join("") || "?").toUpperCase();
               const hasLink = !!p.linkedin;
               const Tag = hasLink ? "a" : "div";
               const tagProps = hasLink
                 ? { href: p.linkedin, target: "_blank", rel: "noopener noreferrer" }
                 : {};
-              const hue = (p.name.charCodeAt(0) * 37 + (p.name.charCodeAt(1) || 0) * 11) % 360;
+              const hue = ((p.name.charCodeAt(0) || 0) * 37 + (p.name.charCodeAt(1) || 0) * 11) % 360;
               return (
                 <Tag key={p.name} {...tagProps}
                   style={{
