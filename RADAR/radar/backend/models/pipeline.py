@@ -24,4 +24,5 @@ class PipelineRun(BaseModel):
     competitors: List[CompetitorProfile] = []
     discover_source_urls: List[str] = []
     radar_scores: dict[str, List[float]] = {}
+    threat_scores: dict[str, int] = {}
     from_cache: bool = False

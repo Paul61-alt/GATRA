@@ -30,7 +30,7 @@ function isValidUrl(value) {
   }
 }
 
-function SearchScreen({ onComplete, onScanStart }) {
+function SearchScreen({ onComplete, onScanStart, onDiscoverComplete }) {
   const [phase, setPhase] = _uS_search("input");
   const [url, setUrl] = _uS_search("");
   const [urlError, setUrlError] = _uS_search(null);
@@ -96,41 +96,51 @@ function SearchScreen({ onComplete, onScanStart }) {
     setPhase("scanning");
     if (onScanStart) onScanStart(url.trim());
 
-    const result = window.RADAR_DATA;
-    if (!result) {
-      setError("No cached data found — add a scan result to data.js first.");
+    // ── Animate the step indicator while /scan/discover runs (UNDERSTAND ~10s + DISCOVER ~5s)
+    let cancelled = false;
+    const animate = (async () => {
+      setStep(PHASE_STEP["UNDERSTAND:start"]);
+      await sleep(2500);
+      if (cancelled) return;
+      setStep(PHASE_STEP["UNDERSTAND:ok"]);
+      await sleep(4000);
+      if (cancelled) return;
+      setStep(PHASE_STEP["DISCOVER:start"]);
+    })();
+
+    let discoverResult;
+    try {
+      const resp = await fetch(`${window.RADAR_API}/scan/discover`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ url: url.trim() }),
+      });
+      if (!resp.ok) {
+        cancelled = true;
+        const txt = await resp.text();
+        setError(`Backend error ${resp.status}: ${txt.slice(0, 240)}`);
+        setPhase("input");
+        return;
+      }
+      discoverResult = await resp.json();
+    } catch (err) {
+      cancelled = true;
+      setError(`Network error: ${err.message || err}`);
       setPhase("input");
       return;
     }
+    cancelled = true;
+    await animate;
 
-    const emit = async (ph, status, extra) => {
-      const key = `${ph}:${status}`;
-      if (key in PHASE_STEP) setStep(PHASE_STEP[key]);
-      if (key === "DISCOVER:ok")
-        setFoundCount(extra?.count ?? (result.competitors?.length || 0));
-    };
+    setStep(PHASE_STEP["DISCOVER:ok"]);
+    setFoundCount((discoverResult.candidates || []).length);
 
-    await emit("UNDERSTAND", "start");
-    await sleep(1500);
-    await emit("UNDERSTAND", "ok");
-    await sleep(1500);
-    await emit("DISCOVER", "start");
-    await sleep(1200);
-    await emit("DISCOVER", "ok");
-    await sleep(2000);
-    await emit("ENRICH", "start");
-    await sleep(2000);
-    await emit("ENRICH", "ok");
-    await sleep(600);
-
-    if (!result.allCompanies) {
-      const subject = result.subject ? [result.subject] : [];
-      const competitors = (result.competitors || [])
-        .slice()
-        .sort((a, b) => (b.similarity || 0) - (a.similarity || 0));
-      result.allCompanies = [...subject, ...competitors];
+    if (onDiscoverComplete) {
+      onDiscoverComplete(discoverResult);
+    } else if (onComplete) {
+      // Legacy: caller wants full RadarOutput — keep prototype-style fallback
+      onComplete(discoverResult);
     }
-    onComplete(result);
     setPhase("input");
     setUrl("");
   };

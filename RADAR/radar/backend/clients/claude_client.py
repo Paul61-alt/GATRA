@@ -201,6 +201,183 @@ class ClaudeClient:
         return profile
 
     @traced
+    def discover_competitors_fallback(
+        self,
+        company_name: str,
+        company_domain: str,
+        positioning: str,
+        markets_str: str,
+        max_candidates: int = 20,
+    ) -> list[dict]:
+        """Fallback: use Claude training data to list competitors when Linkup returns nothing.
+
+        Returns list of {name, domain, tagline} dicts. Zero Linkup cost.
+        Falls back to [] on parse failure.
+        """
+        system = (
+            "You are a competitive intelligence analyst. "
+            f"Based on your training data, list up to {max_candidates} direct competitors "
+            f"of {company_name} ({company_domain}). "
+            f"Context: {positioning}. Market: {markets_str}. "
+            f"Exclude {company_name} ({company_domain}) itself. "
+            "For each competitor: name (string), domain (bare domain, no https/www), "
+            "tagline (1-sentence elevator pitch). "
+            "Return ONLY strict JSON with key 'competitors'. No prose, no markdown fences.\n"
+            '{"competitors": [{"name": "...", "domain": "...", "tagline": "..."}, ...]}'
+        )
+        user = (
+            f"List the main direct competitors of {company_name} ({company_domain}), "
+            f"a {positioning} in the {markets_str} market."
+        )
+        try:
+            result = self.extract_json(system, user, max_tokens=2048)
+            raw_list = result.get("competitors", [])
+            if not isinstance(raw_list, list):
+                return []
+            out = []
+            for item in raw_list:
+                if not isinstance(item, dict):
+                    continue
+                name = str(item.get("name", "")).strip()
+                domain = str(item.get("domain", "")).strip()
+                tagline = str(item.get("tagline", "")).strip()
+                if name and domain:
+                    out.append({"name": name, "domain": domain, "tagline": tagline})
+            return out[:max_candidates]
+        except Exception as e:
+            logger.warning("discover_competitors_fallback failed error=%s", e)
+            return []
+
+    @traced
+    def extract_discover_candidates(
+        self,
+        raw_texts: list[str],
+        company_name: str,
+        company_domain: str,
+        max_candidates: int = 20,
+    ) -> list[dict]:
+        """Merge 3 search result texts into a deduped competitor list.
+
+        Returns list of {name, domain, tagline} dicts.
+        Falls back to [] on any parse failure.
+        """
+        combined = "\n\n---\n\n".join(
+            f"[SOURCE {i + 1}]\n{t}" for i, t in enumerate(raw_texts) if t
+        )
+        system = (
+            "You are a competitive intelligence analyst. "
+            f"Extract the direct competitors of {company_name} ({company_domain}) "
+            "from the search results below. "
+            f"Return up to {max_candidates} unique companies. "
+            f"Exclude {company_name} ({company_domain}) itself. "
+            "Prioritise direct competitors (same target customer, overlapping core features). "
+            "For each competitor return:\n"
+            "  - name: company name (string)\n"
+            "  - domain: bare domain, no https:// or www. (e.g. 'notion.so')\n"
+            "  - tagline: 1-sentence elevator pitch (string)\n"
+            "Output ONLY strict JSON with key 'competitors'. No prose, no markdown fences.\n"
+            '{"competitors": [{"name": "...", "domain": "...", "tagline": "..."}, ...]}'
+        )
+        user = f"SEARCH RESULTS:\n\n{combined}"
+        try:
+            result = self.extract_json(system, user, max_tokens=2048)
+            raw_list = result.get("competitors", [])
+            if not isinstance(raw_list, list):
+                logger.warning("extract_discover_candidates: 'competitors' not a list")
+                return []
+            out = []
+            for item in raw_list:
+                if not isinstance(item, dict):
+                    continue
+                name = str(item.get("name", "")).strip()
+                domain = str(item.get("domain", "")).strip()
+                tagline = str(item.get("tagline", "")).strip()
+                if name and domain:
+                    out.append({"name": name, "domain": domain, "tagline": tagline})
+            return out[:max_candidates]
+        except Exception as e:
+            logger.warning("extract_discover_candidates failed error=%s", e)
+            return []
+
+    @traced
+    def score_threats_candidates(
+        self,
+        subject_summary: str,
+        candidates: list[dict],
+    ) -> dict[str, int]:
+        """Rank DiscoverCandidate dicts by competitive threat (0-100).
+
+        Accepts {name, domain, tagline} dicts (HITL discover path).
+        Returns {domain: score}. Falls back to {} on parse failure.
+        """
+        system = (
+            "You are a competitive intelligence analyst. "
+            "Score each competitor 0-100 on how directly they threaten the subject's core business "
+            "(same ICP, same product category, same geo, similar pricing). "
+            "100 = head-on direct competitor. 0 = adjacent or irrelevant. "
+            "Output strict JSON mapping each competitor's domain to its integer score. "
+            'Example: {"competitor-a.com": 85, "competitor-b.io": 42}. '
+            "No prose, no explanation, no markdown fences."
+        )
+        slim = [
+            {"name": c.get("name", ""), "domain": c.get("domain", ""), "tagline": c.get("tagline", "")}
+            for c in candidates
+        ]
+        user = f"SUBJECT:\n{subject_summary}\n\nCOMPETITORS:\n{json.dumps(slim, ensure_ascii=False)}"
+        try:
+            raw = self.extract_json(system, user, max_tokens=1024)
+        except Exception as e:
+            logger.warning("score_threats_candidates parse failed error=%s", e)
+            return {}
+        out: dict[str, int] = {}
+        for k, v in raw.items():
+            try:
+                out[str(k)] = max(0, min(100, int(v)))
+            except (TypeError, ValueError):
+                continue
+        return out
+
+    @traced
+    def discover_competitors_fallback(
+        self,
+        name: str,
+        domain: str,
+        positioning: str,
+        markets: str,
+    ) -> list[dict]:
+        """Fallback competitor discovery using Claude knowledge when Linkup returns empty.
+
+        Returns list[dict] matching discover._SCHEMA competitor items.
+        """
+        system = (
+            "You are a competitive intelligence analyst. "
+            "Output ONLY strict JSON — no prose, no markdown fences.\n"
+            "Return a JSON object with a 'competitors' array. "
+            "Each item must have: name (string), website (full https:// URL), "
+            "hq_city (string), hq_country (string), "
+            "founded_year (integer), "
+            "funding_stage (Seed/Series A/Series B/Series C+/Public/Bootstrapped), "
+            "employee_count (approximate integer as string), "
+            "one_liner (1 sentence describing what they do), "
+            "differentiator (main difference vs the subject company)."
+        )
+        user = (
+            f"List 10-15 direct competitors of {name} ({domain}).\n"
+            f"Context: {positioning}. Market: {markets}.\n"
+            "Prioritise companies with overlapping core features, same target segment, "
+            f"similar pricing tier. Do NOT include {name} ({domain}) itself."
+        )
+        try:
+            result = self.extract_json(system, user, max_tokens=2048)
+            candidates = result.get("competitors", [])
+            if isinstance(candidates, list):
+                return [c for c in candidates if isinstance(c, dict) and c.get("name")]
+            return []
+        except Exception as e:
+            logger.warning("discover_competitors_fallback failed: %s", e)
+            return []
+
+    @traced
     def score_threats(self, subject_summary: str, competitors: list[dict]) -> dict[str, int]:
         """Rank competitors by competitive threat to the subject.
 

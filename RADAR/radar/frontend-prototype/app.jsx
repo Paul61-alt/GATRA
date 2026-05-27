@@ -23,6 +23,8 @@ function App() {
   const [openCompanyIds, setOpenCompanyIds] = _uS_app([]);
   // Scan in progress: null | { url, domain, startedAt }
   const [scanInProgress, setScanInProgress] = _uS_app(null);
+  // HITL: result of /scan/discover, fed to SelectScreen
+  const [discoverResult, setDiscoverResult] = _uS_app(null);
 
   _uE_app(() => {
     document.documentElement.setAttribute("data-density", tweaks.density);
@@ -44,11 +46,95 @@ function App() {
   const handleScanStart = (url) => {
     const domain = url.replace(/^https?:\/\//, "").replace(/\/.*$/, "");
     setScanInProgress({ url, domain, startedAt: new Date().toISOString() });
-    // Navigate immediately with skeletons — no need to sit on the scan animation
+    // Stay on the search screen during DISCOVER (its scanning UI shows progress).
+    // handleDiscoverComplete auto-flips to "current" with skeleton + runs enrich.
+  };
+
+  // Auto-enrich: DISCOVER finished → pick top 10 by threat_score and trigger enrich
+  // (Candidates are already sorted by threat_score desc in backend discover.py.)
+  const handleDiscoverComplete = (result) => {
+    const candidates = result?.candidates || [];
+    const topDomains = candidates.slice(0, Math.min(10, candidates.length)).map(c => c.domain);
+
+    if (topDomains.length === 0) {
+      setToast({ label: "No competitors found — try another URL", action: null });
+      setView("new");
+      return;
+    }
+
+    setDiscoverResult(result);
+    handleEnrichStart(result.companyDomain);
+    runEnrich(result.runId, topDomains);
+  };
+
+  // Auto-enrich SSE consumer: POST /scan/enrich and stream until result/error.
+  const runEnrich = async (runId, selectedDomains) => {
+    let resp;
+    try {
+      resp = await fetch(`${window.RADAR_API}/scan/enrich`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ runId, selected: selectedDomains }),
+      });
+    } catch (err) {
+      setToast({ label: `Enrich failed (network): ${err.message || err}`, action: null });
+      setView("new");
+      return;
+    }
+
+    if (!resp.ok) {
+      const txt = await resp.text();
+      const msg = resp.status === 404
+        ? "Session expirée. Relance un scan."
+        : `Enrich failed ${resp.status}: ${txt.slice(0, 200)}`;
+      setToast({ label: msg, action: null });
+      setView("new");
+      return;
+    }
+
+    const reader = resp.body.getReader();
+    const decoder = new TextDecoder();
+    let buf = "";
+
+    while (true) {
+      const { value, done } = await reader.read();
+      if (done) break;
+      buf += decoder.decode(value, { stream: true });
+      const events = buf.split("\n\n");
+      buf = events.pop();
+      for (const evt of events) {
+        const dataLine = evt.split("\n").find(l => l.startsWith("data: "));
+        if (!dataLine) continue;
+        let payload;
+        try { payload = JSON.parse(dataLine.slice(6)); } catch { continue; }
+        if (payload.result) {
+          handleEnrichComplete(payload.result);
+          return;
+        }
+        if (payload.error) {
+          setToast({ label: `Enrich error: ${payload.error}`, action: null });
+          setView("new");
+          return;
+        }
+      }
+    }
+  };
+
+  // HITL: ENRICH+SYNTHESIZE stream finished, jump to current with full data
+  const handleEnrichComplete = (radarOutput) => {
+    window.RADAR_DATA = radarOutput;
+    setData(radarOutput);
+    setDiscoverResult(null);
+    setLoadingPhase(2);
+    setScanInProgress(prev => prev ? { ...prev, done: true } : null);
+    setView("current");
+  };
+
+  // Triggered when user clicks "Analyser X concurrents" — switch to skeleton view immediately
+  const handleEnrichStart = (domain) => {
     setLoadingPhase(0);
     setView("current");
     setTimeout(() => setLoadingPhase(1), 1800);
-    setTimeout(() => setLoadingPhase(2), 6800);
   };
 
   // Toast: null | { label, action }
@@ -101,9 +187,9 @@ function App() {
 
   return (
     <div className="app" data-screen-label={
-      view === "new"  ? "01 New scan" :
-      view === "home" ? "02 Home"     :
-                        "03 Current scan"
+      view === "new"    ? "01 New scan" :
+      view === "home"   ? "02 Home"     :
+                          "03 Current scan"
     }>
       <Sidebar
         view={view}
@@ -117,6 +203,7 @@ function App() {
           <SearchScreen
             onComplete={handleScanComplete}
             onScanStart={handleScanStart}
+            onDiscoverComplete={handleDiscoverComplete}
           />
         </div>
 
