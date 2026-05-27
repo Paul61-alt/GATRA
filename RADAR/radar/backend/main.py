@@ -285,9 +285,15 @@ async def scan_stream(request: Request, req: AnalyzeRequest) -> StreamingRespons
     )
 
 
+class CopilotMessage(BaseModel):
+    role: str  # "user" | "assistant"
+    text: str
+
+
 class CopilotRequest(BaseModel):
     query: str
     context: str = ""
+    history: list[CopilotMessage] = []
 
 
 @app.post("/copilot")
@@ -298,13 +304,24 @@ async def copilot(request: Request, req: CopilotRequest) -> dict:  # noqa: ARG00
     if not query:
         raise HTTPException(status_code=422, detail="query is required")
 
-    # Enrich the query with scan context so Linkup results are grounded
-    full_query = f"{query}\n\nContext: {req.context}" if req.context else query
+    # Build conversation history prefix so follow-up questions have context
+    history_text = ""
+    if req.history:
+        lines = []
+        for m in req.history[-6:]:  # last 6 messages max
+            prefix = "User" if m.role == "user" else "Assistant"
+            lines.append(f"{prefix}: {m.text}")
+        history_text = "Previous conversation:\n" + "\n".join(lines) + "\n\n"
+
+    full_query = (
+        f"{history_text}"
+        f"Current question: {query}"
+        + (f"\n\nScan context: {req.context}" if req.context else "")
+    )
 
     linkup: LinkupClient = app.state.linkup
     result = await linkup.search(query=full_query, depth="standard", output_type="sourcedAnswer")
 
-    # Normalise the Linkup response shape
     sources = [
         {
             "name": s.get("name", ""),
