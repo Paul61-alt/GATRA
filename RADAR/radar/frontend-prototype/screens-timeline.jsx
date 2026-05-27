@@ -5,6 +5,9 @@ const ACCENT  = "#b34a1f";
 const ROW_H   = 56;   // taller rows give vertical room
 const LABEL_W = 200;
 const AXIS_H  = 26;
+const MIN_R   = 6;
+const MAX_R   = ROW_H / 2 - 2;
+const LOG_SCALE_RATIO_THRESHOLD = 100; // max/min disclosed amount ratio → auto log scale
 
 const SORT_OPTIONS = [
   { key: "first",       label: "First raise" },
@@ -18,17 +21,31 @@ function TimelineScreen({ data, onOpenCompany }) {
   const all = [subject, ...competitors];
 
   // ── Compute default view window ───────────────────────────────────
-  const allRounds = all.flatMap(c => (funding[c.id] || []).filter(e => e.amt > 0));
-  const earliestYear = allRounds.length
-    ? Math.min(...allRounds.map(e => e.y))
+  const allRoundsAll       = all.flatMap(c => funding[c.id] || []);
+  const allRoundsDisclosed = allRoundsAll.filter(e => e.amt > 0);
+  const earliestYear = allRoundsDisclosed.length
+    ? Math.min(...allRoundsDisclosed.map(e => e.y))
     : new Date().getFullYear() - 5;
   const DEFAULT_START = new Date(earliestYear - 3, 0, 1).getTime();
   const DEFAULT_END   = new Date(2027, 11, 31).getTime();
+
+  // Auto log-scale when funding amounts span > 2 orders of magnitude — otherwise
+  // mega-rounds visually crush small seeds against the radius floor.
+  const { minAmt, maxAmt, autoLog } = _uMemo_tl(() => {
+    const disclosed = all.flatMap(c => (funding[c.id] || []).filter(e => e.amt > 0));
+    if (!disclosed.length) return { minAmt: 0, maxAmt: 0, autoLog: false };
+    const amts = disclosed.map(e => e.amt);
+    const max = Math.max(...amts);
+    const min = Math.min(...amts);
+    return { minAmt: min, maxAmt: max, autoLog: max / min > LOG_SCALE_RATIO_THRESHOLD };
+  }, [data]);
 
   const [view, setView]       = _uS_tl({ start: DEFAULT_START, end: DEFAULT_END });
   const [sortBy, setSortBy]   = _uS_tl("total_desc");
   const [selected, setSelected] = _uS_tl(null);
   const [tooltip, setTooltip] = _uS_tl(null);
+  const [scaleOverride, setScaleOverride] = _uS_tl(null); // null = auto | "linear" | "log"
+  const useLogScale = scaleOverride === null ? autoLog : scaleOverride === "log";
 
   const wrapRef = _uR_tl(null);
   const svgRef  = _uR_tl(null);
@@ -71,8 +88,15 @@ function TimelineScreen({ data, onOpenCompany }) {
   const rows = _uMemo_tl(() => {
     const sub   = all.find(c => c.isSubject);
     const comps = all.filter(c => !c.isSubject).map(c => {
-      const rounds = (funding[c.id] || []).filter(e => e.amt > 0);
-      return { ...c, rounds, _total: (c.funding?.total || 0), _firstY: rounds[0]?.y ?? 9999, _lastY: rounds[rounds.length - 1]?.y ?? 0 };
+      const rounds = funding[c.id] || [];
+      // Sort by first/last *disclosed* raise — undisclosed rounds ignored for sort ordering.
+      const disclosedYrs = rounds.filter(e => e.amt > 0).map(e => e.y);
+      return {
+        ...c, rounds,
+        _total: (c.funding?.total || 0),
+        _firstY: disclosedYrs[0] ?? 9999,
+        _lastY: disclosedYrs[disclosedYrs.length - 1] ?? 0,
+      };
     });
 
     comps.sort((a, b) => {
@@ -83,21 +107,30 @@ function TimelineScreen({ data, onOpenCompany }) {
       return 0;
     });
 
-    const subRounds = (funding[sub.id] || []).filter(e => e.amt > 0);
+    const subRounds = funding[sub.id] || [];
     return [
       { ...sub, rounds: subRounds, _total: sub.funding?.total || 0 },
       ...comps,
     ];
   }, [sortBy, data]);
 
-  // Enrich rounds with pixel-ready data
+  const radiusFor = (amt) => {
+    if (!amt || amt <= 0 || maxAmt <= 0) return MIN_R;
+    if (useLogScale) {
+      const norm = Math.log10(amt + 1) / Math.log10(maxAmt + 1);
+      return Math.max(MIN_R, Math.min(MAX_R, norm * MAX_R));
+    }
+    const norm = Math.sqrt(amt / maxAmt);
+    return Math.max(MIN_R, Math.min(MAX_R, norm * MAX_R));
+  };
+
   const enrichedRows = rows.map(c => ({
     ...c,
-    rounds: (c.rounds || (funding[c.id] || []).filter(e => e.amt > 0)).map(e => ({
+    rounds: c.rounds.map(e => ({
       ...e,
       ms: new Date(e.y, (e.q - 1) * 3, 15).getTime(),
-      // sqrt scale: wide range (6–26px), small rounds stay small
-      r: Math.min(ROW_H / 2 - 2, Math.max(6, Math.sqrt(e.amt) * 1.8)),
+      r: radiusFor(e.amt),
+      undisclosed: !e.amt || e.amt <= 0,
     })),
   }));
 
@@ -108,12 +141,14 @@ function TimelineScreen({ data, onOpenCompany }) {
   for (let y = startYear; y <= endYear; y++) yearTicks.push(y);
 
   const svgH       = enrichedRows.length * ROW_H;
-  const totalRaised = all.reduce((s, c) => s + (funding[c.id] || []).reduce((a, b) => a + b.amt, 0), 0);
-  const totalEvents = all.reduce((s, c) => s + (funding[c.id] || []).filter(e => e.amt > 0).length, 0);
+  const totalRaised = all.reduce((s, c) => s + (funding[c.id] || []).reduce((a, b) => a + (b.amt > 0 ? b.amt : 0), 0), 0);
+  const totalEvents = allRoundsDisclosed.length;
+  const undisclosedCount = allRoundsAll.length - allRoundsDisclosed.length;
 
   return (
     <div className="screen">
-      <SectionH title="Funding timeline" meta={`${totalEvents} rounds · $${totalRaised.toFixed(0)}M total`} />
+      <SectionH title="Funding timeline"
+                meta={`${totalEvents} disclosed${undisclosedCount ? ` · ${undisclosedCount} undisclosed` : ""} · $${totalRaised.toFixed(0)}M total · ${useLogScale ? "log" : "linear"} scale`} />
 
       {/* Controls */}
       <div style={{display:"flex", gap:8, marginBottom:12, flexWrap:"wrap", alignItems:"center"}}>
@@ -132,7 +167,17 @@ function TimelineScreen({ data, onOpenCompany }) {
           </button>
         ))}
 
-        <div style={{marginLeft:"auto", display:"flex", alignItems:"center", gap:10}}>
+        <div style={{marginLeft:"auto", display:"flex", alignItems:"center", gap:6}}>
+          <span style={{fontSize:11, color:"var(--fg-4)"}}>Scale:</span>
+          <button className={"tb-btn" + (!useLogScale ? " primary" : "")}
+                  onClick={() => setScaleOverride("linear")}
+                  title="Linear (sqrt) scale">Linear</button>
+          <button className={"tb-btn" + (useLogScale ? " primary" : "")}
+                  onClick={() => setScaleOverride("log")}
+                  title={autoLog && minAmt > 0
+                    ? `Log scale (auto-suggested: ratio ${Math.round(maxAmt / minAmt)}×)`
+                    : "Log scale"}>Log</button>
+          <div style={{width:1, height:20, background:"var(--border)", margin:"0 6px"}}></div>
           <svg width={12} height={12} style={{flexShrink:0}}>
             <polygon points="6,0 12,6 6,12 0,6" fill="#0ea5e9" fillOpacity={0.85} />
           </svg>
@@ -150,6 +195,9 @@ function TimelineScreen({ data, onOpenCompany }) {
             <div style={{height:AXIS_H, borderBottom:"1px solid var(--border)", background:"var(--bg-2)"}}></div>
             {enrichedRows.map((c, i) => {
               const total = (funding[c.id] || []).reduce((s, e) => s + e.amt, 0);
+              const status = c.funding?.status;
+              // F2: empty row when no disclosed rounds + status is not "enriched"
+              const showEmptyState = total <= 0 && status && status !== "enriched";
               return (
                 <div key={c.id}
                   onClick={() => !c.isSubject && onOpenCompany && onOpenCompany(c.id)}
@@ -170,7 +218,9 @@ function TimelineScreen({ data, onOpenCompany }) {
                       whiteSpace:"nowrap", overflow:"hidden", textOverflow:"ellipsis",
                     }}>{c.name}</div>
                     <div style={{fontSize:9.5, color:"var(--fg-4)", fontFamily:"var(--font-mono)"}}>
-                      {total > 0 ? "$" + total.toFixed(0) + "M" : "Bootstrapped"}
+                      {showEmptyState
+                        ? <RowEmptyState status={status} founded={c.founded} />
+                        : total > 0 ? "$" + total.toFixed(0) + "M" : "—"}
                     </div>
                   </div>
                 </div>
@@ -267,16 +317,22 @@ function TimelineScreen({ data, onOpenCompany }) {
                       const x   = toX(e.ms);
                       const amt = `$${Math.round(e.amt)}M`;
                       // r < 13 → too small for any text; 13–21 → amount only; ≥22 → round + amount
-                      const showAmt   = e.r >= 13;
-                      const showRound = e.r >= 22;
+                      const showAmt   = !e.undisclosed && e.r >= 13;
+                      const showRound = !e.undisclosed && e.r >= 22;
                       return (
                         <g key={j} style={{cursor:"pointer"}}
                            onClick={(ev) => { ev.stopPropagation(); setSelected({ company: c, round: e }); }}
                            onMouseEnter={() => setTooltip({ x, y: cy - e.r - 8, company: c, round: e })}
                            onMouseLeave={() => setTooltip(null)}>
-                          <circle cx={x} cy={cy} r={e.r}
-                                  fill={color} fillOpacity={isS ? 0.88 : 0.78}
-                                  stroke="none" />
+                          {e.undisclosed ? (
+                            <circle cx={x} cy={cy} r={e.r}
+                                    fill="none" stroke={color} strokeWidth={1.5}
+                                    strokeDasharray="3,2" opacity={isS ? 0.85 : 0.7} />
+                          ) : (
+                            <circle cx={x} cy={cy} r={e.r}
+                                    fill={color} fillOpacity={isS ? 0.88 : 0.78}
+                                    stroke="none" />
+                          )}
                           {showRound && (
                             <text x={x} y={cy - 5} textAnchor="middle" dominantBaseline="middle"
                                   fontSize={7} fill="rgba(255,255,255,0.75)"
@@ -297,6 +353,39 @@ function TimelineScreen({ data, onOpenCompany }) {
                         </g>
                       );
                     })}
+                  </g>
+                );
+              })}
+
+              {/* F2: Empty-state placeholder for rows with no disclosed rounds */}
+              {enrichedRows.map((c, i) => {
+                if (c.rounds && c.rounds.length > 0) return null;
+                const status = c.funding?.status;
+                if (!status || status === "enriched") return null;
+                const cy = AXIS_H + i * ROW_H + ROW_H / 2;
+                const LABEL = {
+                  bootstrapped: "BOOTSTRAPPED · no outside capital",
+                  stealth:      "STEALTH · pre-launch",
+                  not_found:    "NO DATA · funding not disclosed",
+                  pending:      "ENRICHING…",
+                };
+                const COLOR = {
+                  bootstrapped: "var(--fg-3)",
+                  stealth:      "#0ea5e9",
+                  not_found:    "var(--fg-4)",
+                  pending:      "var(--accent, #ff5d00)",
+                };
+                return (
+                  <g key={`empty-${c.id}`} style={{pointerEvents:"none"}}>
+                    <line x1={0} y1={cy} x2={svgW} y2={cy}
+                          stroke={COLOR[status]} strokeWidth={1}
+                          strokeDasharray="4,3" opacity={0.35} />
+                    <text x={svgW / 2} y={cy - 4} textAnchor="middle"
+                          fontSize={9.5} fill={COLOR[status]}
+                          fontFamily="var(--font-mono)" fontWeight={600}
+                          opacity={0.9}>
+                      {LABEL[status]}
+                    </text>
                   </g>
                 );
               })}
@@ -331,7 +420,11 @@ function TimelineScreen({ data, onOpenCompany }) {
                 whiteSpace:"nowrap",
               }}>
                 <div style={{fontWeight:600, color:"var(--fg)"}}>{tooltip.company.name}</div>
-                <div style={{color:"var(--fg-2)"}}>{tooltip.round.round} · <b>${tooltip.round.amt}M</b></div>
+                <div style={{color:"var(--fg-2)"}}>
+                  {tooltip.round.round} · {tooltip.round.undisclosed
+                    ? <i style={{color:"var(--fg-4)"}}>amount undisclosed</i>
+                    : <b>${tooltip.round.amt}M</b>}
+                </div>
                 <div style={{color:"var(--fg-4)", fontFamily:"var(--font-mono)", fontSize:10.5}}>
                   Q{tooltip.round.q} {tooltip.round.y}
                 </div>
@@ -348,7 +441,7 @@ function TimelineScreen({ data, onOpenCompany }) {
           <div style={{flex:1}}>
             <div style={{fontWeight:600, fontSize:13}}>{selected.company.name}</div>
             <div className="mono" style={{fontSize:11.5, color:"var(--fg-3)", marginTop:2}}>
-              {selected.round.round} · ${selected.round.amt}M · Q{selected.round.q} {selected.round.y}
+              {selected.round.round} · {selected.round.undisclosed ? "undisclosed" : `$${selected.round.amt}M`} · Q{selected.round.q} {selected.round.y}
             </div>
           </div>
           {!selected.company.isSubject && <ThreatTag level={selected.company.threat} />}
