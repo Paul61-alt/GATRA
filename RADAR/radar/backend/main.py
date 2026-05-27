@@ -314,8 +314,11 @@ async def copilot(request: Request, req: CopilotRequest) -> dict:  # noqa: ARG00
         history_text = "Previous conversation:\n" + "\n".join(lines) + "\n\n"
 
     full_query = (
+        "You are a sharp VC analyst assistant. Answer in 2-4 sentences max. "
+        "Be direct and specific — no filler, no long paragraphs. "
+        "Use bullet points only if listing 3+ items. Lead with the insight, not the context.\n\n"
         f"{history_text}"
-        f"Current question: {query}"
+        f"Question: {query}"
         + (f"\n\nScan context: {req.context}" if req.context else "")
     )
 
