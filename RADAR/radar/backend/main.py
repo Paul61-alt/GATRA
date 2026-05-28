@@ -2,6 +2,7 @@ import asyncio
 import json
 import logging
 import os
+import re
 import time
 from contextlib import asynccontextmanager
 from datetime import datetime, timezone
@@ -11,7 +12,8 @@ from dotenv import load_dotenv
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict
+from pydantic.alias_generators import to_camel
 from slowapi import Limiter
 from slowapi.errors import RateLimitExceeded
 from slowapi.middleware import SlowAPIMiddleware
@@ -28,12 +30,31 @@ from models import PipelineRun, PipelineStatus
 from models.competitor import DiscoverCandidate, DiscoverResult
 from pipeline import discover, enrich, synthesize, understand
 from pipeline.transform import pipeline_run_to_radar_output
-from utils import cache_get, cache_set, cache_get_discover, cache_set_discover, normalize_domain as _norm_domain_util
+from utils import (
+    cache_get,
+    cache_set,
+    cache_get_discover,
+    cache_set_discover,
+    cache_get_progress,
+    cache_set_progress,
+    normalize_domain as _norm_domain_util,
+)
 
 
 def _check_kill_switch() -> None:
     if os.environ.get("RADAR_KILL_SWITCH", "").lower() in ("1", "true", "on"):
         raise HTTPException(status_code=503, detail="Service temporarily disabled")
+
+
+# run_id is used as a filename in the cache (progress, discover). Reject anything that
+# could escape the cache directory via path traversal or shell injection.
+_RUN_ID_RE = re.compile(r"^[A-Za-z0-9_-]{8,64}$")
+
+
+def _validate_run_id(run_id: str) -> str:
+    if not run_id or not _RUN_ID_RE.match(run_id):
+        raise HTTPException(status_code=422, detail="Invalid run_id format")
+    return run_id
 
 
 limiter = Limiter(key_func=get_remote_address, default_limits=["10/minute", "100/hour"])
@@ -46,6 +67,8 @@ async def lifespan(app: FastAPI):
     app.state.pipeline_sem = asyncio.Semaphore(
         int(os.environ.get("RADAR_MAX_CONCURRENT", "2"))
     )
+    # Running enrich pipelines keyed by run_id — used to dedupe concurrent POSTs after a refresh.
+    app.state.enrich_jobs = {}
     yield
 
 
@@ -74,7 +97,11 @@ app.add_middleware(
 
 
 class AnalyzeRequest(BaseModel):
+    model_config = ConfigDict(alias_generator=to_camel, populate_by_name=True)
     url: str
+    # Client-supplied run_id (UUID) — enables refresh recovery via /scan/status/{run_id}.
+    # Optional for backwards compatibility; server generates one if absent.
+    run_id: str | None = None
 
 
 def _normalize_domain(url: str) -> str:
@@ -103,6 +130,7 @@ def _candidates_to_enrich_dicts(candidates: list[DiscoverCandidate]) -> list[dic
 
 
 class EnrichRequest(BaseModel):
+    model_config = ConfigDict(alias_generator=to_camel, populate_by_name=True)
     run_id: str
     selected: list[str]  # bare domains VC selected, e.g. ["notion.so", "coda.io"]
 
@@ -334,25 +362,35 @@ async def scan_discover(request: Request, req: AnalyzeRequest) -> dict:
     """Phase 1+2: UNDERSTAND + DISCOVER only. Returns lightweight candidate list.
 
     Response cached by run_id for 2h so /scan/enrich can resume without re-running.
+    Client can supply run_id for refresh recovery via /scan/status/{run_id}.
     """
     _check_kill_switch()
     domain = _normalize_domain(req.url)
     if not domain:
         raise HTTPException(status_code=422, detail="Invalid URL")
 
-    run_id = str(uuid4())
+    run_id = _validate_run_id(req.run_id) if req.run_id else str(uuid4())
     created_at = datetime.now(timezone.utc).isoformat()
     t0 = time.monotonic()
+
+    cache_set_progress(run_id, {
+        "runId": run_id, "domain": domain, "phase": "UNDERSTAND", "status": "start",
+        "startedAt": created_at,
+    })
 
     try:
         linkup: LinkupClient = app.state.linkup
 
         async with app.state.pipeline_sem:
             company_profile = await understand.run(domain, linkup, run_id, claude=app.state.claude)
+            cache_set_progress(run_id, {
+                "runId": run_id, "domain": domain, "phase": "DISCOVER", "status": "start",
+                "startedAt": created_at,
+            })
             candidates, discover_sources, _ = await discover.run(company_profile, linkup)
 
         # Persist intermediate state so /scan/enrich can resume with selected subset
-        run_id = company_profile.pipeline_run_id  # use the profile's run_id (already a UUID)
+        run_id = company_profile.pipeline_run_id  # propagated UUID
         cache_set_discover(run_id, {
             "company_profile": company_profile.model_dump(mode="json"),
             "candidates": [c.model_dump() for c in candidates],
@@ -368,15 +406,24 @@ async def scan_discover(request: Request, req: AnalyzeRequest) -> dict:
             scanned_at=created_at,
             sources_count=len(discover_sources),
         )
+        # Return camelCase via alias (model uses snake_case internally)
+        result_json = result.model_dump(by_alias=True, mode="json")
+        cache_set_progress(run_id, {
+            "runId": run_id, "domain": domain, "phase": "DISCOVER", "status": "ok",
+            "startedAt": created_at, "discoverResult": result_json,
+        })
         logger.info(
             "scan_discover=complete domain=%s run_id=%s candidates=%d duration=%.1fs",
             domain, run_id, len(candidates), time.monotonic() - t0,
         )
-        # Return camelCase via alias (model uses snake_case internally)
-        return result.model_dump(by_alias=True, mode="json")
+        return result_json
 
     except Exception as e:
         logger.error("scan_discover=error domain=%s error=%s", domain, e, exc_info=True)
+        cache_set_progress(run_id, {
+            "runId": run_id, "domain": domain, "phase": "DISCOVER", "status": "error",
+            "startedAt": created_at, "error": str(e),
+        })
         raise HTTPException(status_code=500, detail=str(e))
 
 
@@ -389,6 +436,7 @@ async def scan_enrich_stream(request: Request, req: EnrichRequest) -> StreamingR
     'selected' is a list of bare domains to enrich, e.g. ["notion.so", "coda.io"].
     """
     _check_kill_switch()
+    _validate_run_id(req.run_id)
 
     cached_discover = cache_get_discover(req.run_id)
     if not cached_discover:
@@ -400,79 +448,121 @@ async def scan_enrich_stream(request: Request, req: EnrichRequest) -> StreamingR
     if not req.selected:
         raise HTTPException(status_code=422, detail="'selected' list is empty — nothing to enrich.")
 
+    # If a pipeline is already running for this run_id (e.g. user re-POSTed after a refresh
+    # before the original finished), tell the client to poll /scan/status instead of spawning
+    # a duplicate pipeline that would burn Linkup credits twice.
+    jobs: dict = app.state.enrich_jobs
+    existing = jobs.get(req.run_id)
+    if existing is not None and not existing["task"].done():
+        raise HTTPException(
+            status_code=409,
+            detail=f"Pipeline already running for run_id '{req.run_id}'. Poll GET /scan/status/{{run_id}} instead.",
+        )
+
+    queue: asyncio.Queue = asyncio.Queue()
+    domain = cached_discover.get("company_profile", {}).get("domain", "")
+    created_at = datetime.now(timezone.utc).isoformat()
+
+    async def emit(event: dict) -> None:
+        await queue.put(event)
+
+    async def run_enrich_pipeline() -> None:
+        t0 = time.monotonic()
+        run_id = req.run_id
+        try:
+            from models.company import CompanyProfile as _CompanyProfile
+            company_profile = _CompanyProfile.model_validate(cached_discover["company_profile"])
+            all_candidates = cached_discover.get("candidates", [])
+            discover_sources = cached_discover.get("discover_sources", [])
+
+            # Filter to VC-selected domains only
+            selected_set = {_normalize_domain(d) for d in req.selected}
+            selected_candidates = [
+                DiscoverCandidate.model_validate(c)
+                for c in all_candidates
+                if _normalize_domain(c.get("domain", "")) in selected_set
+            ]
+
+            if not selected_candidates:
+                cache_set_progress(run_id, {
+                    "runId": run_id, "domain": company_profile.domain, "phase": "ENRICH",
+                    "status": "error", "startedAt": created_at,
+                    "error": "None of the selected domains matched discovered candidates.",
+                })
+                await queue.put({"error": "None of the selected domains matched discovered candidates."})
+                return
+
+            competitor_dicts = _candidates_to_enrich_dicts(selected_candidates)
+
+            linkup: LinkupClient = app.state.linkup
+
+            async with app.state.pipeline_sem:
+                cache_set_progress(run_id, {
+                    "runId": run_id, "domain": company_profile.domain, "phase": "ENRICH",
+                    "status": "start", "startedAt": created_at,
+                })
+                await queue.put({"phase": "ENRICH", "status": "start"})
+                competitor_profiles = await enrich.run(competitor_dicts, linkup, run_id, event_cb=emit)
+                cache_set_progress(run_id, {
+                    "runId": run_id, "domain": company_profile.domain, "phase": "ENRICH",
+                    "status": "ok", "startedAt": created_at, "count": len(competitor_profiles),
+                })
+                await queue.put({"phase": "ENRICH", "status": "ok", "count": len(competitor_profiles)})
+
+                cache_set_progress(run_id, {
+                    "runId": run_id, "domain": company_profile.domain, "phase": "SYNTHESIZE",
+                    "status": "start", "startedAt": created_at,
+                })
+                await queue.put({"phase": "SYNTHESIZE", "status": "start"})
+                radar_scores = synthesize.run(company_profile, competitor_profiles)
+                await queue.put({"phase": "SYNTHESIZE", "status": "ok", "count": len(radar_scores)})
+
+            run = PipelineRun(
+                id=run_id,
+                company_domain=company_profile.domain,
+                status=PipelineStatus.COMPLETED,
+                created_at=created_at,
+                completed_at=datetime.now(timezone.utc).isoformat(),
+                company_profile=company_profile,
+                competitors=competitor_profiles,
+                discover_source_urls=discover_sources,
+                radar_scores=radar_scores,
+            )
+            radar_output = pipeline_run_to_radar_output(run)
+            result = radar_output.model_dump(by_alias=True, mode="json", exclude_none=True)
+            # Cache full result under standard radar key + progress (with result) for refresh recovery
+            cache_set(f"radar_{company_profile.domain}", result)
+            cache_set_progress(run_id, {
+                "runId": run_id, "domain": company_profile.domain, "phase": "SYNTHESIZE",
+                "status": "ok", "startedAt": created_at, "result": result,
+            })
+            logger.info(
+                "scan_enrich=complete domain=%s run_id=%s duration=%.1fs",
+                company_profile.domain, run_id, time.monotonic() - t0,
+            )
+            await queue.put({"result": result})
+        except Exception as e:
+            logger.error("scan_enrich=error run_id=%s error=%s", run_id, e, exc_info=True)
+            cache_set_progress(run_id, {
+                "runId": run_id, "domain": domain, "phase": "ENRICH", "status": "error",
+                "startedAt": created_at, "error": str(e),
+            })
+            await queue.put({"error": str(e)})
+        finally:
+            await queue.put(None)  # sentinel — end of stream
+
+    pipeline_task = asyncio.create_task(run_enrich_pipeline())
+    jobs[req.run_id] = {"task": pipeline_task}
+    # GC when done so dict doesn't grow unbounded (2h TTL on progress cache covers reads)
+    def _cleanup(_t: asyncio.Task, _rid: str = req.run_id) -> None:
+        jobs.pop(_rid, None)
+    pipeline_task.add_done_callback(_cleanup)
+
     async def event_stream():
         def _sse(data: dict) -> str:
             return f": flush\n\ndata: {json.dumps(data)}\n\n"
 
-        queue: asyncio.Queue = asyncio.Queue()
-
-        async def emit(event: dict) -> None:
-            await queue.put(event)
-
-        async def run_enrich_pipeline() -> None:
-            t0 = time.monotonic()
-            run_id = req.run_id
-            created_at = datetime.now(timezone.utc).isoformat()
-            try:
-                from models.company import CompanyProfile as _CompanyProfile
-                company_profile = _CompanyProfile.model_validate(cached_discover["company_profile"])
-                all_candidates = cached_discover.get("candidates", [])
-                discover_sources = cached_discover.get("discover_sources", [])
-
-                # Filter to VC-selected domains only
-                selected_set = {_normalize_domain(d) for d in req.selected}
-                selected_candidates = [
-                    DiscoverCandidate.model_validate(c)
-                    for c in all_candidates
-                    if _normalize_domain(c.get("domain", "")) in selected_set
-                ]
-
-                if not selected_candidates:
-                    await queue.put({"error": "None of the selected domains matched discovered candidates."})
-                    return
-
-                competitor_dicts = _candidates_to_enrich_dicts(selected_candidates)
-
-                linkup: LinkupClient = app.state.linkup
-
-                async with app.state.pipeline_sem:
-                    await queue.put({"phase": "ENRICH", "status": "start"})
-                    competitor_profiles = await enrich.run(competitor_dicts, linkup, run_id, event_cb=emit)
-                    await queue.put({"phase": "ENRICH", "status": "ok", "count": len(competitor_profiles)})
-
-                    await queue.put({"phase": "SYNTHESIZE", "status": "start"})
-                    radar_scores = synthesize.run(company_profile, competitor_profiles)
-                    await queue.put({"phase": "SYNTHESIZE", "status": "ok", "count": len(radar_scores)})
-
-                run = PipelineRun(
-                    id=run_id,
-                    company_domain=company_profile.domain,
-                    status=PipelineStatus.COMPLETED,
-                    created_at=created_at,
-                    completed_at=datetime.now(timezone.utc).isoformat(),
-                    company_profile=company_profile,
-                    competitors=competitor_profiles,
-                    discover_source_urls=discover_sources,
-                    radar_scores=radar_scores,
-                )
-                radar_output = pipeline_run_to_radar_output(run)
-                result = radar_output.model_dump(by_alias=True, mode="json", exclude_none=True)
-                # Cache full result under standard radar key for later retrieval
-                cache_set(f"radar_{company_profile.domain}", result)
-                logger.info(
-                    "scan_enrich=complete domain=%s run_id=%s duration=%.1fs",
-                    company_profile.domain, run_id, time.monotonic() - t0,
-                )
-                await queue.put({"result": result})
-            except Exception as e:
-                logger.error("scan_enrich=error run_id=%s error=%s", run_id, e, exc_info=True)
-                await queue.put({"error": str(e)})
-            finally:
-                await queue.put(None)  # sentinel
-
-        pipeline_task = asyncio.create_task(run_enrich_pipeline())
         yield ": connected\n\n"
-
         try:
             while True:
                 try:
@@ -484,11 +574,8 @@ async def scan_enrich_stream(request: Request, req: EnrichRequest) -> StreamingR
                     break
                 yield _sse(event)
         except (GeneratorExit, asyncio.CancelledError):
-            pipeline_task.cancel()
-            try:
-                await pipeline_task
-            except (asyncio.CancelledError, Exception):
-                pass
+            # Client disconnected — DO NOT cancel the pipeline. It writes progress + final
+            # result to cache so a reconnecting client (refresh) can recover via /scan/status.
             raise
 
     return StreamingResponse(
@@ -496,6 +583,26 @@ async def scan_enrich_stream(request: Request, req: EnrichRequest) -> StreamingR
         media_type="text/event-stream",
         headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
     )
+
+
+@app.get("/scan/status/{run_id}")
+@limiter.exempt
+async def scan_status(request: Request, run_id: str) -> dict:
+    """Return the latest progress snapshot for a run_id (refresh recovery).
+
+    Frontend localStorage stashes run_id on scan start; after a refresh it polls
+    this endpoint every 2s until phase=="SYNTHESIZE" && status=="ok" (result attached).
+    Exempt from the global rate limit so polling (~30 req/min) doesn't trip 429.
+    """
+    _validate_run_id(run_id)
+    progress = cache_get_progress(run_id)
+    if not progress:
+        raise HTTPException(
+            status_code=404,
+            detail=f"run_id '{run_id}' not found or expired (2h TTL).",
+        )
+    progress["running"] = run_id in app.state.enrich_jobs
+    return progress
 
 
 @app.get("/health")
