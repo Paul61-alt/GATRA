@@ -271,6 +271,7 @@ python scripts/precompute_demo.py  # à créer en semaine 3
 3. **Coût Linkup** — ~0.60€ par analyse complète. Ne jamais lancer un pipeline complet en boucle pour débugger — utiliser les mocks dans `tests/fixtures/`
 4. **CORS** — le backend FastAPI doit autoriser `localhost:3000` en dev et le domaine Vercel en prod
 5. **Rate limiting Nominatim** — 1 req/s max, ajouter `asyncio.sleep(1)` entre les calls dans `geocoding.py`
+6. **Refresh-recovery — pipeline ne s'annule PLUS au disconnect** : `/scan/enrich` lance la pipeline en background task et NE l'annule pas si le client SSE se déconnecte. Le résultat atterrit toujours dans `cache_set(f"radar_{domain}", ...)` + `cache_set_progress(run_id, ...)`. Conséquence : un refresh client ne récupère pas les crédits Linkup, mais évite un re-scan complet (~€4.50). Le frontend stocke `run_id` dans `localStorage["radar:activeScan"]` et poll `GET /scan/status/{run_id}` (exempt du rate limit). Si tu ajoutes une nouvelle phase au pipeline, écris dans `cache_set_progress` au début + à la fin pour que la recovery la couvre.
 
 ---
 

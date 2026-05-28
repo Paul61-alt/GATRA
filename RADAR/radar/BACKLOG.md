@@ -56,11 +56,17 @@
 - S4.2 Frontend Vercel
 - S4.3 Smoke test prod end-to-end
 
+### E5 — Refresh-recovery follow-ups (non-bloquants, post-démo)
+- S5.1 Cap retry count dans `pollScanStatus` (loop infini si backend down)
+- S5.2 Factoriser le dict progress (~11 sites de construction ad-hoc dans `main.py`)
+- S5.3 Status endpoint renvoie `hasResult: true` au lieu du `result` complet → un GET séparé pour le payload (économie bande passante sur polling post-completion)
+- S5.4 Assert/drop ligne `run_id = company_profile.pipeline_run_id` ([main.py:381](RADAR/radar/backend/main.py#L381)) — probablement redondant
+
 ---
 
 ## Done (chronologique, plus récent en haut)
 
-_(vide pour l'instant)_
+- **2026-05-28** — Refresh-recovery scan (progress cache + status endpoint + localStorage restore + polling). Smoke test 12/12. 2 blockers sécurité corrigés (path traversal, rate-limit).
 
 ---
 

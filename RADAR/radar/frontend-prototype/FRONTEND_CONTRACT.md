@@ -260,9 +260,59 @@ Handle `from_cache` to optionally show a "cached" indicator in the UI.
 | Scenario | What you receive |
 |---|---|
 | Invalid URL | HTTP 422 before stream starts |
-| Rate limit exceeded | HTTP 429 before stream starts |
+| Invalid `runId` format (not `^[A-Za-z0-9_-]{8,64}$`) | HTTP 422 before any work |
+| Rate limit exceeded | HTTP 429 before stream starts (`/scan/status` exempt) |
+| Pipeline already running for `runId` | HTTP 409 → fall back to polling |
 | Pipeline error mid-stream | `data: { error: "message" }` |
-| Client disconnects | Backend cancels pipeline (stops burning API credits) |
+| Client disconnects | Backend **keeps the pipeline running**. Final result lands in cache + `cache_set_progress` so a refreshed client recovers via `GET /scan/status/{run_id}` |
+
+---
+
+## 11. Refresh recovery — `/scan/status` + localStorage
+
+Persisting an in-flight scan across page refresh.
+
+### Client → server
+
+1. Frontend generates `runId` via `crypto.randomUUID()` **before** `POST /scan/discover`, includes it in the body:
+   ```json
+   { "url": "stripe.com", "runId": "5f3b2c1a-..." }
+   ```
+2. Frontend writes to `localStorage["radar:activeScan"]`:
+   ```json
+   { "runId": "5f3b2c1a-...", "url": "stripe.com", "domain": "stripe.com", "phase": "DISCOVER", "startedAt": "2026-05-28T…" }
+   ```
+3. Same `runId` is reused for `POST /scan/enrich` so the run is tracked end-to-end.
+4. On `handleEnrichComplete` (or any error/expiry) → `localStorage.removeItem("radar:activeScan")`.
+
+### Server snapshot — `GET /scan/status/{run_id}`
+
+Returns the latest progress write from `cache_set_progress`. Exempt from the global rate limit (`@limiter.exempt`). 404 if `run_id` unknown or expired (2h TTL).
+
+```json
+{
+  "runId": "5f3b2c1a-...",
+  "domain": "stripe.com",
+  "phase": "ENRICH",            // UNDERSTAND | DISCOVER | ENRICH | SYNTHESIZE
+  "status": "start",            // start | ok | error
+  "startedAt": "2026-05-28T…",
+  "running": true,               // server-side: pipeline task still in app.state.enrich_jobs
+  "count": 7,                   // optional, present on ENRICH:ok / DISCOVER:ok
+  "discoverResult": { /* DiscoverResult */ },  // present once DISCOVER:ok
+  "result": { /* RadarOutput */ },             // present once SYNTHESIZE:ok
+  "error": "msg"                 // present if status==="error"
+}
+```
+
+### Frontend on mount
+
+1. Read `localStorage["radar:activeScan"]`. No entry → idle.
+2. `GET /scan/status/{runId}` → branch:
+   - `status.result` present → hydrate `RADAR_DATA`, flip to `view==="current"`, clear localStorage
+   - `status.status === "error"` → toast + clear
+   - 404 → "Scan expiré" toast + clear
+   - Otherwise → restore `scanInProgress`, show skeleton (`loadingPhase: 0 → 1`), call `pollScanStatus(runId)` (every 2s)
+3. `pollScanStatus` also handles the case where DISCOVER finished but ENRICH was never POSTed (mid-phase refresh) — it calls `handleDiscoverComplete(status.discoverResult)` which triggers `POST /scan/enrich`. A 409 (pipeline still alive server-side) falls back to more polling.
 
 ---
 
