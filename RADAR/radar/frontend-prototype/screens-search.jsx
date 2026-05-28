@@ -55,17 +55,33 @@ function SearchScreen({ onComplete, onScanStart, onDiscoverComplete }) {
   _uE_search(() => {
     if (phase !== "scanning") return;
     let cancelled = false;
-    const tick = setInterval(() => {
+    let timer = null;
+    const startedAt = Date.now();
+
+    const schedule = () => {
       if (cancelled) return;
-      setSources((s) =>
-        Math.min(1247, s + Math.floor(20 + Math.random() * 80)),
-      );
-    }, 220);
+      // Faster ticks during "Searching market corpus" step
+      const isCorpusStep = step === 3;
+      const interval = isCorpusStep ? 180 : 320;
+
+      setSources((s) => {
+        const elapsedSec = (Date.now() - startedAt) / 1000;
+        // Target drifts up with time: ~1200 by 15s, ~1500 by 50s, no ceiling
+        const target = 1200 + elapsedSec * 8;
+        // Asymptotic easing + small jitter → no plateau feel
+        const delta = (target - s) * 0.07 + Math.random() * 6;
+        return Math.max(s, Math.floor(s + delta));
+      });
+
+      timer = setTimeout(schedule, interval);
+    };
+    schedule();
+
     return () => {
       cancelled = true;
-      clearInterval(tick);
+      if (timer) clearTimeout(timer);
     };
-  }, [phase]);
+  }, [phase, step]);
 
   const PHASE_STEP = {
     "UNDERSTAND:start": 0,
@@ -94,7 +110,11 @@ function SearchScreen({ onComplete, onScanStart, onDiscoverComplete }) {
     setFoundCount(0);
     setError(null);
     setPhase("scanning");
-    if (onScanStart) onScanStart(url.trim());
+    // Generate run_id client-side so localStorage can track this scan *before*
+    // the backend response arrives → refresh during discover is recoverable.
+    const runId = (window.crypto?.randomUUID?.()) ||
+      `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+    if (onScanStart) onScanStart(url.trim(), runId);
 
     // ── Animate the step indicator while /scan/discover runs (UNDERSTAND ~10s + DISCOVER ~5s)
     let cancelled = false;
@@ -113,7 +133,7 @@ function SearchScreen({ onComplete, onScanStart, onDiscoverComplete }) {
       const resp = await fetch(`${window.RADAR_API}/scan/discover`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ url: url.trim() }),
+        body: JSON.stringify({ url: url.trim(), runId }),
       });
       if (!resp.ok) {
         cancelled = true;

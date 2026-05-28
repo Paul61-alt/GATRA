@@ -1,5 +1,23 @@
 // app.jsx — top-level wiring: workspace tabs + dynamic company tabs
-const { useState: _uS_app, useEffect: _uE_app } = React;
+const { useState: _uS_app, useEffect: _uE_app, useRef: _uR_app } = React;
+
+// ─── localStorage helpers for refresh-recovery of an in-flight scan ───────────
+const ACTIVE_SCAN_KEY = "radar:activeScan";
+
+function _readActiveScan() {
+  try {
+    const raw = localStorage.getItem(ACTIVE_SCAN_KEY);
+    return raw ? JSON.parse(raw) : null;
+  } catch { return null; }
+}
+
+function _writeActiveScan(scan) {
+  try { localStorage.setItem(ACTIVE_SCAN_KEY, JSON.stringify(scan)); } catch {}
+}
+
+function _clearActiveScan() {
+  try { localStorage.removeItem(ACTIVE_SCAN_KEY); } catch {}
+}
 
 const SCAN_TABS = [
   { key: "overview",  label: "Overview",    icon: "overview" },
@@ -30,6 +48,57 @@ function App() {
     document.documentElement.setAttribute("data-density", tweaks.density);
   }, [tweaks.density]);
 
+  // ─── Refresh recovery: on mount, restore any in-flight scan from localStorage ─
+  // Runs once. Reads the saved {runId, url, domain, phase} → calls /scan/status
+  // → either hydrates the final result, restores in-progress UI + polls, or
+  // shows an "expired" toast and clears the entry.
+  _uE_app(() => {
+    const saved = _readActiveScan();
+    if (!saved || !saved.runId) return;
+
+    (async () => {
+      let resp;
+      try {
+        resp = await fetch(`${window.RADAR_API}/scan/status/${saved.runId}`);
+      } catch {
+        return;  // network error on cold open — keep entry, user can retry
+      }
+      if (resp.status === 404) {
+        _clearActiveScan();
+        setToast({ label: `Scan expiré pour ${saved.domain} — relance.`, action: null });
+        return;
+      }
+      if (!resp.ok) return;
+      const status = await resp.json();
+
+      // Final result available → hydrate straight to current view.
+      if (status.result) {
+        window.RADAR_DATA = status.result;
+        setData(status.result);
+        setLoadingPhase(2);
+        setView("current");
+        _clearActiveScan();
+        return;
+      }
+      // Hard error → clear + toast.
+      if (status.status === "error") {
+        _clearActiveScan();
+        setToast({ label: `Scan failed: ${status.error || "unknown"}`, action: null });
+        return;
+      }
+      // Still running — show the skeleton current view (covers all phases uniformly)
+      // and poll /scan/status until either result/error or DISCOVER ok (→ enrich).
+      setScanInProgress({
+        url: saved.url, domain: saved.domain, runId: saved.runId, startedAt: saved.startedAt,
+      });
+      setLoadingPhase(0);
+      setView("current");
+      setTimeout(() => setLoadingPhase(1), 1800);
+      pollScanStatus(saved.runId);
+    })();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   const handleDelete = () => {
     setData(null);
     setView("home");
@@ -43,9 +112,11 @@ function App() {
     }, 10000);
   };
 
-  const handleScanStart = (url) => {
+  const handleScanStart = (url, runId) => {
     const domain = url.replace(/^https?:\/\//, "").replace(/\/.*$/, "");
-    setScanInProgress({ url, domain, startedAt: new Date().toISOString() });
+    const startedAt = new Date().toISOString();
+    setScanInProgress({ url, domain, runId, startedAt });
+    _writeActiveScan({ runId, url, domain, phase: "DISCOVER", startedAt });
     // Stay on the search screen during DISCOVER (its scanning UI shows progress).
     // handleDiscoverComplete auto-flips to "current" with skeleton + runs enrich.
   };
@@ -63,6 +134,9 @@ function App() {
     }
 
     setDiscoverResult(result);
+    // Bump localStorage phase so refresh recovery knows we're past DISCOVER
+    const prior = _readActiveScan();
+    if (prior) _writeActiveScan({ ...prior, phase: "ENRICH", runId: result.runId, domain: result.companyDomain });
     handleEnrichStart(result.companyDomain);
     runEnrich(result.runId, topDomains);
   };
@@ -74,9 +148,10 @@ function App() {
       resp = await fetch(`${window.RADAR_API}/scan/enrich`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ runId, selected: selectedDomains }),
+        body: JSON.stringify({ run_id: runId, selected: selectedDomains }),
       });
     } catch (err) {
+      _clearActiveScan();
       setToast({ label: `Enrich failed (network): ${err.message || err}`, action: null });
       setView("new");
       return;
@@ -84,6 +159,13 @@ function App() {
 
     if (!resp.ok) {
       const txt = await resp.text();
+      // 409 = a pipeline is already running for this run_id (e.g. duplicate from refresh
+      // race). Fall back to polling /scan/status — the in-flight pipeline writes there.
+      if (resp.status === 409) {
+        pollScanStatus(runId);
+        return;
+      }
+      _clearActiveScan();
       const msg = resp.status === 404
         ? "Session expirée. Relance un scan."
         : `Enrich failed ${resp.status}: ${txt.slice(0, 200)}`;
@@ -112,11 +194,69 @@ function App() {
           return;
         }
         if (payload.error) {
+          _clearActiveScan();
           setToast({ label: `Enrich error: ${payload.error}`, action: null });
           setView("new");
           return;
         }
       }
+    }
+  };
+
+  // ─── Refresh recovery: poll /scan/status until result/error/expired ──────────
+  // Used after a refresh (mount-time restore) and as fallback when /scan/enrich
+  // returns 409 (pipeline already running server-side).
+  const pollAbortRef = _uR_app({ stop: false });
+
+  const pollScanStatus = async (runId) => {
+    pollAbortRef.current.stop = false;
+    const sleep = (ms) => new Promise(r => setTimeout(r, ms));
+    let consecutive404 = 0;
+    while (!pollAbortRef.current.stop) {
+      let resp;
+      try {
+        resp = await fetch(`${window.RADAR_API}/scan/status/${runId}`);
+      } catch (err) {
+        await sleep(2000);
+        continue;
+      }
+      if (resp.status === 404) {
+        consecutive404 += 1;
+        if (consecutive404 >= 2) {
+          _clearActiveScan();
+          setToast({ label: "Scan expiré — relance une analyse.", action: null });
+          setView("new");
+          return;
+        }
+        await sleep(2000);
+        continue;
+      }
+      consecutive404 = 0;
+      if (!resp.ok) {
+        await sleep(2000);
+        continue;
+      }
+      const status = await resp.json();
+      if (status.result) {
+        handleEnrichComplete(status.result);
+        return;
+      }
+      if (status.status === "error") {
+        _clearActiveScan();
+        setToast({ label: `Scan failed: ${status.error || "unknown error"}`, action: null });
+        setView("new");
+        return;
+      }
+      // DISCOVER finished but enrich hasn't been kicked off yet (client refreshed
+      // between phases) → trigger it now. handleDiscoverComplete will re-POST
+      // /scan/enrich; if a pipeline is still running server-side the 409 path
+      // will resume polling here.
+      if (status.phase === "DISCOVER" && status.status === "ok" && status.discoverResult) {
+        pollAbortRef.current.stop = true;
+        handleDiscoverComplete(status.discoverResult);
+        return;
+      }
+      await sleep(2000);
     }
   };
 
@@ -128,6 +268,7 @@ function App() {
     setLoadingPhase(2);
     setScanInProgress(prev => prev ? { ...prev, done: true } : null);
     setView("current");
+    _clearActiveScan();
   };
 
   // Triggered when user clicks "Analyser X concurrents" — switch to skeleton view immediately
@@ -227,7 +368,11 @@ function App() {
             />
             <Tabs tabs={tabs} active={activeTab} onTab={setActiveTab} />
             <div className="content">
-              {activeTab === "overview"  && <OverviewScreen  data={data} onOpenCompany={openCompany} loadingPhase={loadingPhase} />}
+              {activeTab === "overview"  && (
+                tweaks.overviewVersion === "v2"
+                  ? <OverviewScreenV2 data={data} onOpenCompany={openCompany} loadingPhase={loadingPhase} />
+                  : <OverviewScreen   data={data} onOpenCompany={openCompany} loadingPhase={loadingPhase} />
+              )}
               {activeTab === "list"      && <ListScreen      data={data} onOpenCompany={openCompany} />}
               {activeTab === "compare"   && <CompareScreen   data={data} onOpenCompany={openCompany} />}
               {activeTab === "map"         && <MapScreen         data={data} onOpenCompany={openCompany} />}
@@ -294,6 +439,8 @@ function RadarTweaksPanel({ t, setTweak, onJumpToSearch }) {
       <TweakSection label="Display" />
       <TweakRadio label="Density" value={t.density} options={["compact", "comfortable"]}
         onChange={(v) => setTweak("density", v)} />
+      <TweakRadio label="Overview" value={t.overviewVersion || "v1"} options={["v1", "v2"]}
+        onChange={(v) => setTweak("overviewVersion", v)} />
       <TweakSection label="Brand accent" />
       <TweakColor label="Subject highlight" value={t.accent}
         options={["#b34a1f", "#1f6b3d", "#1a3a6b", "#5a3d8a", "#0a0a0a"]}
