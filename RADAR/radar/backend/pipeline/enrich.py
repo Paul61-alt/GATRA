@@ -359,6 +359,37 @@ async def _geocode_all(competitors: list[dict]) -> dict[int, tuple]:
     return out
 
 
+async def _fill_missing_coords(profiles: list[CompetitorProfile]) -> None:
+    """Re-geocode profiles whose hq has city/country but missing lat/lng.
+
+    Initial _geocode_all runs before LLM enrichment, so shortlist competitors
+    without hq_city/hq_country in the input dict have no coords. After LLM
+    fills hq.city/country, re-geocode in place.
+    """
+    targets: list[tuple[int, str, str]] = []
+    for i, p in enumerate(profiles):
+        if not p.hq:
+            continue
+        if p.hq.lat is not None and p.hq.lng is not None:
+            continue
+        city = p.hq.city or ""
+        country = p.hq.country or ""
+        if city or country:
+            targets.append((i, city, country))
+
+    if not targets:
+        return
+
+    results = await asyncio.gather(
+        *[geocode(city, country) for _, city, country in targets],
+        return_exceptions=True,
+    )
+    for (i, _, _), coords in zip(targets, results):
+        if isinstance(coords, tuple):
+            profiles[i].hq.lat = coords[0]
+            profiles[i].hq.lng = coords[1]
+
+
 async def _enrich_one(
     competitor: dict,
     depth: Literal["S", "M"],
@@ -543,6 +574,8 @@ async def run(
             competitors, linkup, run_id, now, coords_map, depth=DEPTH_BATCH, event_cb=event_cb,
         )
 
+        await _fill_missing_coords(profiles)
+
         if event_cb:
             await event_cb({
                 "phase": "ENRICH",
@@ -602,6 +635,8 @@ async def run(
 
     stubs = [_stub(c, run_id, now) for c in tail]
     profiles = enriched + stubs
+
+    await _fill_missing_coords(profiles)
 
     if event_cb:
         await event_cb(

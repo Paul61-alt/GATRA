@@ -10,6 +10,15 @@ function getRegion(lat, lng) {
   return "North America";
 }
 
+// Treat [0,0] / null / missing as "no HQ resolved" — never plot null island.
+function hasValidCoords(c) {
+  if (!c || !Array.isArray(c.hqCoords) || c.hqCoords.length < 2) return false;
+  const [lat, lng] = c.hqCoords;
+  if (typeof lat !== "number" || typeof lng !== "number") return false;
+  if (Math.abs(lat) < 0.5 && Math.abs(lng) < 0.5) return false;
+  return true;
+}
+
 // ─── Leaflet map component (imperative, no react-leaflet needed) ───────────────
 // Build the HTML for a logo pill marker
 function makeMarkerHtml(c, isHovered) {
@@ -90,7 +99,8 @@ function LeafletMap({ all, hovered, onHover }) {
   _uE_map(() => {
     if (!containerRef.current || mapRef.current) return;
 
-    const coords = all.map(c => c.hqCoords);
+    const plotted = all.filter(hasValidCoords);
+    const coords = plotted.length ? plotted.map(c => c.hqCoords) : [[20, 0]];
     const avgLat = coords.reduce((s, [lat]) => s + lat, 0) / coords.length;
     const avgLng = coords.reduce((s, [, lng]) => s + lng, 0) / coords.length;
 
@@ -107,9 +117,9 @@ function LeafletMap({ all, hovered, onHover }) {
       { attribution: '© <a href="https://carto.com">CARTO</a>', maxZoom: 19 }
     ).addTo(map);
 
-    const offsets = applyClusterOffsets(all);
+    const offsets = applyClusterOffsets(plotted);
 
-    all.forEach(c => {
+    plotted.forEach(c => {
       const [lat, lng] = c.hqCoords;
       const [dLat, dLng] = offsets[c.id] || [0, 0];
 
@@ -164,8 +174,15 @@ function MapScreen({ data }) {
   const [hovered, setHovered] = _uS_map(null);
 
   const byRegion = _uM_map(() => {
-    const regions = { "North America": [], "Europe": [], "Asia / Pacific": [], "Latin America": [] };
+    const regions = {
+      "North America": [], "Europe": [], "Asia / Pacific": [], "Latin America": [],
+      "Location unknown": [],
+    };
     all.forEach(c => {
+      if (!hasValidCoords(c)) {
+        regions["Location unknown"].push(c);
+        return;
+      }
       const r = getRegion(c.hqCoords[0], c.hqCoords[1]);
       regions[r].push(c);
     });
@@ -176,7 +193,7 @@ function MapScreen({ data }) {
     <div className="screen">
       <SectionH
         title="Geographic distribution"
-        meta={`${all.length} headquarters`}
+        meta={`${all.filter(hasValidCoords).length} / ${all.length} headquarters`}
       >
         <button className="tb-btn">{Icons.download}</button>
       </SectionH>
@@ -196,7 +213,7 @@ function MapScreen({ data }) {
         <div className="card">
           <div className="card-h">
             <h3>By region</h3>
-            <span className="meta">{Object.keys(byRegion).length} regions</span>
+            <span className="meta">{Object.entries(byRegion).filter(([, v]) => v.length > 0).length} regions</span>
           </div>
           <div>
             {Object.entries(byRegion).filter(([, v]) => v.length > 0).map(([region, list], idx) => (
