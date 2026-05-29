@@ -341,7 +341,11 @@ function App() {
       <Sidebar
         view={view}
         onView={setView}
-        currentSubjectName={data ? data.subject.name : null}
+        currentSubjectName={
+          scanInProgress && !scanInProgress.done
+            ? scanInProgress.domain
+            : data?.subject?.name || null
+        }
       />
 
       <div className="main">
