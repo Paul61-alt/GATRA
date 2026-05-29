@@ -114,7 +114,7 @@ function RowMenu({ scan, onRescan, onDelete }) {
   );
 }
 
-function HomeScreen({ onOpenCurrent, onNewScan, scanInProgress, showToast }) {
+function HomeScreen({ onOpenCurrent, onNewScan, scanInProgress, onResumeLoading, showToast }) {
   const [q, setQ] = _uS_home("");
   const [scans, setScans] = _uS_home(PAST_SCANS);
 
@@ -220,8 +220,11 @@ function HomeScreen({ onOpenCurrent, onNewScan, scanInProgress, showToast }) {
           <tbody>
             {scanInProgress && (
               <tr
-                style={{opacity:1, background:"var(--accent-bg, rgba(179,74,31,.04))", cursor: scanInProgress.done ? "pointer" : "default"}}
-                onClick={scanInProgress.done ? onOpenCurrent : undefined}
+                style={{opacity:1, background:"var(--accent-bg, rgba(179,74,31,.04))", cursor:"pointer"}}
+                onClick={() => {
+                  if (scanInProgress.done) onOpenCurrent();
+                  else if (onResumeLoading) onResumeLoading();
+                }}
               >
                 <td>
                   <div style={{display:"flex", alignItems:"center", gap:10}}>

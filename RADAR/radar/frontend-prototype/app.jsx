@@ -104,6 +104,12 @@ function App() {
     setView("home");
   };
 
+  // Resume loading view from Home when user clicks the in-flight scan row.
+  // If no prior data, synth a stub so OverviewScreen can render skeletons.
+  const handleResumeLoading = () => {
+    setView("current");
+  };
+
   const handleRescan = () => {
     setIsRescanning(true);
     setTimeout(() => {
@@ -353,15 +359,36 @@ function App() {
             onOpenCurrent={() => setView("current")}
             onNewScan={() => setView("new")}
             scanInProgress={scanInProgress}
+            onResumeLoading={handleResumeLoading}
             showToast={(t) => setToast(t)}
           />
         )}
 
-        {view === "current" && data && (
+        {view === "current" && (() => {
+          // Build stub data when scan in progress and we have no prior payload.
+          // Lets OverviewScreen render skeletons under loadingPhase < 2.
+          const displayData = data || (scanInProgress ? {
+            subject: {
+              name: scanInProgress.domain,
+              domain: scanInProgress.domain,
+              tagline: "",
+              category: "",
+              subCategory: "",
+              hq: "",
+              founded: "",
+              employees: 0,
+              funding: { total: 0, lastRound: "" },
+              notable: [],
+            },
+            competitors: [],
+            query: { name: scanInProgress.domain, scannedAt: scanInProgress.startedAt },
+          } : null);
+          if (!displayData) return null;
+          return (
           <>
             <Topbar
-              subject={data.subject}
-              data={data}
+              subject={displayData.subject}
+              data={displayData}
               onDelete={handleDelete}
               onRescan={handleRescan}
               isRescanning={isRescanning}
@@ -370,24 +397,25 @@ function App() {
             <div className="content">
               {activeTab === "overview"  && (
                 tweaks.overviewVersion === "v2"
-                  ? <OverviewScreenV2 data={data} onOpenCompany={openCompany} loadingPhase={loadingPhase} />
-                  : <OverviewScreen   data={data} onOpenCompany={openCompany} loadingPhase={loadingPhase} />
+                  ? <OverviewScreenV2 data={displayData} onOpenCompany={openCompany} loadingPhase={loadingPhase} />
+                  : <OverviewScreen   data={displayData} onOpenCompany={openCompany} loadingPhase={loadingPhase} />
               )}
-              {activeTab === "list"      && <ListScreen      data={data} onOpenCompany={openCompany} />}
-              {activeTab === "compare"   && <CompareScreen   data={data} onOpenCompany={openCompany} />}
-              {activeTab === "map"         && <MapScreen         data={data} onOpenCompany={openCompany} />}
-              {activeTab === "positioning" && <PositioningScreen data={data} onOpenCompany={openCompany} />}
-              {activeTab === "features"  && <FeaturesScreen  data={data} onOpenCompany={openCompany} />}
-              {activeTab === "pricing"   && <PricingScreen   data={data} onOpenCompany={openCompany} />}
-              {activeTab === "timeline"  && <TimelineScreen  data={data} onOpenCompany={openCompany} />}
+              {activeTab === "list"      && <ListScreen      data={displayData} onOpenCompany={openCompany} />}
+              {activeTab === "compare"   && <CompareScreen   data={displayData} onOpenCompany={openCompany} />}
+              {activeTab === "map"         && <MapScreen         data={displayData} onOpenCompany={openCompany} />}
+              {activeTab === "positioning" && <PositioningScreen data={displayData} onOpenCompany={openCompany} />}
+              {activeTab === "features"  && <FeaturesScreen  data={displayData} onOpenCompany={openCompany} />}
+              {activeTab === "pricing"   && <PricingScreen   data={displayData} onOpenCompany={openCompany} />}
+              {activeTab === "timeline"  && <TimelineScreen  data={displayData} onOpenCompany={openCompany} />}
               {openCompanyIds.map(id => (
                 activeTab === "company:" + id && (
-                  <CompanyScreen key={id} data={data} companyId={id} onOpenCompany={openCompany} />
+                  <CompanyScreen key={id} data={displayData} companyId={id} onOpenCompany={openCompany} />
                 )
               ))}
             </div>
           </>
-        )}
+          );
+        })()}
       </div>
 
       <RadarTweaksPanel t={tweaks} setTweak={setTweak} onJumpToSearch={() => setView("new")} />
