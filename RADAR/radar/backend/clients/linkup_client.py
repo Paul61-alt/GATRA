@@ -15,16 +15,16 @@ LINKUP_BASE = "https://api.linkup.so/v1"
 _MAX_RETRIES = 3
 _RETRY_STATUSES = {429, 500, 502, 503}
 
-# Cost model based on observed Linkup billing (2026-05 wallet export).
-# /research is flat €1.50 regardless of depth (was previously underestimated).
+# Cost model per Linkup official pricing (2026-05 docs).
+# /research: $1.50 FLAT regardless of depth (S/M/L/XL) — depth-tiered table was wrong.
 # /search standard = €0.006, /search deep or with structured output = €0.055.
 # /fetch = €0.001-0.005.
-RESEARCH_COST_EUR: dict[str, float] = {"S": 1.50, "M": 1.50, "L": 1.50, "XL": 1.50}
+RESEARCH_COST_EUR: float = 1.50
 SEARCH_COST_EUR: dict[str, float] = {"standard": 0.006, "deep": 0.055, "structured": 0.055}
 FETCH_COST_EUR = 0.005
 # Env-overridable so a scan can be sandboxed below the default cap.
-DAILY_HARD_CAP_EUR = float(os.environ.get("RADAR_DAILY_HARD_CAP_EUR", "5.0"))
-DAILY_WARN_CAP_EUR = float(os.environ.get("RADAR_DAILY_WARN_CAP_EUR", "3.0"))
+DAILY_HARD_CAP_EUR = float(os.environ.get("RADAR_DAILY_HARD_CAP_EUR", "8.0"))
+DAILY_WARN_CAP_EUR = float(os.environ.get("RADAR_DAILY_WARN_CAP_EUR", "5.0"))
 
 
 class BudgetExceededError(RuntimeError):
@@ -63,6 +63,11 @@ def _load_ledger() -> None:
                 date = entry.get("date")
                 if not date:
                     continue
+                # Exempt polling GETs (/tasks/{id}, /research/{id}) — they don't
+                # count against daily call budget. Mirror _check_daily_budget.
+                ep = entry.get("endpoint", "")
+                if ep.startswith("/tasks/") or ep.startswith("/research/"):
+                    continue
                 _call_count[date] = _call_count.get(date, 0) + 1
     except OSError as e:
         logger.warning("linkup ledger read failed error=%s", e)
@@ -82,6 +87,20 @@ def _record_call(endpoint: str, status: str, cost_eur: float = 0.0) -> None:
             f.write(json.dumps(entry) + "\n")
     except OSError as e:
         logger.warning("linkup ledger write failed error=%s", e)
+
+    # Dual-write to Supabase (best effort — jsonl above stays source of truth)
+    try:
+        from utils.cache import _sb
+        sb = _sb()
+        if sb is not None:
+            sb.table("radar_usage_events").insert({
+                "ts": entry["ts"],
+                "endpoint": entry["endpoint"],
+                "status": entry["status"],
+                "cost_eur": entry["cost_eur"],
+            }).execute()
+    except Exception as e:
+        logger.warning("supabase usage_events insert failed: %s", e)
 
 
 def estimate_today_cost_eur() -> float:
@@ -145,6 +164,63 @@ def get_usage_today() -> dict:
     today = datetime.now(timezone.utc).date().isoformat()
     budget = int(os.environ.get("RADAR_DAILY_BUDGET", "50"))
     return {"date": today, "used": _call_count.get(today, 0), "budget": budget}
+
+
+def record_scan_delta(
+    scan_id: str,
+    phase: str,
+    balance_before_usd: float | None,
+    balance_after_usd: float | None,
+    duration_s: float,
+) -> None:
+    """Append scan-level USD delta to ledger + Supabase (mirror of _record_call).
+
+    Cost computed from balance delta = ground truth from Linkup billing API,
+    in contrast to the per-call cost_eur estimates recorded by _record_call.
+    """
+    cost_usd: float | None = None
+    if balance_before_usd is not None and balance_after_usd is not None:
+        cost_usd = max(0.0, balance_before_usd - balance_after_usd)
+    entry = {
+        "ts": datetime.now(timezone.utc).isoformat().replace("+00:00", "Z"),
+        "date": datetime.now(timezone.utc).date().isoformat(),
+        "endpoint": "scan_delta",
+        "status": "ok" if cost_usd is not None else "missing_balance",
+        "scan_id": scan_id,
+        "phase": phase,
+        "balance_before_usd": balance_before_usd,
+        "balance_after_usd": balance_after_usd,
+        "cost_usd": cost_usd,
+        "duration_s": duration_s,
+    }
+    try:
+        _LEDGER_PATH.parent.mkdir(parents=True, exist_ok=True)
+        with _LEDGER_PATH.open("a", encoding="utf-8") as f:
+            f.write(json.dumps(entry) + "\n")
+    except OSError as e:
+        logger.warning("linkup ledger scan_delta write failed error=%s", e)
+
+    try:
+        from utils.cache import _sb
+        sb = _sb()
+        if sb is not None:
+            # TODO: requires migration on radar_usage_events to add columns:
+            #   scan_id text, phase text, balance_before_usd numeric,
+            #   balance_after_usd numeric, cost_usd numeric, duration_s numeric.
+            # Until applied, this insert silently fails — JSONL ledger above is source of truth.
+            sb.table("radar_usage_events").insert({
+                "ts": entry["ts"],
+                "endpoint": entry["endpoint"],
+                "status": entry["status"],
+                "scan_id": scan_id,
+                "phase": phase,
+                "balance_before_usd": balance_before_usd,
+                "balance_after_usd": balance_after_usd,
+                "cost_usd": cost_usd,
+                "duration_s": duration_s,
+            }).execute()
+    except Exception as e:
+        logger.warning("supabase scan_delta insert failed: %s", e)
 
 
 class LinkupClient:
@@ -246,13 +322,14 @@ class LinkupClient:
 
         Each task in batch billed individually; approximate as one /research per task.
         """
-        per_task_cost = RESEARCH_COST_EUR.get("S", 1.50)
+        per_task_cost = RESEARCH_COST_EUR
         total_cost = per_task_cost * len(requests_payload)
         created = await self._post("/tasks", requests_payload, cost_eur=total_cost)
         task_ids = [t["id"] for t in created]
         logger.info("linkup tasks_created=%d", len(task_ids))
 
-        max_wait, interval = 600, 10  # Research depth=S can take up to 5 min per job
+        # Exponential backoff per Linkup recommendation: start 2s, double up to 10s.
+        max_wait, interval, max_interval = 600, 2, 10
         elapsed = 0
         while elapsed < max_wait:
             await asyncio.sleep(interval)
@@ -263,6 +340,7 @@ class LinkupClient:
             if all(s.get("status") in ("completed", "failed") for s in statuses):
                 logger.info("linkup tasks_done elapsed=%ds", elapsed)
                 return statuses
+            interval = min(interval * 2, max_interval)
         raise TimeoutError(f"Linkup tasks not done after {max_wait}s")
 
     async def research(
@@ -277,29 +355,34 @@ class LinkupClient:
         """
         body: dict = {
             "q": query,
-            "mode": "Investigate",
+            "mode": "investigate",
             "depth": depth,
             "outputType": "sourcedAnswer",
         }
         if structured_schema:
             body["outputType"] = "structured"
             body["structuredOutputSchema"] = json.dumps(structured_schema)
-        cost = RESEARCH_COST_EUR.get(depth, 0.0)
+        cost = RESEARCH_COST_EUR
         return await self._post("/research", body, cost_eur=cost)
 
     async def wait_for_research(
         self,
         job_id: str,
         max_wait: int = 600,
-        interval: int = 7,
+        initial_interval: int = 2,
+        max_interval: int = 10,
         on_poll=None,
     ) -> dict:
         """Poll /research/{id} until status in {completed, failed} or max_wait elapsed.
 
         Polling GETs are budget-exempt (see _check_daily_budget).
         Optional on_poll(dict) async callback fires each iteration (for SSE progress).
+
+        Exponential backoff per Linkup recommendation: start 2s, double up to 10s.
+        Keeps tail-latency low on fast jobs without spamming long ones.
         """
         elapsed = 0
+        interval = initial_interval
         while elapsed < max_wait:
             result = await self._get(f"/research/{job_id}")
             status = result.get("status")
@@ -312,7 +395,29 @@ class LinkupClient:
                     logger.warning("on_poll callback failed error=%s", e)
             await asyncio.sleep(interval)
             elapsed += interval
+            interval = min(interval * 2, max_interval)
         raise TimeoutError(f"research job {job_id} not done after {max_wait}s")
+
+    async def balance(self) -> float | None:
+        """GET /v1/credits/balance → current USD credit balance, or None on error.
+
+        Direct httpx call: bypasses budget tracking + ledger (this is account
+        metadata, not a billable Linkup call).
+        """
+        url = f"{LINKUP_BASE}/credits/balance"
+        try:
+            async with httpx.AsyncClient(timeout=10.0) as client:
+                r = await client.get(url, headers=self._headers)
+                r.raise_for_status()
+                data = r.json()
+                balance = data.get("balance")
+                if balance is None:
+                    logger.warning("linkup balance unexpected response shape=%s", data)
+                    return None
+                return float(balance)
+        except Exception as e:
+            logger.warning("linkup balance fetch failed error=%s", e)
+            return None
 
     async def research_and_wait(
         self,
@@ -320,7 +425,8 @@ class LinkupClient:
         depth: Literal["S", "M", "L", "XL"] = "S",
         structured_schema: Optional[dict] = None,
         max_wait: int = 600,
-        interval: int = 7,
+        initial_interval: int = 2,
+        max_interval: int = 10,
         on_poll=None,
     ) -> dict:
         """Submit + poll. Raises if the job fails or times out."""
@@ -329,7 +435,11 @@ class LinkupClient:
         if not job_id:
             raise RuntimeError(f"research submit returned no id: {submitted}")
         result = await self.wait_for_research(
-            job_id, max_wait=max_wait, interval=interval, on_poll=on_poll
+            job_id,
+            max_wait=max_wait,
+            initial_interval=initial_interval,
+            max_interval=max_interval,
+            on_poll=on_poll,
         )
         if result.get("status") == "failed":
             raise RuntimeError(f"research job {job_id} failed: {result.get('error')}")

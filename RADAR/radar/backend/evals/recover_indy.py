@@ -41,7 +41,7 @@ async def main() -> None:
     now = datetime.now(timezone.utc).isoformat()
 
     print(f"⏳ Waiting for job {JOB_ID} to complete (up to 15min)...")
-    research = await linkup.wait_for_research(JOB_ID, max_wait=900, interval=15)
+    research = await linkup.wait_for_research(JOB_ID, max_wait=900, initial_interval=5, max_interval=15)
     if research.get("status") == "failed":
         print(f"❌ Job failed: {research.get('error')}", file=sys.stderr)
         sys.exit(1)
