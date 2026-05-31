@@ -28,8 +28,40 @@ window.RADAR_TWEAK_DEFAULTS = /*EDITMODE-BEGIN*/{
 // Populated after a real scan; starts empty so the app boots into Home/New scan
 window.RADAR_DATA = null;
 
-// Backend URL — change if your backend runs on a different port
-window.RADAR_API = "http://localhost:8000";
+// Backend URL — Render-hosted prod backend (change to localhost:8000 for local dev)
+window.RADAR_API = "https://radar-backend-je6o.onrender.com";
+
+// ─── Bearer token auth helpers (shared secret, gates /scan* endpoints) ────────
+window.RADAR_TOKEN_KEY = "radar:token";
+
+window.radarGetToken = function () {
+  try { return localStorage.getItem(window.RADAR_TOKEN_KEY) || ""; } catch { return ""; }
+};
+window.radarSetToken = function (t) {
+  try { localStorage.setItem(window.RADAR_TOKEN_KEY, t || ""); } catch {}
+};
+window.radarClearToken = function () {
+  try { localStorage.removeItem(window.RADAR_TOKEN_KEY); } catch {}
+};
+
+// Monkey-patch fetch so every call to window.RADAR_API auto-attaches the bearer
+// token. Zero changes needed at fetch sites in app.jsx / screens-*.jsx.
+(function () {
+  const _origFetch = window.fetch;
+  window.fetch = function (input, init) {
+    init = init || {};
+    const url = typeof input === "string" ? input : (input && input.url) || "";
+    if (window.RADAR_API && url.startsWith(window.RADAR_API)) {
+      const token = window.radarGetToken();
+      if (token) {
+        init.headers = Object.assign({}, init.headers || {}, {
+          Authorization: "Bearer " + token,
+        });
+      }
+    }
+    return _origFetch(input, init);
+  };
+})();
 </script>
 
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" crossorigin=""/>
