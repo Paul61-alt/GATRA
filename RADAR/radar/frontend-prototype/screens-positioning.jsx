@@ -1,232 +1,518 @@
-// screens-positioning.jsx — Positioning tab: 4 VC-oriented charts
-//   1. Capital Efficiency Matrix (ARR × funding raised)
-//   2. Funding Round Timeline (per-company round cadence)
-//   3. Investor Concentration Graph (investor → company SVG network)
-//   4. Customer Logo Overlap (contested-account matrix)
+// screens-positioning.jsx — Positioning tab: reliable-data comparison views
+//   1. Cohort Comparison  — ranked horizontal bar charts on fields we collect well
+//                           (funding, headcount, capital intensity, age, funding velocity)
+//   2. Investor Concentration — ranked bars of investors backing >1 cohort company
+//   3. Customer Overlap   — contested-account matrix (contested-first, collapsible tail)
+//   4. Funding Round Timeline — per-company round cadence
+//
+// ARR/valuation deliberately NOT charted: ARR is disclosed by too few companies to
+// compare a cohort, and valuation is only captured as narrative text, not a number.
 
 const ACCENT = "#b34a1f";
-const LOGO_SIZE = 28;
-const LOGO_HALF = LOGO_SIZE / 2;
+const NEUTRAL = "#bdb6a8";        // competitor bar fill (warm gray, matches stone palette)
+const NEUTRAL_DIM = "#d8d2c6";
+const NOW_YEAR = 2026;
 
-function faviconUrl(domain) {
-  if (!domain) return null;
-  return `https://t2.gstatic.com/faviconV2?client=SOCIAL&type=FAVICON&fallback_opts=TYPE,SIZE,URL&url=https://${domain}&size=64`;
-}
-
-function preloadLogos(companies, onAllReady) {
-  const logos = {};
-  let pending = companies.length;
-  if (pending === 0) { onAllReady(logos); return logos; }
-  companies.forEach(c => {
-    if (!c.domain) {
-      pending--;
-      if (pending === 0) onAllReady(logos);
-      return;
-    }
-    const img = new Image();
-    img.src = faviconUrl(c.domain);
-    logos[c.id] = img;
-    img.onload = img.onerror = () => {
-      pending--;
-      if (pending === 0) onAllReady(logos);
-    };
-  });
-  return logos;
-}
-
-function drawLogoBox(ctx, img, c, px, py, half = LOGO_HALF) {
-  ctx.save();
-  ctx.strokeStyle = c.isSubject ? ACCENT : "#d0d0d0";
-  ctx.lineWidth = c.isSubject ? 2 : 1.5;
-  ctx.beginPath();
-  ctx.roundRect(px - half - 2, py - half - 2, half * 2 + 4, half * 2 + 4, 5);
-  ctx.stroke();
-  if (img && img.complete && img.naturalWidth > 0) {
-    ctx.save();
-    ctx.beginPath();
-    ctx.roundRect(px - half, py - half, half * 2, half * 2, 4);
-    ctx.clip();
-    ctx.fillStyle = "#fff";
-    ctx.fill();
-    ctx.drawImage(img, px - half, py - half, half * 2, half * 2);
-    ctx.restore();
-  } else {
-    ctx.fillStyle = c.isSubject ? ACCENT + "22" : "rgba(0,0,0,0.08)";
-    ctx.beginPath();
-    ctx.roundRect(px - half, py - half, half * 2, half * 2, 4);
-    ctx.fill();
-    ctx.fillStyle = c.isSubject ? ACCENT : "#666";
-    ctx.font = "bold 11px sans-serif";
-    ctx.textAlign = "center";
-    ctx.textBaseline = "middle";
-    const parts = c.name.split(/\s+/);
-    const initials = (parts[0][0] + (parts[1] ? parts[1][0] : "")).toUpperCase();
-    ctx.fillText(initials, px, py);
-  }
-  ctx.restore();
+function truncName(name, n = 14) {
+  return name.length > n ? name.slice(0, n - 1) + "…" : name;
 }
 
 // ────────────────────────────────────────────────────────────────
-//  Chart 1 — Capital Efficiency Matrix (ARR × Funding, log-log)
+//  Chart 1 — Cohort Comparison (small-multiples of ranked bar charts)
 // ────────────────────────────────────────────────────────────────
-function CapitalEfficiencyMatrix({ companies, onPick }) {
+function RankedBarChart({ title, sub, companies, valueFn, fmt, onPick }) {
   const canvasRef = React.useRef(null);
   const chartRef = React.useRef(null);
-  const eligible = companies.filter(c => typeof c.arr === "number" && c.arr > 0 && c.funding?.total > 0);
+
+  // Build + sort rows once per render; reused by effect and empty-state guard.
+  const rows = companies
+    .map(c => ({ c, v: valueFn(c) }))
+    .filter(r => Number.isFinite(r.v) && r.v > 0)
+    .sort((a, b) => b.v - a.v);
 
   React.useEffect(() => {
-    if (!canvasRef.current || typeof Chart === "undefined" || !eligible.length) return;
+    if (!canvasRef.current || typeof Chart === "undefined" || rows.length < 2) return;
     if (chartRef.current) { chartRef.current.destroy(); chartRef.current = null; }
 
-    function build(logos) {
-      const datasets = eligible.map(c => ({
-        label: c.name,
-        data: [{ x: c.funding.total, y: c.arr, _company: c }],
-        pointRadius: LOGO_HALF + 2,
-        pointHoverRadius: LOGO_HALF + 4,
-        backgroundColor: "transparent",
-        borderColor: "transparent",
-      }));
-      const moneyTicks = [1e5, 1e6, 1e7, 5e7, 1e8, 5e8, 1e9];
-      chartRef.current = new Chart(canvasRef.current, {
-        type: "scatter",
-        data: { datasets },
-        options: {
-          responsive: true, maintainAspectRatio: true, aspectRatio: 2.4, animation: false,
-          onClick(evt) {
-            if (!chartRef.current) return;
-            const pts = chartRef.current.getElementsAtEventForMode(evt, "nearest", { intersect: false }, false);
-            if (!pts.length) return;
-            const c = datasets[pts[0].datasetIndex].data[0]._company;
-            if (onPick) onPick(c);
+    chartRef.current = new Chart(canvasRef.current, {
+      type: "bar",
+      data: {
+        labels: rows.map(r => truncName(r.c.name)),
+        datasets: [{
+          data: rows.map(r => r.v),
+          backgroundColor: rows.map(r => r.c.isSubject ? ACCENT : NEUTRAL),
+          borderColor: rows.map(r => r.c.isSubject ? ACCENT : NEUTRAL_DIM),
+          borderWidth: 1,
+          borderRadius: 3,
+          barThickness: 16,
+          maxBarThickness: 18,
+        }],
+      },
+      options: {
+        indexAxis: "y",
+        responsive: true,
+        maintainAspectRatio: false,
+        animation: false,
+        layout: { padding: { right: 56 } }, // room for value labels at bar tips
+        onClick(evt) {
+          if (!chartRef.current) return;
+          const pts = chartRef.current.getElementsAtEventForMode(evt, "nearest", { intersect: false }, false);
+          if (!pts.length) return;
+          const r = rows[pts[0].index];
+          if (r && onPick) onPick(r.c);
+        },
+        scales: {
+          x: {
+            beginAtZero: true,
+            grid: { color: "rgba(0,0,0,0.05)", drawTicks: false },
+            ticks: { display: false },
+            border: { display: false },
           },
-          scales: {
-            x: {
-              type: "logarithmic",
-              title: { display: true, text: "Total funding raised →", font: { size: 10 }, color: "#bbb" },
-              min: 1e6,
-              ticks: {
-                callback(v) { return moneyTicks.includes(v) ? fmtMoney(v) : null; },
-                font: { size: 10 }, color: "#aaa", maxTicksLimit: 6,
-              },
-              grid: { color: "rgba(0,0,0,0.05)" },
-              afterBuildTicks(axis) {
-                axis.ticks = moneyTicks
-                  .filter(t => t >= axis.min && t <= axis.max * 2)
-                  .map(t => ({ value: t }));
-              },
+          y: {
+            grid: { display: false },
+            ticks: {
+              font: { size: 10.5 },
+              color: (ctx) => (rows[ctx.index] && rows[ctx.index].c.isSubject ? ACCENT : "#6b6357"),
             },
-            y: {
-              type: "logarithmic",
-              title: { display: true, text: "ARR →", font: { size: 10 }, color: "#bbb" },
-              min: 1e5,
-              ticks: {
-                callback(v) { return moneyTicks.includes(v) ? fmtMoney(v) : null; },
-                font: { size: 10 }, color: "#aaa", maxTicksLimit: 6,
-              },
-              grid: { color: "rgba(0,0,0,0.05)" },
-              afterBuildTicks(axis) {
-                axis.ticks = moneyTicks
-                  .filter(t => t >= axis.min && t <= axis.max * 2)
-                  .map(t => ({ value: t }));
-              },
-            },
-          },
-          plugins: {
-            legend: { display: false },
-            tooltip: {
-              callbacks: {
-                title: () => "",
-                label(ctx) {
-                  const c = ctx.dataset.data[0]._company;
-                  const ratio = c.arr / c.funding.total;
-                  return [
-                    c.name,
-                    "ARR: " + fmtMoney(c.arr),
-                    "Funding: " + fmtMoney(c.funding.total),
-                    "Capital efficiency: " + ratio.toFixed(2) + "x",
-                  ];
-                },
-              },
-            },
+            border: { display: false },
           },
         },
-        plugins: [{
-          id: "ratioLines",
-          beforeDatasetsDraw(chart) {
-            const { ctx, chartArea, scales: { x, y } } = chart;
-            if (!chartArea) return;
-            ctx.save();
-            ctx.strokeStyle = "rgba(120,120,120,0.15)";
-            ctx.lineWidth = 1;
-            ctx.setLineDash([4, 4]);
-            ctx.fillStyle = "rgba(120,120,120,0.55)";
-            ctx.font = "10px sans-serif";
-            ctx.textAlign = "left";
-            ctx.textBaseline = "middle";
-            const ratios = [
-              { r: 1.0, label: "1.0× ARR/$" },
-              { r: 0.5, label: "0.5×" },
-              { r: 0.25, label: "0.25×" },
-            ];
-            ratios.forEach(({ r, label }) => {
-              const x1 = x.min, x2 = x.max;
-              const y1 = r * x1, y2 = r * x2;
-              if (y1 < y.min && y2 < y.min) return;
-              const px1 = x.getPixelForValue(x1);
-              const py1 = y.getPixelForValue(Math.max(y1, y.min));
-              const px2 = x.getPixelForValue(x2);
-              const py2 = y.getPixelForValue(Math.min(y2, y.max));
-              ctx.beginPath();
-              ctx.moveTo(px1, py1);
-              ctx.lineTo(px2, py2);
-              ctx.stroke();
-              ctx.fillText(label, px2 - 60, py2 - 6);
-            });
-            ctx.restore();
-          },
-        }, {
-          id: "logoPoints",
-          afterDatasetsDraw(chart) {
-            chart.data.datasets.forEach((ds, i) => {
-              const meta = chart.getDatasetMeta(i);
-              const el = meta.data[0];
-              if (!el) return;
-              const c = ds.data[0]._company;
-              drawLogoBox(chart.ctx, logos[c.id], c, el.x, el.y);
-            });
-          },
-        }],
-      });
-    }
-
-    const logos = preloadLogos(eligible, build);
-    build(logos);
+        plugins: { legend: { display: false }, tooltip: { enabled: false } },
+      },
+      plugins: [{
+        id: "valueLabels",
+        afterDatasetsDraw(chart) {
+          const { ctx } = chart;
+          const meta = chart.getDatasetMeta(0);
+          ctx.save();
+          ctx.font = "10px " + (getComputedStyle(document.body).getPropertyValue("--font-mono") || "monospace");
+          ctx.textAlign = "left";
+          ctx.textBaseline = "middle";
+          meta.data.forEach((bar, i) => {
+            const r = rows[i];
+            if (!r) return;
+            ctx.fillStyle = r.c.isSubject ? ACCENT : "#8a8174";
+            ctx.fillText(fmt(r.v), bar.x + 6, bar.y);
+          });
+          ctx.restore();
+        },
+      }],
+    });
 
     return () => { if (chartRef.current) { chartRef.current.destroy(); chartRef.current = null; } };
   }, [companies]);
 
+  const h = rows.length * 26 + 16;
+
+  return (
+    <div>
+      <div style={{display:"flex", alignItems:"baseline", gap:6, marginBottom:8}}>
+        <span style={{fontSize:11.5, fontWeight:600, color:"var(--fg-2)"}}>{title}</span>
+        {sub && <span className="mono" style={{fontSize:9.5, color:"var(--fg-4)", textTransform:"uppercase", letterSpacing:"0.04em"}}>{sub}</span>}
+      </div>
+      {rows.length < 2
+        ? <div style={{padding:"24px 0", textAlign:"center", color:"var(--fg-4)", fontSize:11}}>Not enough data to compare.</div>
+        : <div style={{position:"relative", height:h}}><canvas ref={canvasRef} /></div>
+      }
+    </div>
+  );
+}
+
+function CohortComparison({ companies, onPick }) {
+  const metrics = [
+    { key: "funding",  title: "Total funding raised", valueFn: c => c.funding?.total, fmt: fmtMoney },
+    { key: "emp",      title: "Headcount", sub: "employees", valueFn: c => c.employees, fmt: fmtNum },
+    { key: "intensity",title: "Capital intensity", sub: "€ / employee",
+      valueFn: c => (c.funding?.total && c.employees) ? c.funding.total / c.employees : null,
+      fmt: v => fmtMoney(v) },
+    { key: "age",      title: "Company age", sub: "years", valueFn: c => (c.founded ? NOW_YEAR - c.founded : null), fmt: v => v + "y" },
+    { key: "velocity", title: "Funding velocity", sub: "€ raised / year",
+      valueFn: c => {
+        const age = c.founded ? NOW_YEAR - c.founded : null;
+        return (age && age > 0 && c.funding?.total) ? c.funding.total / age : null;
+      },
+      fmt: v => fmtMoney(v) },
+    { key: "growth", title: "Headcount growth", sub: "YoY %",
+      valueFn: c => (c.employeeGrowth > 0 ? c.employeeGrowth : null), fmt: v => fmtPct(v) },
+  ];
+
   return (
     <div className="card">
       <div className="card-h">
-        <h3>Capital efficiency</h3>
-        <span className="meta">ARR per $ raised · {eligible.length} comps</span>
+        <h3>Cohort comparison</h3>
+        <span className="meta">{companies.length} companies · sourced metrics</span>
       </div>
-      <div style={{padding:"16px 16px 8px"}}>
-        {eligible.length === 0
-          ? <div style={{padding:"40px 0", textAlign:"center", color:"var(--fg-4)", fontSize:12}}>No ARR data available for this cohort.</div>
-          : <canvas ref={canvasRef} />
-        }
-      </div>
-      <div style={{padding:"0 16px 12px", fontSize:11, color:"var(--fg-3)"}}>
-        Above the 1.0× line = punching above weight. Below 0.25× = capital-inefficient.
+      <div style={{
+        display:"grid",
+        gridTemplateColumns:"repeat(auto-fit, minmax(260px, 1fr))",
+        gap:"20px 28px",
+        padding:"18px 16px 6px",
+      }}>
+        {metrics.map(m => (
+          <RankedBarChart
+            key={m.key}
+            title={m.title}
+            sub={m.sub}
+            companies={companies}
+            valueFn={m.valueFn}
+            fmt={m.fmt}
+            onPick={onPick}
+          />
+        ))}
       </div>
     </div>
   );
 }
 
 // ────────────────────────────────────────────────────────────────
-//  Chart 2 — Funding Round Timeline
+//  Positioning map — target segment × GTM motion (signature VC 2×2)
+// ────────────────────────────────────────────────────────────────
+const SEG_AXIS = ["SMB", "Mid-Market", "Enterprise"];
+const GTM_AXIS = ["Product-led", "Hybrid", "Sales-led"];
+
+function segScore(s) {
+  if (!s) return null;
+  const t = s.toLowerCase();
+  if (t.includes("enterprise")) return 3;
+  if (t.includes("mid") || t.includes("mixed")) return 2;
+  if (t.includes("smb") || t.includes("small") || t.includes("pme") || t.includes("startup")) return 1;
+  return null;
+}
+function gtmScore(s) {
+  if (!s) return null;
+  const t = s.toLowerCase();
+  if (t.includes("sales")) return 3;
+  if (t.includes("hybrid") || t.includes("mixed")) return 2;
+  if (t.includes("product") || t.includes("plg") || t.includes("marketing")) return 1;
+  return null;
+}
+
+function PositioningMap({ companies, onPick }) {
+  const canvasRef = React.useRef(null);
+  const chartRef = React.useRef(null);
+
+  const points = companies
+    .map((c, i) => ({ c, x: segScore(c.target_segment), y: gtmScore(c.gtm_motion), i }))
+    .filter(p => p.x != null && p.y != null);
+
+  React.useEffect(() => {
+    if (!canvasRef.current || typeof Chart === "undefined" || !points.length) return;
+    if (chartRef.current) { chartRef.current.destroy(); chartRef.current = null; }
+
+    // Deterministic jitter so companies sharing a cell don't fully overlap.
+    const jit = (n) => ((n % 5) - 2) * 0.07;
+    const data = points.map(p => ({ x: p.x + jit(p.i), y: p.y + jit(p.i + 2), _p: p }));
+
+    chartRef.current = new Chart(canvasRef.current, {
+      type: "scatter",
+      data: {
+        datasets: [{
+          data,
+          pointRadius: 7,
+          pointHoverRadius: 9,
+          backgroundColor: points.map(p => p.c.isSubject ? ACCENT : NEUTRAL),
+          borderColor: points.map(p => p.c.isSubject ? ACCENT : NEUTRAL_DIM),
+          borderWidth: 1.5,
+        }],
+      },
+      options: {
+        responsive: true, maintainAspectRatio: true, aspectRatio: 2.2, animation: false,
+        layout: { padding: { top: 8, right: 12, bottom: 4, left: 4 } },
+        onClick(evt) {
+          if (!chartRef.current) return;
+          const pts = chartRef.current.getElementsAtEventForMode(evt, "nearest", { intersect: false }, false);
+          if (!pts.length) return;
+          const p = data[pts[0].index]._p;
+          if (p && onPick) onPick(p.c);
+        },
+        scales: {
+          x: {
+            min: 0.5, max: 3.5,
+            title: { display: true, text: "Target segment →", font: { size: 10 }, color: "#bbb" },
+            ticks: { stepSize: 1, callback: v => SEG_AXIS[v - 1] || "", font: { size: 10 }, color: "#888" },
+            grid: { color: "rgba(0,0,0,0.05)" },
+          },
+          y: {
+            min: 0.5, max: 3.5,
+            title: { display: true, text: "Go-to-market motion →", font: { size: 10 }, color: "#bbb" },
+            ticks: { stepSize: 1, callback: v => GTM_AXIS[v - 1] || "", font: { size: 10 }, color: "#888" },
+            grid: { color: "rgba(0,0,0,0.05)" },
+          },
+        },
+        plugins: {
+          legend: { display: false },
+          tooltip: {
+            callbacks: {
+              title: () => "",
+              label(ctx) {
+                const p = ctx.raw._p;
+                return [p.c.name, "Segment: " + (p.c.target_segment || "—"), "GTM: " + (p.c.gtm_motion || "—")];
+              },
+            },
+          },
+        },
+      },
+      plugins: [{
+        id: "mapLabels",
+        afterDatasetsDraw(chart) {
+          const { ctx } = chart;
+          const meta = chart.getDatasetMeta(0);
+          ctx.save();
+          ctx.font = "11px " + (getComputedStyle(document.body).getPropertyValue("--font-sans") || "sans-serif");
+          ctx.textAlign = "center";
+          ctx.textBaseline = "top";
+          meta.data.forEach((pt, i) => {
+            const p = data[i]._p;
+            if (!p) return;
+            ctx.fillStyle = p.c.isSubject ? ACCENT : "#6b6357";
+            ctx.font = (p.c.isSubject ? "600 " : "") + "11px " + (getComputedStyle(document.body).getPropertyValue("--font-sans") || "sans-serif");
+            ctx.fillText(truncName(p.c.name, 16), pt.x, pt.y + 9);
+          });
+          ctx.restore();
+        },
+      }],
+    });
+
+    return () => { if (chartRef.current) { chartRef.current.destroy(); chartRef.current = null; } };
+  }, [companies]);
+
+  const skipped = companies.length - points.length;
+
+  return (
+    <div className="card">
+      <div className="card-h">
+        <h3>Positioning map</h3>
+        <span className="meta">segment × GTM motion</span>
+      </div>
+      <div style={{padding:"16px 16px 8px"}}>
+        {points.length === 0
+          ? <div style={{padding:"40px 0", textAlign:"center", color:"var(--fg-4)", fontSize:12}}>No segment / GTM data to map.</div>
+          : <canvas ref={canvasRef} />
+        }
+      </div>
+      <div style={{padding:"0 16px 12px", fontSize:11, color:"var(--fg-3)"}}>
+        Where each player sits by who they sell to and how they sell.
+        {skipped > 0 && ` ${skipped} omitted (unclassified).`}
+      </div>
+    </div>
+  );
+}
+
+// ────────────────────────────────────────────────────────────────
+//  Chart 2 — Investor Concentration (ranked bars of shared investors)
+// ────────────────────────────────────────────────────────────────
+function InvestorConcentrationGraph({ companies, onPick }) {
+  // Build investor → companies map
+  const investorMap = new Map();
+  companies.forEach(c => {
+    (c.notable_investors || []).forEach(inv => {
+      const key = cleanLabel(inv.name);
+      if (!key) return;
+      if (!investorMap.has(key)) investorMap.set(key, { name: key, companies: [] });
+      investorMap.get(key).companies.push(c);
+    });
+  });
+
+  const allInvestors = [...investorMap.values()];
+  // Only investors backing ≥2 cohort companies carry signal; rank by count desc.
+  const shared = allInvestors
+    .filter(i => i.companies.length >= 2)
+    .sort((a, b) => b.companies.length - a.companies.length || a.name.localeCompare(b.name));
+  const maxCount = shared.length ? shared[0].companies.length : 1;
+
+  return (
+    <div className="card">
+      <div className="card-h">
+        <h3>Investor concentration</h3>
+        <span className="meta">{allInvestors.length} investors · {shared.length} shared</span>
+      </div>
+      <div style={{padding:"14px 16px 6px"}}>
+        {shared.length === 0
+          ? (
+            // No shared backers — fall back to a per-company investor roster so the card stays useful.
+            <div style={{display:"flex", flexDirection:"column", gap:10}}>
+              <div style={{fontSize:11, color:"var(--fg-4)", marginBottom:2}}>No investor backs more than one company here — backers by company:</div>
+              {companies.map(c => (
+                <div key={c.id} style={{display:"flex", gap:8, alignItems:"baseline"}}>
+                  <span
+                    onClick={() => onPick && onPick(c)}
+                    style={{flex:"0 0 110px", fontSize:11.5, fontWeight:c.isSubject ? 600 : 500, color:c.isSubject ? ACCENT : "var(--fg-2)", cursor:"pointer"}}>
+                    {truncName(c.name, 16)}
+                  </span>
+                  <div style={{display:"flex", flexWrap:"wrap", gap:4}}>
+                    {(c.notable_investors || []).length === 0
+                      ? <span style={{fontSize:10, color:"var(--fg-4)"}}>—</span>
+                      : c.notable_investors.map((inv, k) => (
+                        <span key={k} style={{fontSize:10, padding:"2px 7px", borderRadius:10, background:"var(--bg-2)", color:"var(--fg-3)", border:"1px solid var(--border)"}}>
+                          {cleanLabel(inv.name)}
+                        </span>
+                      ))}
+                  </div>
+                </div>
+              ))}
+            </div>
+          )
+          : (
+            <div style={{display:"flex", flexDirection:"column", gap:12}}>
+              {shared.map(inv => (
+                <div key={inv.name}>
+                  <div style={{display:"flex", alignItems:"baseline", justifyContent:"space-between", marginBottom:4}}>
+                    <span style={{fontSize:12, fontWeight:600, color:"var(--fg-2)"}}>{inv.name}</span>
+                    <span className="mono" style={{fontSize:10.5, color:ACCENT, fontWeight:600}}>{inv.companies.length} backings</span>
+                  </div>
+                  <div style={{height:8, borderRadius:4, background:"var(--bg-3)", overflow:"hidden"}}>
+                    <div style={{height:"100%", width:(inv.companies.length / maxCount * 100) + "%", background:ACCENT, opacity:0.85, borderRadius:4}} />
+                  </div>
+                  <div style={{display:"flex", flexWrap:"wrap", gap:5, marginTop:6}}>
+                    {inv.companies.map(c => (
+                      <span
+                        key={c.id}
+                        onClick={() => onPick && onPick(c)}
+                        style={{
+                          fontSize:10, padding:"2px 7px", borderRadius:10, cursor:"pointer",
+                          background:c.isSubject ? "var(--accent-bg)" : "var(--bg-2)",
+                          color:c.isSubject ? "var(--accent-fg)" : "var(--fg-3)",
+                          border:"1px solid " + (c.isSubject ? "var(--accent)" : "var(--border)"),
+                          fontWeight:c.isSubject ? 600 : 400,
+                        }}>
+                        {c.name}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              ))}
+            </div>
+          )
+        }
+      </div>
+      <div style={{padding:"6px 16px 12px", fontSize:11, color:"var(--fg-3)"}}>
+        Investors backing multiple cohort companies signal where smart money concentrates.
+      </div>
+    </div>
+  );
+}
+
+// ────────────────────────────────────────────────────────────────
+//  Chart 3 — Overlap Matrix (generic: customers OR verticals)
+//    extract(company) → string[] of entity names. Contested-first,
+//    collapsible tail. Reused by CustomerLogoOverlap + VerticalOverlap.
+// ────────────────────────────────────────────────────────────────
+function OverlapMatrix({ companies, onPick, title, rowLabel, hint, extract }) {
+  const [showAll, setShowAll] = React.useState(false);
+
+  // Build entity → companies map
+  const entMap = new Map();
+  companies.forEach(c => {
+    extract(c).forEach(name => {
+      const key = (name || "").trim();
+      if (!key) return;
+      if (!entMap.has(key)) entMap.set(key, { name: key, companyIds: new Set() });
+      entMap.get(key).companyIds.add(c.id);
+    });
+  });
+
+  // Sort: shared (count desc) first, then alphabetical
+  const allRows = [...entMap.values()]
+    .map(r => ({ ...r, count: r.companyIds.size }))
+    .sort((a, b) => b.count - a.count || a.name.localeCompare(b.name));
+
+  const contested = allRows.filter(r => r.count >= 2);
+  const tailCount = allRows.length - contested.length;
+  // Default view: contested only (the signal). If none contested, show first 8 so card isn't empty.
+  const visible = showAll
+    ? allRows
+    : (contested.length ? contested : allRows.slice(0, 8));
+
+  return (
+    <div className="card">
+      <div className="card-h">
+        <h3>{title}</h3>
+        <span className="meta">{allRows.length} {rowLabel} · {contested.length} contested</span>
+      </div>
+      <div style={{padding:"6px 12px 6px", overflowX:"auto", maxHeight:340, overflowY:"auto"}}>
+        {allRows.length === 0
+          ? <div style={{padding:"40px 0", textAlign:"center", color:"var(--fg-4)", fontSize:12}}>No {rowLabel} data.</div>
+          : (
+            <table className="customer-overlap-table" style={{width:"100%", borderCollapse:"collapse", fontSize:11}}>
+              <thead>
+                <tr>
+                  <th style={{textAlign:"left", padding:"6px 8px", color:"#888", fontWeight:500, position:"sticky", top:0, background:"var(--bg)", borderBottom:"1px solid var(--border)", textTransform:"capitalize"}}>{rowLabel.replace(/s$/, "")}</th>
+                  {companies.map(c => (
+                    <th key={c.id}
+                        title={c.name}
+                        style={{textAlign:"center", padding:"6px 4px", color:c.isSubject ? ACCENT : "#888", fontWeight:c.isSubject ? 600 : 500, position:"sticky", top:0, background:"var(--bg)", borderBottom:"1px solid var(--border)", minWidth:50, cursor:"pointer"}}
+                        onClick={() => onPick && onPick(c)}>
+                      {c.name.length > 9 ? c.name.slice(0, 8) + "…" : c.name}
+                    </th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {visible.map(r => (
+                  <tr key={r.name} style={{borderBottom:"1px solid var(--border-dim, rgba(0,0,0,0.05))"}}>
+                    <td style={{padding:"5px 8px", color:"#333", fontWeight:r.count >= 2 ? 600 : 400}}>
+                      {r.name}
+                      {r.count >= 2 && <span style={{marginLeft:6, color:ACCENT, fontSize:9, letterSpacing:"0.05em"}}>×{r.count}</span>}
+                    </td>
+                    {companies.map(c => (
+                      <td key={c.id} style={{textAlign:"center", padding:"5px 4px"}}>
+                        {r.companyIds.has(c.id)
+                          ? <span style={{display:"inline-block", width:10, height:10, borderRadius:"50%", background:c.isSubject ? ACCENT : "#444"}}></span>
+                          : <span style={{color:"#ddd"}}>·</span>
+                        }
+                      </td>
+                    ))}
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )
+        }
+      </div>
+      <div style={{padding:"4px 16px 12px", fontSize:11, color:"var(--fg-3)", display:"flex", alignItems:"center", gap:10}}>
+        <span>{hint}</span>
+        {tailCount > 0 && (
+          <button
+            onClick={() => setShowAll(s => !s)}
+            style={{marginLeft:"auto", background:"none", border:"1px solid var(--border)", borderRadius:5, padding:"3px 9px", fontSize:10.5, color:"var(--fg-3)", cursor:"pointer"}}>
+            {showAll ? "Show contested only" : `Show all ${allRows.length}`}
+          </button>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// Strip markdown-link junk that leaks into some sourced strings, e.g.
+// "Retail [Harver: ...](https://…)" → "Retail", "Insight Partners [..](..)" → "Insight Partners".
+function cleanLabel(v) {
+  return (v || "").split(/\s*\[/)[0].trim();
+}
+
+function CustomerLogoOverlap({ companies, onPick }) {
+  return (
+    <OverlapMatrix
+      companies={companies} onPick={onPick}
+      title="Customer overlap" rowLabel="customers"
+      hint="Contested logos (×n) indicate ICP convergence."
+      extract={c => (c.notable_customers || []).map(x => x.name)}
+    />
+  );
+}
+
+function VerticalOverlap({ companies, onPick }) {
+  return (
+    <OverlapMatrix
+      companies={companies} onPick={onPick}
+      title="Vertical overlap" rowLabel="verticals"
+      hint="Contested verticals (×n) are the crowded battlegrounds."
+      extract={c => (c.targetVerticals || []).map(cleanLabel)}
+    />
+  );
+}
+
+// ────────────────────────────────────────────────────────────────
+//  Chart 4 — Funding Round Timeline (simplified bubble sizing)
 // ────────────────────────────────────────────────────────────────
 function FundingRoundTimeline({ companies, onPick }) {
   const canvasRef = React.useRef(null);
@@ -249,6 +535,7 @@ function FundingRoundTimeline({ companies, onPick }) {
     const xPad = (xMax - xMin) * 0.05;
 
     const roundColors = {
+      "Pre-Seed": "#a3e635",
       "Seed": "#84cc16",
       "Series A": "#22d3ee",
       "Series B": "#3b82f6",
@@ -256,6 +543,14 @@ function FundingRoundTimeline({ companies, onPick }) {
       "Series D": "#a855f7",
       "Series E": "#d946ef",
       "Series F": "#ec4899",
+    };
+
+    // 3 fixed size buckets by round amount — replaces noisy log-radius scaling.
+    const bucketRadius = (amt) => {
+      if (!amt) return 5;
+      if (amt < 5e6) return 6;
+      if (amt < 5e7) return 9;
+      return 13;
     };
 
     const datasets = rows.map(c => {
@@ -271,11 +566,8 @@ function FundingRoundTimeline({ companies, onPick }) {
         backgroundColor: dated.map(r => roundColors[r.round] || "#888"),
         borderColor: c.isSubject ? ACCENT : "rgba(0,0,0,0.25)",
         borderWidth: c.isSubject ? 2 : 1,
-        pointRadius: (ctx) => {
-          const amt = ctx.raw?._round?.amountEur || 0;
-          return Math.max(6, Math.min(18, 6 + Math.log10(amt / 1e6 + 1) * 4));
-        },
-        pointHoverRadius: 22,
+        pointRadius: (ctx) => bucketRadius(ctx.raw?._round?.amountEur || 0),
+        pointHoverRadius: (ctx) => bucketRadius(ctx.raw?._round?.amountEur || 0) + 3,
       };
     });
 
@@ -298,13 +590,10 @@ function FundingRoundTimeline({ companies, onPick }) {
             max: xMax + xPad,
             title: { display: true, text: "Date →", font: { size: 10 }, color: "#bbb" },
             ticks: {
-              callback(v) {
-                const d = new Date(v);
-                return d.getFullYear();
-              },
-              font: { size: 10 }, color: "#aaa", maxTicksLimit: 10,
+              callback(v) { return new Date(v).getFullYear(); },
+              font: { size: 10 }, color: "#aaa", maxTicksLimit: 8,
             },
-            grid: { color: "rgba(0,0,0,0.05)" },
+            grid: { color: "rgba(0,0,0,0.04)" },
           },
           y: {
             min: -0.5, max: yLabels.length - 0.5,
@@ -316,7 +605,7 @@ function FundingRoundTimeline({ companies, onPick }) {
               font: { size: 11 }, color: "#666",
               stepSize: 1,
             },
-            grid: { color: "rgba(0,0,0,0.05)" },
+            grid: { color: "rgba(0,0,0,0.04)" },
           },
         },
         plugins: {
@@ -345,7 +634,7 @@ function FundingRoundTimeline({ companies, onPick }) {
   // Legend for round colors
   const stagesPresent = [...new Set(rows.flatMap(c => c.fundingRounds.map(r => r.round)).filter(Boolean))];
   const roundColors = {
-    "Seed": "#84cc16", "Series A": "#22d3ee", "Series B": "#3b82f6",
+    "Pre-Seed": "#a3e635", "Seed": "#84cc16", "Series A": "#22d3ee", "Series B": "#3b82f6",
     "Series C": "#8b5cf6", "Series D": "#a855f7", "Series E": "#d946ef", "Series F": "#ec4899",
   };
 
@@ -362,191 +651,13 @@ function FundingRoundTimeline({ companies, onPick }) {
         }
       </div>
       <div style={{display:"flex", gap:14, flexWrap:"wrap", padding:"0 16px 12px", fontSize:11, color:"var(--fg-3)"}}>
-        <span>Bubble size ≈ round amount</span>
+        <span>Dot size ≈ round amount (small / mid / large)</span>
         {stagesPresent.map(s => (
           <span key={s} style={{display:"inline-flex", alignItems:"center", gap:4}}>
             <span style={{width:10, height:10, borderRadius:"50%", background:roundColors[s] || "#888", display:"inline-block"}} />
             {s}
           </span>
         ))}
-      </div>
-    </div>
-  );
-}
-
-// ────────────────────────────────────────────────────────────────
-//  Chart 3 — Investor Concentration Graph (SVG)
-// ────────────────────────────────────────────────────────────────
-function InvestorConcentrationGraph({ companies, onPick }) {
-  // Build investor → companies map
-  const investorMap = new Map();
-  companies.forEach(c => {
-    (c.notable_investors || []).forEach(inv => {
-      if (!inv.name) return;
-      const key = inv.name.trim();
-      if (!investorMap.has(key)) investorMap.set(key, { name: key, domain: inv.domain, companies: [] });
-      investorMap.get(key).companies.push(c);
-    });
-  });
-
-  // Sort investors: by count of cohort backings desc, then name
-  const investors = [...investorMap.values()].sort((a, b) => b.companies.length - a.companies.length || a.name.localeCompare(b.name));
-  // Cap to top 12 for readability; flag shared (count>=2) for emphasis
-  const topInvestors = investors.slice(0, 12);
-  const sharedCount = investors.filter(i => i.companies.length >= 2).length;
-
-  const W = 520;
-  const ROW_H = 26;
-  const H = Math.max(topInvestors.length, companies.length) * ROW_H + 40;
-  const COL_LEFT = 130;
-  const COL_RIGHT = W - 130;
-
-  return (
-    <div className="card">
-      <div className="card-h">
-        <h3>Investor concentration</h3>
-        <span className="meta">{investors.length} investors · {sharedCount} shared</span>
-      </div>
-      <div style={{padding:"12px 12px 6px", overflowX:"auto"}}>
-        {investors.length === 0
-          ? <div style={{padding:"40px 0", textAlign:"center", color:"var(--fg-4)", fontSize:12}}>No investor data.</div>
-          : (
-            <svg viewBox={`0 0 ${W} ${H}`} style={{width:"100%", height:H, maxHeight:380, display:"block"}}>
-              <text x={20} y={18} fontSize={10} fill="#888" fontFamily="sans-serif">Investors</text>
-              <text x={W - 20} y={18} fontSize={10} fill="#888" fontFamily="sans-serif" textAnchor="end">Companies</text>
-              {/* Edges */}
-              {topInvestors.flatMap((inv, i) =>
-                inv.companies.map(c => {
-                  const ci = companies.findIndex(x => x.id === c.id);
-                  if (ci < 0) return null;
-                  const y1 = 30 + i * ROW_H + ROW_H / 2;
-                  const y2 = 30 + ci * ROW_H + ROW_H / 2;
-                  return (
-                    <line
-                      key={`${inv.name}-${c.id}`}
-                      x1={COL_LEFT} y1={y1}
-                      x2={COL_RIGHT} y2={y2}
-                      stroke={c.isSubject ? ACCENT : (inv.companies.length >= 2 ? "rgba(179,74,31,0.4)" : "rgba(0,0,0,0.15)")}
-                      strokeWidth={c.isSubject ? 1.5 : 1}
-                    />
-                  );
-                })
-              )}
-              {/* Investor nodes */}
-              {topInvestors.map((inv, i) => {
-                const y = 30 + i * ROW_H + ROW_H / 2;
-                const r = 4 + Math.min(inv.companies.length, 5) * 2;
-                const shared = inv.companies.length >= 2;
-                return (
-                  <g key={inv.name}>
-                    <circle cx={COL_LEFT} cy={y} r={r} fill={shared ? ACCENT : "#888"} fillOpacity={shared ? 0.85 : 0.5} />
-                    <text x={COL_LEFT - r - 6} y={y + 3} fontSize={11} fill="#333" textAnchor="end" fontFamily="sans-serif">
-                      {inv.name} {inv.companies.length >= 2 ? `(${inv.companies.length})` : ""}
-                    </text>
-                  </g>
-                );
-              })}
-              {/* Company nodes */}
-              {companies.map((c, i) => {
-                const y = 30 + i * ROW_H + ROW_H / 2;
-                return (
-                  <g key={c.id} style={{cursor:"pointer"}} onClick={() => onPick && onPick(c)}>
-                    <rect
-                      x={COL_RIGHT - 6} y={y - 8}
-                      width={12} height={16} rx={3}
-                      fill={c.isSubject ? ACCENT + "33" : "#f4f4f4"}
-                      stroke={c.isSubject ? ACCENT : "#bbb"}
-                      strokeWidth={c.isSubject ? 1.5 : 1}
-                    />
-                    <text x={COL_RIGHT + 14} y={y + 4} fontSize={11} fill="#333" fontFamily="sans-serif">
-                      {c.name}
-                    </text>
-                  </g>
-                );
-              })}
-            </svg>
-          )
-        }
-      </div>
-      <div style={{padding:"0 16px 12px", fontSize:11, color:"var(--fg-3)"}}>
-        Shared investors (orange) signal cohort conviction.
-      </div>
-    </div>
-  );
-}
-
-// ────────────────────────────────────────────────────────────────
-//  Chart 4 — Customer Logo Overlap
-// ────────────────────────────────────────────────────────────────
-function CustomerLogoOverlap({ companies, onPick }) {
-  // Build customer → companies map
-  const customerMap = new Map();
-  companies.forEach(c => {
-    (c.notable_customers || []).forEach(cust => {
-      if (!cust.name) return;
-      const key = cust.name.trim();
-      if (!customerMap.has(key)) customerMap.set(key, { name: key, domain: cust.domain, segments: new Set(), companyIds: new Set() });
-      const entry = customerMap.get(key);
-      entry.companyIds.add(c.id);
-      if (cust.segment) entry.segments.add(cust.segment);
-    });
-  });
-
-  // Sort: shared (count desc) first, then alphabetical
-  const rows = [...customerMap.values()]
-    .map(r => ({ ...r, count: r.companyIds.size }))
-    .sort((a, b) => b.count - a.count || a.name.localeCompare(b.name));
-
-  const sharedCount = rows.filter(r => r.count >= 2).length;
-
-  return (
-    <div className="card">
-      <div className="card-h">
-        <h3>Customer overlap</h3>
-        <span className="meta">{rows.length} customers · {sharedCount} contested</span>
-      </div>
-      <div style={{padding:"6px 12px 12px", overflowX:"auto", maxHeight:380, overflowY:"auto"}}>
-        {rows.length === 0
-          ? <div style={{padding:"40px 0", textAlign:"center", color:"var(--fg-4)", fontSize:12}}>No customer data.</div>
-          : (
-            <table className="customer-overlap-table" style={{width:"100%", borderCollapse:"collapse", fontSize:11}}>
-              <thead>
-                <tr>
-                  <th style={{textAlign:"left", padding:"6px 8px", color:"#888", fontWeight:500, position:"sticky", top:0, background:"var(--bg)", borderBottom:"1px solid var(--border)"}}>Customer</th>
-                  {companies.map(c => (
-                    <th key={c.id}
-                        title={c.name}
-                        style={{textAlign:"center", padding:"6px 4px", color:c.isSubject ? ACCENT : "#888", fontWeight:c.isSubject ? 600 : 500, position:"sticky", top:0, background:"var(--bg)", borderBottom:"1px solid var(--border)", minWidth:50, cursor:"pointer"}}
-                        onClick={() => onPick && onPick(c)}>
-                      {c.name.length > 9 ? c.name.slice(0, 8) + "…" : c.name}
-                    </th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody>
-                {rows.map(r => (
-                  <tr key={r.name} style={{borderBottom:"1px solid var(--border-dim, rgba(0,0,0,0.05))"}}>
-                    <td style={{padding:"5px 8px", color:"#333", fontWeight:r.count >= 2 ? 600 : 400}}>
-                      {r.name}
-                      {r.count >= 2 && <span style={{marginLeft:6, color:ACCENT, fontSize:9, letterSpacing:"0.05em"}}>×{r.count}</span>}
-                    </td>
-                    {companies.map(c => (
-                      <td key={c.id} style={{textAlign:"center", padding:"5px 4px"}}>
-                        {r.companyIds.has(c.id)
-                          ? <span style={{display:"inline-block", width:10, height:10, borderRadius:"50%", background:c.isSubject ? ACCENT : "#444"}}></span>
-                          : <span style={{color:"#ddd"}}>·</span>
-                        }
-                      </td>
-                    ))}
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          )
-        }
-      </div>
-      <div style={{padding:"0 16px 12px", fontSize:11, color:"var(--fg-3)"}}>
-        Contested logos (×n) indicate ICP convergence.
       </div>
     </div>
   );
@@ -576,16 +687,20 @@ function PositioningScreen({ data, onOpenCompany }) {
           Positioning
         </h1>
         <p style={{color:"var(--fg-3)", fontSize:13, marginTop:6, marginBottom:0}}>
-          Four VC-grade views of the cohort. Click any company to drill in.
+          Cohort compared on reliable, sourced metrics. Click any company to drill in.
         </p>
       </div>
 
-      <CapitalEfficiencyMatrix companies={all} onPick={handlePick} />
+      <CohortComparison companies={all} onPick={handlePick} />
+
+      <PositioningMap companies={all} onPick={handlePick} />
 
       <div className="positioning-grid">
-        <InvestorConcentrationGraph companies={all} onPick={handlePick} />
+        <VerticalOverlap companies={all} onPick={handlePick} />
         <CustomerLogoOverlap companies={all} onPick={handlePick} />
       </div>
+
+      <InvestorConcentrationGraph companies={all} onPick={handlePick} />
 
       <FundingRoundTimeline companies={all} onPick={handlePick} />
 
@@ -602,7 +717,7 @@ function PositioningScreen({ data, onOpenCompany }) {
             <div style={{fontWeight:600, fontSize:13}}>{selected.name}</div>
             <div className="mono" style={{fontSize:11, color:"var(--fg-3)", marginTop:2}}>
               {selected.subCategory || selected.category} · Founded {selected.founded || "—"} · {fmtMoney(selected.funding?.total || 0)} raised
-              {typeof selected.arr === "number" ? " · ARR " + fmtMoney(selected.arr) : ""}
+              {typeof selected.employees === "number" ? " · " + fmtNum(selected.employees) + " emp" : ""}
             </div>
           </div>
           {!selected.isSubject && <ThreatTag level={selected.threat} />}
