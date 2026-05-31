@@ -91,6 +91,7 @@ function CompanyScreen({ data, companyId }) {
   const partCount = caps.filter(x => x === "part").length;
   const noneCount = caps.filter(x => x === "none").length;
   const pricing = ((data.pricing || {})[c.id]) || [];
+  const liPosts = (c.recentLinkedinPosts || []).filter(p => p && (p.excerpt || "").trim());
 
   const grouped = features.reduce((acc, f, i) => {
     if (!acc[f.group]) acc[f.group] = [];
@@ -241,6 +242,69 @@ function CompanyScreen({ data, companyId }) {
                     {ev.amt >= 1 ? fmtMoney(ev.amt * 1e6) : "undisclosed"}
                   </span>
                 </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
+      {/* ── Recent LinkedIn activity (only if posts exist) ── */}
+      {liPosts.length > 0 && (
+        <div className="card" style={{ marginBottom: 20 }}>
+          <div className="card-h">
+            <h3>Recent LinkedIn activity</h3>
+            <span className="meta">{liPosts.length} latest post{liPosts.length > 1 ? "s" : ""}</span>
+          </div>
+          <div style={{ padding: "4px 0" }}>
+            {liPosts.map((p, i) => {
+              const text = (p.excerpt || "").trim();
+              const preview = text.length > 280 ? text.slice(0, 280).trimEnd() + "…" : text;
+              return (
+                <a
+                  key={i}
+                  href={p.sourceUrl || undefined}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  style={{
+                    display: "flex", gap: 14, padding: "14px 16px", textDecoration: "none",
+                    color: "inherit", alignItems: "flex-start",
+                    borderBottom: i < liPosts.length - 1 ? "1px solid var(--border-dim)" : "none",
+                    cursor: p.sourceUrl ? "pointer" : "default",
+                  }}
+                >
+                  {p.imageUrl && (
+                    <img
+                      src={p.imageUrl}
+                      alt=""
+                      onError={(e) => { e.currentTarget.style.display = "none"; }}
+                      style={{
+                        width: 56, height: 56, borderRadius: 8, objectFit: "cover",
+                        flexShrink: 0, background: "var(--bg-3)",
+                      }}
+                    />
+                  )}
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ display: "flex", alignItems: "baseline", gap: 8, marginBottom: 5 }}>
+                      <span style={{ fontSize: 12, fontWeight: 600, color: "var(--fg-2)" }}>
+                        {p.author || "LinkedIn"}
+                      </span>
+                      {p.date && (
+                        <span className="mono" style={{ fontSize: 10, color: "var(--fg-3)" }}>
+                          {fmtDate(p.date)}
+                        </span>
+                      )}
+                      <span style={{ marginLeft: "auto", fontSize: 10, color: "var(--fg-4)" }}>
+                        in {Icons.ext}
+                      </span>
+                    </div>
+                    <p style={{
+                      margin: 0, fontSize: 12.5, lineHeight: 1.6, color: "var(--fg-3)",
+                      whiteSpace: "pre-wrap", wordBreak: "break-word",
+                    }}>
+                      {preview}
+                    </p>
+                  </div>
+                </a>
               );
             })}
           </div>

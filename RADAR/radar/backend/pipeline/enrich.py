@@ -268,6 +268,8 @@ def _parse_result(
             date=s.get("date"),
             author=s.get("author"),
             signal=s.get("signal", ""),
+            excerpt=s.get("excerpt"),
+            image_url=s.get("image_url"),
             source_url=s.get("source_url"),
         )
         for s in data.get("recent_linkedin_signals", [])
@@ -776,6 +778,8 @@ _LANE3_ITEM_SCHEMA = {
                     "date": {"type": "string", "description": "YYYY-MM-DD"},
                     "author": {"type": "string"},
                     "signal": {"type": "string", "description": "Post headline or first 150 chars"},
+                    "excerpt": {"type": "string", "description": "First ~280 chars of the post body text, verbatim. Null if not readable."},
+                    "image_url": {"type": "string", "description": "Direct URL of the post's main image (og:image / media.licdn.com) if any, else null."},
                     "source_url": {"type": "string", "description": "Full post URL"},
                 },
             },
@@ -812,6 +816,9 @@ def _lane3_query(competitors: list[dict]) -> str:
         "STEP 3 — For each company page, return the 3 to 5 MOST RECENT public posts "
         "from the company page or its founders (last 12 months). For each post: "
         "date (YYYY-MM-DD), author name, signal (post headline or first 150 chars), "
+        "excerpt (first ~280 chars of the post body, verbatim), "
+        "image_url (direct URL of the post's main image / og:image / media.licdn.com "
+        "if the post has one, else null), "
         "and full post URL (linkedin.com/posts/...).\n\n"
         "Return one object per company in the same order as the input list. "
         "Preserve company names EXACTLY as given. "
@@ -1327,6 +1334,8 @@ def _merge_one_competitor(
             date=s.get("date"),
             author=s.get("author"),
             signal=s.get("signal", ""),
+            excerpt=s.get("excerpt"),
+            image_url=s.get("image_url"),
             source_url=s.get("source_url"),
         )
         for s in (l3.get("recent_linkedin_signals") or [])

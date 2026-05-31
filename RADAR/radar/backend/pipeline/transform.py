@@ -24,6 +24,7 @@ from models.radar_output import (
     FundingRoundOut,
     FundingStatus,
     KeyPerson,
+    LinkedInPostOut,
     MarketOut,
     NamedEntity,
     NewsItemOut,
@@ -47,6 +48,27 @@ _DEFAULT_RADAR_DEFS = {
 
 def _slug(name: str) -> str:
     return re.sub(r"[^a-z0-9]+", "_", name.lower()).strip("_")
+
+
+def _linkedin_posts_out(profile) -> list[LinkedInPostOut]:
+    """Map recent LinkedIn signals → preview cards (excerpt falls back to headline). Cap 5.
+
+    Accepts CompetitorProfile (has recent_linkedin_signals) or CompanyProfile (does
+    not — yields [] via getattr until the subject carries LinkedIn signals).
+    """
+    out: list[LinkedInPostOut] = []
+    for s in (getattr(profile, "recent_linkedin_signals", None) or [])[:5]:
+        excerpt = (s.excerpt or s.signal or "").strip()
+        if not excerpt:
+            continue
+        out.append(LinkedInPostOut(
+            date=s.date,
+            author=s.author,
+            excerpt=excerpt,
+            image_url=s.image_url,
+            source_url=s.source_url,
+        ))
+    return out
 
 
 def _map_pricing_tiers(profile: CompetitorProfile) -> list[PricingTier]:
@@ -300,6 +322,8 @@ def _map_subject(profile: CompanyProfile) -> Company:
         if n.headline
     ]
 
+    linkedin_posts_out = _linkedin_posts_out(profile)
+
     acquisition_out = None
     if profile.acquisition:
         a = profile.acquisition
@@ -373,6 +397,7 @@ def _map_subject(profile: CompanyProfile) -> Company:
         top_3_features=list(profile.top_3_features or []),
         tech_stack=list(profile.tech_stack or []),
         recent_news=news_out,
+        recent_linkedin_posts=linkedin_posts_out,
         growth_signals=list(profile.growth_signals or []),
         funding_rounds=funding_rounds_out,
         funding_stage=profile.funding_stage,
@@ -506,6 +531,8 @@ def _map_competitor(
         if s.headline:
             news_out.append(NewsItemOut(date=s.date, headline=s.headline, source_url=s.source_url))
 
+    linkedin_posts_out = _linkedin_posts_out(profile)
+
     # Pricing summary (Lane 2)
     pricing_summary = PricingSummary(model="Custom", starts_at=None, mention="Contact sales", sales_gated=True)
     if profile.pricing:
@@ -592,6 +619,7 @@ def _map_competitor(
         funding_stage=profile.funding_stage.value if profile.funding_stage else None,
         acquisition=acquisition_out,
         recent_news=news_out,
+        recent_linkedin_posts=linkedin_posts_out,
         growth_signals=list(profile.recent_signals or []),
         similarity=similarity,
         threat=_threat_from_score(threat_score),

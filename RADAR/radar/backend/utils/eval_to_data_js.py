@@ -180,6 +180,17 @@ def _convert(raw: dict, *, is_subject: bool, similarity: float, threat: str) -> 
         "geo_coverage": _coerce_str_field(raw.get("geo_coverage")),
         "acquisition": acquisition,
         "recentNews": raw.get("recent_news") or [],
+        "recentLinkedinPosts": [
+            {
+                "date": s.get("date"),
+                "author": s.get("author"),
+                "excerpt": (s.get("excerpt") or s.get("signal") or "").strip(),
+                "imageUrl": s.get("image_url"),
+                "sourceUrl": s.get("source_url"),
+            }
+            for s in (raw.get("recent_linkedin_signals") or [])[:5]
+            if (s.get("excerpt") or s.get("signal"))
+        ],
         "growthSignals": raw.get("growth_signals") or [],
         "top3Features": raw.get("top_3_features") or [],
         "targetVerticals": raw.get("target_verticals") or [],
