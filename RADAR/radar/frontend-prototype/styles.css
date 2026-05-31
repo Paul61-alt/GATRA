@@ -772,3 +772,61 @@ button { font-family: inherit; font-size: inherit; }
 }
 .positioning-page .customer-overlap-table tbody tr:nth-child(odd) { background: rgba(0,0,0,0.015); }
 .positioning-page .customer-overlap-table tbody tr:hover { background: rgba(179,74,31,0.05); }
+
+/* ── Recent LinkedIn activity feed (CompanyScreen) ──────────────────────── */
+.li-mono {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 16px; height: 16px; border-radius: 3px;
+  font-family: var(--font-serif); font-weight: 700; font-size: 10px;
+  color: var(--fg-4); border: 1px solid var(--border-strong);
+  line-height: 1; letter-spacing: -0.02em;
+}
+.li-post {
+  display: flex; gap: 12px; align-items: flex-start;
+  padding: 14px 16px 14px 14px;
+  border-bottom: 1px solid var(--border-dim);
+  border-left: 2px solid transparent;
+  text-decoration: none; color: inherit;
+  transition: background .15s ease, border-left-color .15s ease;
+  opacity: 0; transform: translateY(6px);
+  animation: li-reveal .42s cubic-bezier(.2,.7,.3,1) forwards;
+}
+.li-post:last-child { border-bottom: none; }
+.li-post:hover { background: var(--bg-2); border-left-color: var(--accent); }
+.li-post:focus-visible { outline: none; background: var(--bg-2); border-left-color: var(--accent); }
+@keyframes li-reveal { to { opacity: 1; transform: translateY(0); } }
+@media (prefers-reduced-motion: reduce) {
+  .li-post { animation: none; opacity: 1; transform: none; }
+}
+.li-thumb {
+  width: 52px; height: 52px; border-radius: var(--radius);
+  object-fit: cover; flex-shrink: 0; background: var(--bg-3);
+  border: 1px solid var(--border-dim);
+}
+.li-body { flex: 1; min-width: 0; }
+.li-meta { display: flex; align-items: baseline; gap: 8px; margin-bottom: 5px; }
+.li-author { font-size: 12px; font-weight: 600; color: var(--fg-2); }
+.li-date {
+  font-family: var(--font-mono); font-size: 10px; color: var(--fg-4);
+  letter-spacing: 0.05em; text-transform: uppercase;
+}
+.li-cta {
+  margin-left: auto; font-family: var(--font-mono); font-size: 10px;
+  color: var(--fg-4); white-space: nowrap; transition: color .15s ease;
+}
+.li-post:hover .li-cta { color: var(--accent); }
+.li-excerpt {
+  margin: 0; font-size: 12.5px; line-height: 1.6; color: var(--fg-3);
+  white-space: pre-wrap; word-break: break-word;
+}
+.li-more {
+  width: 100%; padding: 10px 16px; border: none; background: transparent;
+  color: var(--accent); font-family: var(--font-mono); font-size: 11px;
+  cursor: pointer; border-top: 1px solid var(--border-dim); text-align: center;
+}
+.li-more:hover { background: var(--bg-2); }
+.li-source {
+  display: inline-flex; align-items: center; gap: 4px; margin-top: 7px;
+  font-family: var(--font-mono); font-size: 10px; color: var(--fg-4); letter-spacing: 0.03em;
+}
+.li-source svg { width: 11px; height: 11px; }
