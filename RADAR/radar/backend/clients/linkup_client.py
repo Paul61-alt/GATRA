@@ -225,14 +225,32 @@ def record_scan_delta(
 
 class LinkupClient:
     def __init__(self, api_key: Optional[str] = None) -> None:
+        # BYOK ("bring your own key"): when a caller passes an explicit api_key
+        # (a tester's own LinkUp key), this client must NOT count against our
+        # daily caps nor write to our usage ledger — their spend is on their
+        # account. Falls back to our env key for our own scans (byok=False).
+        # bool() not "is not None": an empty string must resolve to byok=False so
+        # it consistently falls back to the env key below (never flagged BYOK
+        # while secretly spending our credits).
+        self.byok = bool(api_key)
         self._api_key = api_key or os.environ["LINKUP_API_KEY"]
         self._headers = {
             "Authorization": f"Bearer {self._api_key}",
             "Content-Type": "application/json",
         }
 
+    def _record(self, path: str, status: str, cost_eur: float = 0.0) -> None:
+        # No-op for BYOK: a tester's own-key spend never touches our ledger/Supabase.
+        if not self.byok:
+            _record_call(path, status, cost_eur=cost_eur)
+
     async def _post(self, path: str, body: dict, cost_eur: float = 0.0) -> Any:
-        _check_daily_budget(path)
+        # BYOK: kill-switch still applies (our emergency brake) but neither our
+        # daily budget nor our ledger track a tester's own-key spend.
+        if self.byok:
+            _kill_switch_check()
+        else:
+            _check_daily_budget(path)
         url = f"{LINKUP_BASE}{path}"
         try:
             async with httpx.AsyncClient(timeout=360) as client:
@@ -244,16 +262,19 @@ class LinkupClient:
                         await asyncio.sleep(wait)
                         continue
                     r.raise_for_status()
-                    _record_call(path, "ok", cost_eur=cost_eur)
+                    self._record(path, "ok", cost_eur=cost_eur)
                     return r.json()
         except Exception:
-            _record_call(path, "error")
+            self._record(path, "error")
             raise
-        _record_call(path, "error")
+        self._record(path, "error")
         raise RuntimeError("Linkup max retries exceeded")
 
     async def _get(self, path: str) -> Any:
-        _check_daily_budget(path)
+        if self.byok:
+            _kill_switch_check()
+        else:
+            _check_daily_budget(path)
         url = f"{LINKUP_BASE}{path}"
         try:
             async with httpx.AsyncClient(timeout=30) as client:
@@ -265,12 +286,12 @@ class LinkupClient:
                         await asyncio.sleep(wait)
                         continue
                     r.raise_for_status()
-                    _record_call(path, "ok")
+                    self._record(path, "ok")
                     return r.json()
         except Exception:
-            _record_call(path, "error")
+            self._record(path, "error")
             raise
-        _record_call(path, "error")
+        self._record(path, "error")
         raise RuntimeError("Linkup GET max retries exceeded")
 
     async def search(
