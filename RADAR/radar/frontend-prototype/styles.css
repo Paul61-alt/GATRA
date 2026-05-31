@@ -148,6 +148,8 @@ button { font-family: inherit; font-size: inherit; }
   user-select: none;
 }
 .sb-item:hover { background: rgba(20,17,13,.04); color: var(--fg); }
+.sb-item.disabled { opacity: .38; cursor: not-allowed; pointer-events: none; }
+.sb-item.disabled:hover { background: none; color: var(--fg-2); }
 .sb-item.active {
   background: var(--surface);
   color: var(--fg);

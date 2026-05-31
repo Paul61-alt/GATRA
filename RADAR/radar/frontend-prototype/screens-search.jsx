@@ -30,7 +30,7 @@ function isValidUrl(value) {
   }
 }
 
-function SearchScreen({ onComplete, onScanStart, onDiscoverComplete }) {
+function SearchScreen({ active, onComplete, onScanStart, onDiscoverComplete, onCancel }) {
   const [phase, setPhase] = _uS_search("input");
   const [url, setUrl] = _uS_search("");
   const [urlError, setUrlError] = _uS_search(null);
@@ -38,6 +38,17 @@ function SearchScreen({ onComplete, onScanStart, onDiscoverComplete }) {
   const [foundCount, setFoundCount] = _uS_search(0);
   const [sources, setSources] = _uS_search(0);
   const [error, setError] = _uS_search(null);
+
+  // The scanning loader stays up while a scan is in flight (the app owns the
+  // hand-off to the dashboard via `view`). Once the app clears the in-flight
+  // scan (complete / error / cancel), re-arm the URL form here.
+  _uE_search(() => {
+    if (!active && phase === "scanning") {
+      setPhase("input");
+      setUrl("");
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [active]);
 
   const SCAN_STEPS = [
     { label: "Resolving target", detail: "DNS + HTTP handshake" },
@@ -175,19 +186,23 @@ function SearchScreen({ onComplete, onScanStart, onDiscoverComplete }) {
     setFoundCount((discoverResult.candidates || []).length);
 
     if (onDiscoverComplete) {
+      // Keep the scanning loader up — the app holds it for the loading floor and
+      // then hides this screen by switching `view`. The `active` effect re-arms
+      // the URL form when the scan ends. Resetting here would drop the loader.
       onDiscoverComplete(discoverResult);
     } else if (onComplete) {
       // Legacy: caller wants full RadarOutput — keep prototype-style fallback
       onComplete(discoverResult);
+      setPhase("input");
+      setUrl("");
     }
-    setPhase("input");
-    setUrl("");
   };
 
   const cancelScan = () => {
     cancelledRef.current = true;
     if (abortRef.current) abortRef.current.abort();
     setPhase("input");
+    if (onCancel) onCancel();
   };
 
   const handleUrlChange = (e) => {

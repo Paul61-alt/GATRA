@@ -99,6 +99,13 @@ function App() {
   // HITL: result of /scan/discover, fed to SelectScreen
   const [discoverResult, setDiscoverResult] = _uS_app(null);
 
+  // Minimum time the full-screen scanning loader stays up before we flip to the
+  // dashboard. A floor, never a cap: if DISCOVER takes longer we transition when
+  // it lands. Keeps the user on the loader for at least this long.
+  const SCAN_MIN_LOADING_MS = 20000;
+  const scanStartMsRef = _uR_app(0);
+  const floorTimerRef = _uR_app(null);
+
   // Skeleton staging: show full skeleton, then reveal the subject frame after a beat.
   // Held in a ref so we can cancel a pending reveal if the scan bounces back to "new".
   const phaseTimerRef = _uR_app(null);
@@ -109,7 +116,21 @@ function App() {
   };
   const cancelStage = () => {
     if (phaseTimerRef.current) { clearTimeout(phaseTimerRef.current); phaseTimerRef.current = null; }
+    if (floorTimerRef.current) { clearTimeout(floorTimerRef.current); floorTimerRef.current = null; }
   };
+
+  // Flip from the full-screen scanning loader to the dashboard (Overview tab) and
+  // begin skeleton staging. Single entry point so the loader floor controls timing.
+  const transitionToDashboard = () => {
+    if (floorTimerRef.current) { clearTimeout(floorTimerRef.current); floorTimerRef.current = null; }
+    setActiveTab("overview");
+    setView("current");
+    if (!data) stageSubject();
+  };
+
+  // True once the scan has been on the loader for at least the floor duration.
+  const floorElapsed = () =>
+    scanStartMsRef.current > 0 && (Date.now() - scanStartMsRef.current) >= SCAN_MIN_LOADING_MS;
 
   _uE_app(() => {
     document.documentElement.setAttribute("data-density", tweaks.density);
@@ -219,15 +240,35 @@ function App() {
   const handleScanStart = (url, runId) => {
     const domain = url.replace(/^https?:\/\//, "").replace(/\/.*$/, "");
     const startedAt = new Date().toISOString();
+    // Clear any residual data (demo blob or a previous scan) so it can never leak
+    // into the new scan's dashboard while skeletons/enrich load.
+    setData(null);
+    scanStartMsRef.current = Date.now();
     setScanInProgress({ url, domain, runId, startedAt });
     _writeActiveScan({ runId, url, domain, phase: "DISCOVER", startedAt });
-    // Jump straight to the dashboard so the user can read the Understand section
-    // while DISCOVER + ENRICH fill the rest in progressively. SearchScreen stays
-    // mounted (display:none) so its DISCOVER timers/SSE keep running.
+    // Stay on the full-screen scanning loader (view stays "new"). The dashboard
+    // is shown later via transitionToDashboard once the loading floor passes —
+    // see handleDiscoverComplete / handleEnrichComplete.
     setActiveTab("overview");
-    setView("current");
-    if (!data) stageSubject();
   };
+
+  // Tear down all in-flight scan state and return to the New/loader screen.
+  // Clears the floor timer (so it can't flip to an empty dashboard), stops any
+  // poller, and drops scanInProgress — which re-arms SearchScreen's URL form via
+  // its `active` effect. Used by cancel and every enrich/poll error path.
+  const failScan = (label) => {
+    cancelStage();
+    pollAbortRef.current.stop = true;
+    scanStartMsRef.current = 0;
+    setScanInProgress(null);
+    _clearActiveScan();
+    if (label) setToast({ label, action: null });
+    setView("new");
+  };
+
+  // User clicked Cancel on the scanning loader. SearchScreen already aborted its
+  // own fetch; just tear down app-side state (no toast).
+  const handleScanCancel = () => failScan(null);
 
   // Auto-enrich: DISCOVER finished → pick top 10 by threat_score and trigger enrich
   // (Candidates are already sorted by threat_score desc in backend discover.py.)
@@ -236,11 +277,7 @@ function App() {
     const topDomains = candidates.slice(0, Math.min(10, candidates.length)).map(c => c.domain);
 
     if (topDomains.length === 0) {
-      cancelStage();
-      setScanInProgress(null);
-      _clearActiveScan();
-      setToast({ label: "No competitors found — try another URL", action: null });
-      setView("new");
+      failScan("No competitors found — try another URL");
       return;
     }
 
@@ -248,8 +285,16 @@ function App() {
     // Bump localStorage phase so refresh recovery knows we're past DISCOVER
     const prior = _readActiveScan();
     if (prior) _writeActiveScan({ ...prior, phase: "ENRICH", runId: result.runId, domain: result.companyDomain });
-    handleEnrichStart(result.companyDomain);
     runEnrich(result.runId, topDomains);
+    // Loader floor: keep the scanning screen up until SCAN_MIN_LOADING_MS has
+    // elapsed, then flip to the dashboard. Subject + competitors fill in there
+    // progressively as ENRICH streams. The floor is a minimum, never a cap.
+    if (floorElapsed()) {
+      transitionToDashboard();
+    } else {
+      const remaining = SCAN_MIN_LOADING_MS - (Date.now() - scanStartMsRef.current);
+      floorTimerRef.current = setTimeout(transitionToDashboard, Math.max(0, remaining));
+    }
   };
 
   // Auto-enrich SSE consumer: POST /scan/enrich and stream until result/error.
@@ -262,9 +307,7 @@ function App() {
         body: JSON.stringify({ run_id: runId, selected: selectedDomains }),
       });
     } catch (err) {
-      _clearActiveScan();
-      setToast({ label: `Enrich failed (network): ${err.message || err}`, action: null });
-      setView("new");
+      failScan(`Enrich failed (network): ${err.message || err}`);
       return;
     }
 
@@ -276,12 +319,10 @@ function App() {
         pollScanStatus(runId);
         return;
       }
-      _clearActiveScan();
       const msg = resp.status === 404
         ? "Session expirée. Relance un scan."
         : `Enrich failed ${resp.status}: ${txt.slice(0, 200)}`;
-      setToast({ label: msg, action: null });
-      setView("new");
+      failScan(msg);
       return;
     }
 
@@ -305,9 +346,7 @@ function App() {
           return;
         }
         if (payload.error) {
-          _clearActiveScan();
-          setToast({ label: `Enrich error: ${payload.error}`, action: null });
-          setView("new");
+          failScan(`Enrich error: ${payload.error}`);
           return;
         }
       }
@@ -334,9 +373,7 @@ function App() {
       if (resp.status === 404) {
         consecutive404 += 1;
         if (consecutive404 >= 2) {
-          _clearActiveScan();
-          setToast({ label: "Scan expiré — relance une analyse.", action: null });
-          setView("new");
+          failScan("Scan expiré — relance une analyse.");
           return;
         }
         await sleep(2000);
@@ -353,9 +390,7 @@ function App() {
         return;
       }
       if (status.status === "error") {
-        _clearActiveScan();
-        setToast({ label: `Scan failed: ${status.error || "unknown error"}`, action: null });
-        setView("new");
+        failScan(`Scan failed: ${status.error || "unknown error"}`);
         return;
       }
       // DISCOVER finished but enrich hasn't been kicked off yet (client refreshed
@@ -371,22 +406,21 @@ function App() {
     }
   };
 
-  // HITL: ENRICH+SYNTHESIZE stream finished, jump to current with full data
+  // HITL: ENRICH+SYNTHESIZE stream finished — load full data. Only flip to the
+  // dashboard if the loading floor already passed; otherwise the pending floor
+  // timer (armed in handleDiscoverComplete) flips us over with the data in place.
   const handleEnrichComplete = (radarOutput) => {
     window.RADAR_DATA = radarOutput;
     setData(radarOutput);
     setDiscoverResult(null);
     setLoadingPhase(2);
     setScanInProgress(prev => prev ? { ...prev, done: true } : null);
-    setView("current");
+    if (floorElapsed()) {
+      if (floorTimerRef.current) { clearTimeout(floorTimerRef.current); floorTimerRef.current = null; }
+      setActiveTab("overview");
+      setView("current");
+    }
     _clearActiveScan();
-  };
-
-  // Triggered when user clicks "Analyser X concurrents" — switch to skeleton view immediately
-  const handleEnrichStart = (domain) => {
-    // Skeleton staging is owned by handleScanStart / refresh-recovery; just keep
-    // the view on "current" here so DISCOVER-complete doesn't re-flash the skeleton.
-    setView("current");
   };
 
   // Toast: null | { label, action }
@@ -446,6 +480,7 @@ function App() {
       <Sidebar
         view={view}
         onView={setView}
+        hasCurrent={!!(data || scanInProgress)}
         currentSubjectName={
           scanInProgress && !scanInProgress.done
             ? scanInProgress.domain
@@ -457,9 +492,11 @@ function App() {
         {/* Always mounted so scan timers survive tab switches */}
         <div style={{display: view === "new" ? "flex" : "none", flex:1, flexDirection:"column"}}>
           <SearchScreen
+            active={!!scanInProgress}
             onComplete={handleScanComplete}
             onScanStart={handleScanStart}
             onDiscoverComplete={handleDiscoverComplete}
+            onCancel={handleScanCancel}
           />
         </div>
 
