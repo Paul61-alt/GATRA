@@ -18,6 +18,17 @@ from models.memo import Memo, MemoSection, TemplateSection, TemplateSpec
 
 logger = logging.getLogger(__name__)
 
+_CONF = {"high", "medium", "low"}
+# Cap competitors fed to Claude so a large landscape can't blow past the token
+# budget (→ truncated JSON → parse failure). Ordered by threat, highest first.
+_MAX_COMPETITORS = 12
+_THREAT_RANK = {"high": 0, "medium": 1, "low": 2}
+
+
+def _coerce_conf(v: str | None) -> str:
+    """Map an LLM-supplied confidence to the allowed enum, defaulting to medium."""
+    return v if v in _CONF else "medium"
+
 
 # ── Built-in generalist VC comparative memo template ─────────────────────────
 # Standard competitive-landscape investment memo structure. Mirrored in the
@@ -142,9 +153,10 @@ def _company_payload(c: dict, urls: set[str]) -> dict:
 def _build_payload(radar_output: dict, urls: set[str]) -> dict:
     subject = radar_output.get("subject") or {}
     competitors = radar_output.get("competitors") or []
+    ranked = sorted(competitors, key=lambda c: _THREAT_RANK.get(c.get("threat"), 3))
     return {
         "subject": _company_payload(subject, urls),
-        "competitors": [_company_payload(c, urls) for c in competitors],
+        "competitors": [_company_payload(c, urls) for c in ranked[:_MAX_COMPETITORS]],
     }
 
 
@@ -163,22 +175,24 @@ def run(radar_output: dict, template: TemplateSpec, claude: ClaudeClient) -> Mem
     dropped = 0
     for tmpl_sec in template.sections:
         s = by_id.get(tmpl_sec.id, {})
-        # Backstop: drop any citation whose sourceUrl is not in the payload whitelist.
+        # Backstop: drop any citation whose sourceUrl is not in the payload whitelist,
+        # drop citations missing a claim, and coerce LLM-drifted confidence to the
+        # allowed enum — so one malformed field never 500s the whole memo.
         clean_citations = []
         for cit in (s.get("citations") or []):
-            if not isinstance(cit, dict):
+            if not isinstance(cit, dict) or not cit.get("claim"):
                 continue
             src = cit.get("sourceUrl")
             if src and src not in urls:
                 dropped += 1
                 continue
-            clean_citations.append(cit)
+            clean_citations.append({**cit, "confidence": _coerce_conf(cit.get("confidence"))})
         sections.append(MemoSection.model_validate({
             "id": tmpl_sec.id,
             "title": s.get("title") or tmpl_sec.title,
             "body": s.get("body") or "",
             "citations": clean_citations,
-            "confidence": s.get("confidence") or "medium",
+            "confidence": _coerce_conf(s.get("confidence")),
             "hasGaps": bool(s.get("hasGaps")),
         }))
 

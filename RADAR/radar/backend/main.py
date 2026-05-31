@@ -679,7 +679,7 @@ class MemoRequest(BaseModel):
 
 @app.post("/scan/memo")
 @limiter.limit("6/minute")
-async def scan_memo(request: Request, req: MemoRequest) -> dict:
+async def scan_memo(request: Request, req: MemoRequest, _auth: None = Depends(verify_token)) -> dict:
     """Generate a comparative VC memo from an already-cached scan + a template.
 
     On-demand, downstream of the pipeline. Re-reads the authoritative RadarOutput
@@ -780,5 +780,6 @@ async def get_scan_latest(request: Request, domain: str, _auth: None = Depends(v
 
 
 @app.get("/health")
+@limiter.exempt
 async def health() -> dict:
     return {"status": "ok"}

@@ -82,6 +82,7 @@ const SCAN_TABS = [
   // { key: "features",  label: "Features",    icon: "features" },  // hidden
   { key: "pricing",   label: "Pricing",     icon: "pricing" },
   { key: "timeline",  label: "Timeline",    icon: "timeline" },
+  { key: "memo",      label: "Mémo",        icon: "memo" },
 ];
 
 function App() {
@@ -177,8 +178,15 @@ function App() {
     const startedAt = new Date().toISOString();
     setScanInProgress({ url, domain, runId, startedAt });
     _writeActiveScan({ runId, url, domain, phase: "DISCOVER", startedAt });
-    // Stay on the search screen during DISCOVER (its scanning UI shows progress).
-    // handleDiscoverComplete auto-flips to "current" with skeleton + runs enrich.
+    // Jump straight to the dashboard so the user can read the Understand section
+    // while DISCOVER + ENRICH fill the rest in progressively. SearchScreen stays
+    // mounted (display:none) so its DISCOVER timers/SSE keep running.
+    setActiveTab("overview");
+    setView("current");
+    if (!data) {
+      setLoadingPhase(0);
+      setTimeout(() => setLoadingPhase(1), 1800);
+    }
   };
 
   // Auto-enrich: DISCOVER finished → pick top 10 by threat_score and trigger enrich
@@ -333,9 +341,9 @@ function App() {
 
   // Triggered when user clicks "Analyser X concurrents" — switch to skeleton view immediately
   const handleEnrichStart = (domain) => {
-    setLoadingPhase(0);
+    // Skeleton staging is owned by handleScanStart / refresh-recovery; just keep
+    // the view on "current" here so DISCOVER-complete doesn't re-flash the skeleton.
     setView("current");
-    setTimeout(() => setLoadingPhase(1), 1800);
   };
 
   // Toast: null | { label, action }
@@ -465,6 +473,7 @@ function App() {
               {activeTab === "features"  && <FeaturesScreen  data={displayData} onOpenCompany={openCompany} />}
               {activeTab === "pricing"   && <PricingScreen   data={displayData} onOpenCompany={openCompany} />}
               {activeTab === "timeline"  && <TimelineScreen  data={displayData} onOpenCompany={openCompany} />}
+              {activeTab === "memo"      && <MemoScreen      data={displayData} />}
               {openCompanyIds.map(id => (
                 activeTab === "company:" + id && (
                   <CompanyScreen key={id} data={displayData} companyId={id} onOpenCompany={openCompany} />
