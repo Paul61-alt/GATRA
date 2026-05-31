@@ -124,6 +124,8 @@ _ALLOWED_ORIGINS = [
     "http://localhost:3000",
     "http://localhost:5173",
     "http://localhost:8080",
+    "http://localhost:8731",  # static frontend-prototype dev server
+    "http://127.0.0.1:8731",
     "https://frontend-prototype-opal.vercel.app",
     os.environ.get("FRONTEND_URL", ""),
 ]
