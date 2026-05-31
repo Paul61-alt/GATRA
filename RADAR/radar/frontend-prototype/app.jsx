@@ -19,6 +19,60 @@ function _clearActiveScan() {
   try { localStorage.removeItem(ACTIVE_SCAN_KEY); } catch {}
 }
 
+// ─── PasswordGate ────────────────────────────────────────────────────────────
+// Wraps <App/>. If no token in localStorage, renders a single-input form. On
+// submit, stores token + re-renders children. Backend rejects with 401 if the
+// token doesn't match RADAR_SHARED_TOKEN — caller can clear token + retry.
+function PasswordGate({ children }) {
+  const [hasToken, setHasToken] = _uS_app(!!window.radarGetToken());
+  const [input, setInput] = _uS_app("");
+
+  if (hasToken) return children;
+
+  function submit(e) {
+    e.preventDefault();
+    const t = input.trim();
+    if (!t) return;
+    window.radarSetToken(t);
+    setHasToken(true);
+  }
+
+  return (
+    <div style={{
+      display: "flex", alignItems: "center", justifyContent: "center",
+      minHeight: "100vh", background: "var(--bg, #faf8f5)",
+      fontFamily: "Roboto, system-ui, sans-serif",
+    }}>
+      <form onSubmit={submit} style={{
+        display: "flex", flexDirection: "column", gap: 16,
+        padding: 32, borderRadius: 12, background: "white",
+        boxShadow: "0 4px 24px rgba(0,0,0,0.08)", width: 360, maxWidth: "90vw",
+      }}>
+        <div style={{ fontSize: 20, fontWeight: 600, color: "#0a0a0a" }}>Radar — Access</div>
+        <div style={{ fontSize: 13, color: "#666", lineHeight: 1.4 }}>
+          Enter the shared access token to use this demo. Reach out for credentials.
+        </div>
+        <input
+          type="password"
+          autoFocus
+          placeholder="Access token"
+          value={input}
+          onChange={e => setInput(e.target.value)}
+          style={{
+            padding: "10px 12px", fontSize: 14, border: "1px solid #ddd",
+            borderRadius: 6, outline: "none", fontFamily: "Roboto Mono, monospace",
+          }}
+        />
+        <button type="submit" style={{
+          padding: "10px 16px", fontSize: 14, fontWeight: 500,
+          background: "#b34a1f", color: "white", border: "none",
+          borderRadius: 6, cursor: "pointer",
+        }}>Enter</button>
+      </form>
+    </div>
+  );
+}
+
 const SCAN_TABS = [
   { key: "overview",  label: "Overview",    icon: "overview" },
   { key: "list",      label: "Competitors", icon: "list" },
@@ -527,4 +581,6 @@ function RadarTweaksPanel({ t, setTweak, onJumpToSearch }) {
   root.setAttribute("data-density", t.density || "comfortable");
 })();
 
-ReactDOM.createRoot(document.getElementById("root")).render(<App/>);
+ReactDOM.createRoot(document.getElementById("root")).render(
+  <PasswordGate><App/></PasswordGate>
+);

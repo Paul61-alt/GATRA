@@ -10,7 +10,7 @@ from typing import Optional
 from uuid import uuid4
 
 from dotenv import load_dotenv
-from fastapi import FastAPI, HTTPException, Request
+from fastapi import Depends, FastAPI, Header, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, ConfigDict
@@ -27,7 +27,7 @@ logging.basicConfig(level=logging.INFO, format="%(levelname)s %(name)s %(message
 logger = logging.getLogger(__name__)
 
 from clients import ClaudeClient, LinkupClient
-from clients.linkup_client import record_scan_delta
+from clients.linkup_client import estimate_today_cost_eur, record_scan_delta
 from models import PipelineRun, PipelineStatus
 from models.competitor import DiscoverCandidate, DiscoverResult
 from pipeline import discover, enrich, synthesize, understand
@@ -48,6 +48,42 @@ from utils import (
 def _check_kill_switch() -> None:
     if os.environ.get("RADAR_KILL_SWITCH", "").lower() in ("1", "true", "on"):
         raise HTTPException(status_code=503, detail="Service temporarily disabled")
+
+
+def _check_daily_budget_eur() -> None:
+    """Refuse new scans when today's Linkup spend is over the EUR cap.
+
+    Stops a single bad actor from running the budget to zero. Independent of the
+    per-call ledger budget in linkup_client._check_daily_budget (which caps call
+    count, not euro spend).
+    """
+    cap = float(os.environ.get("RADAR_DAILY_BUDGET_EUR", "30"))
+    spent = estimate_today_cost_eur()
+    if spent >= cap:
+        logger.warning("daily_budget_eur_exceeded spent=%.2f cap=%.2f", spent, cap)
+        raise HTTPException(
+            status_code=429,
+            detail={"error": "daily_budget_reached", "spent_eur": spent, "cap_eur": cap},
+        )
+
+
+def verify_token(authorization: str | None = Header(default=None)) -> None:
+    """Bearer-token gate on /scan* endpoints.
+
+    Token comes from RADAR_SHARED_TOKEN env var; if unset, auth is disabled
+    (dev mode). In prod, MUST be set — boot will refuse with a clear error
+    on first request if missing while RADAR_REQUIRE_AUTH=1.
+    """
+    expected = os.environ.get("RADAR_SHARED_TOKEN", "").strip()
+    if not expected:
+        if os.environ.get("RADAR_REQUIRE_AUTH", "").lower() in ("1", "true", "on"):
+            raise HTTPException(status_code=500, detail="Server misconfigured: RADAR_SHARED_TOKEN unset")
+        return  # dev mode, no auth
+    if not authorization or not authorization.startswith("Bearer "):
+        raise HTTPException(status_code=401, detail="Missing bearer token")
+    token = authorization.removeprefix("Bearer ").strip()
+    if token != expected:
+        raise HTTPException(status_code=401, detail="Invalid token")
 
 
 # run_id is used as a filename in the cache (progress, discover). Reject anything that
@@ -88,12 +124,15 @@ _ALLOWED_ORIGINS = [
     "http://localhost:3000",
     "http://localhost:5173",
     "http://localhost:8080",
+    "https://frontend-prototype-opal.vercel.app",
     os.environ.get("FRONTEND_URL", ""),
 ]
 
+# allow_origin_regex covers Vercel preview deploys (frontend-prototype-xxxx-paul-pietras-projects.vercel.app)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[o for o in _ALLOWED_ORIGINS if o],
+    allow_origin_regex=r"https://.*\.vercel\.app",
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -172,8 +211,9 @@ class EnrichRequest(BaseModel):
 
 @app.post("/analyze")
 @limiter.limit("3/minute")
-async def analyze(request: Request, req: AnalyzeRequest) -> dict:
+async def analyze(request: Request, req: AnalyzeRequest, _auth: None = Depends(verify_token)) -> dict:
     _check_kill_switch()
+    _check_daily_budget_eur()
     domain = _normalize_domain(req.url)
     if not domain:
         raise HTTPException(status_code=422, detail="Invalid URL")
@@ -233,9 +273,10 @@ async def analyze(request: Request, req: AnalyzeRequest) -> dict:
 
 @app.post("/scan")
 @limiter.limit("3/minute")
-async def scan(request: Request, req: AnalyzeRequest) -> dict:
+async def scan(request: Request, req: AnalyzeRequest, _auth: None = Depends(verify_token)) -> dict:
     """Like /analyze but returns RadarOutput (camelCase, frontend-ready)."""
     _check_kill_switch()
+    _check_daily_budget_eur()
     domain = _normalize_domain(req.url)
     if not domain:
         raise HTTPException(status_code=422, detail="Invalid URL")
@@ -287,9 +328,10 @@ async def scan(request: Request, req: AnalyzeRequest) -> dict:
 
 @app.post("/scan/stream")
 @limiter.limit("3/minute")
-async def scan_stream(request: Request, req: AnalyzeRequest) -> StreamingResponse:
+async def scan_stream(request: Request, req: AnalyzeRequest, _auth: None = Depends(verify_token)) -> StreamingResponse:
     """SSE endpoint — emits fine-grained progress events then final result."""
     _check_kill_switch()
+    _check_daily_budget_eur()
     domain = _normalize_domain(req.url)
     if not domain:
         raise HTTPException(status_code=422, detail="Invalid URL")
@@ -395,13 +437,14 @@ async def scan_stream(request: Request, req: AnalyzeRequest) -> StreamingRespons
 
 @app.post("/scan/discover")
 @limiter.limit("3/minute")
-async def scan_discover(request: Request, req: AnalyzeRequest) -> dict:
+async def scan_discover(request: Request, req: AnalyzeRequest, _auth: None = Depends(verify_token)) -> dict:
     """Phase 1+2: UNDERSTAND + DISCOVER only. Returns lightweight candidate list.
 
     Response cached by run_id for 2h so /scan/enrich can resume without re-running.
     Client can supply run_id for refresh recovery via /scan/status/{run_id}.
     """
     _check_kill_switch()
+    _check_daily_budget_eur()
     domain = _normalize_domain(req.url)
     if not domain:
         raise HTTPException(status_code=422, detail="Invalid URL")
@@ -467,13 +510,14 @@ async def scan_discover(request: Request, req: AnalyzeRequest) -> dict:
 
 @app.post("/scan/enrich")
 @limiter.limit("3/minute")
-async def scan_enrich_stream(request: Request, req: EnrichRequest) -> StreamingResponse:
+async def scan_enrich_stream(request: Request, req: EnrichRequest, _auth: None = Depends(verify_token)) -> StreamingResponse:
     """Phase 3+4: ENRICH + SYNTHESIZE on VC-selected candidates. SSE stream → RadarOutput.
 
     Requires a valid run_id from a prior /scan/discover call (2h TTL).
     'selected' is a list of bare domains to enrich, e.g. ["notion.so", "coda.io"].
     """
     _check_kill_switch()
+    _check_daily_budget_eur()
     _validate_run_id(req.run_id)
 
     cached_discover = cache_get_discover(req.run_id)
@@ -626,7 +670,7 @@ async def scan_enrich_stream(request: Request, req: EnrichRequest) -> StreamingR
 
 @app.get("/scan/status/{run_id}")
 @limiter.exempt
-async def scan_status(request: Request, run_id: str) -> dict:
+async def scan_status(request: Request, run_id: str, _auth: None = Depends(verify_token)) -> dict:
     """Return the latest progress snapshot for a run_id (refresh recovery).
 
     Frontend localStorage stashes run_id on scan start; after a refresh it polls
@@ -667,7 +711,7 @@ def _status_from_iso(iso: Optional[str]) -> str:
 
 @app.get("/scans")
 @limiter.exempt
-async def list_scans(request: Request) -> list[dict]:
+async def list_scans(request: Request, _auth: None = Depends(verify_token)) -> list[dict]:
     """List all known scans (dedup by domain, most recent first).
 
     Reads Supabase first, file glob fallback. Read-only, never triggers Linkup.
@@ -680,7 +724,7 @@ async def list_scans(request: Request) -> list[dict]:
 
 @app.get("/scans/{domain}/latest")
 @limiter.exempt
-async def get_scan_latest(request: Request, domain: str) -> dict:
+async def get_scan_latest(request: Request, domain: str, _auth: None = Depends(verify_token)) -> dict:
     """Return the most recent full RadarOutput for `domain`.
 
     404 if no cached scan exists. Read-only, never triggers Linkup.
