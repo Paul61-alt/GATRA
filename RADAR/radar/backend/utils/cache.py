@@ -227,6 +227,69 @@ def set(domain: str, data: dict) -> None:
     ) from last_err
 
 
+def set_raw_lanes(run_id: str, domain: Optional[str], lanes: list[dict]) -> None:
+    """Persist the raw Linkup lane responses (query + raw payload) the instant
+    they arrive, before any downstream parsing can lose them.
+
+    This is the SAFETY NET for paid data: by the time it's called, Linkup has
+    already billed. So unlike `set`, it must NEVER raise — a failure here cannot
+    be allowed to crash an otherwise-good scan (which would then also skip the
+    radar_scans write). It logs LOUD on failure but swallows the exception.
+
+    A best-effort file copy is written too, so the raw data survives even a
+    total Supabase outage (recoverable from disk on a non-ephemeral host).
+    """
+    bare = (domain or "").lower().replace("/", "_") or None
+    row = {
+        "run_id": run_id,
+        "domain": bare,
+        "scanned_date": date.today().isoformat(),
+        "lanes": lanes,
+    }
+
+    # 1. File first — never lost even if Supabase is down.
+    try:
+        raw_dir = _CACHE_DIR / "raw_lanes"
+        raw_dir.mkdir(parents=True, exist_ok=True)
+        (raw_dir / f"{run_id}.json").write_text(
+            json.dumps(row, ensure_ascii=False, indent=2)
+        )
+    except Exception as e:
+        logger.warning("raw_lanes file write failed run_id=%s: %s", run_id, e)
+
+    # 2. Supabase — the queryable copy. Retry transient blips, but swallow.
+    sb = _sb()
+    if sb is None:
+        if _sb_configured():
+            logger.error(
+                "Supabase configured but client unavailable — raw lanes for run_id=%s "
+                "domain=%s NOT persisted to DB (file written). Check supabase init logs.",
+                run_id, bare,
+            )
+        else:
+            logger.info("Supabase not configured — raw lanes file-only run_id=%s", run_id)
+        return
+
+    last_err = None
+    for attempt in range(_SB_MAX_RETRIES):
+        try:
+            sb.table("radar_raw_lanes").insert(row).execute()
+            logger.info(
+                "supabase raw_lanes write run_id=%s domain=%s lanes=%d attempt=%d",
+                run_id, bare, len(lanes), attempt + 1,
+            )
+            return
+        except Exception as e:
+            last_err = e
+            if attempt < _SB_MAX_RETRIES - 1:
+                time.sleep(_SB_RETRY_BASE_S * (2 ** attempt))
+    logger.error(
+        "Supabase raw_lanes write FAILED after %d attempts run_id=%s domain=%s: %s "
+        "(raw data IS on disk at cache/raw_lanes/%s.json)",
+        _SB_MAX_RETRIES, run_id, bare, last_err, run_id,
+    )
+
+
 def invalidate(domain: str) -> None:
     # 1. Supabase delete
     sb = _sb()

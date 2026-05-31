@@ -216,6 +216,22 @@ async def _capture_scan_cost(linkup: LinkupClient, scan_id: str, phase: str):
             logger.warning("scan delta record failed run_id=%s phase=%s error=%s", scan_id, phase, e)
 
 
+def _synthesize_safe(company_profile, competitor_profiles, run_id: str):
+    """Scoring must never sink a paid scan. enrich.run already billed Linkup and
+    the raw lanes are persisted; if synthesis throws, log LOUD and fall back to
+    empty scores so the pipeline still builds + writes the result to radar_scans
+    (with the enriched competitor profiles intact). Better a scan with no scores
+    in history than a billed scan that vanishes entirely."""
+    try:
+        return synthesize.run(company_profile, competitor_profiles)
+    except Exception as e:
+        logger.error(
+            "synthesize failed run_id=%s — persisting profiles without scores: %s",
+            run_id, e, exc_info=True,
+        )
+        return []
+
+
 def _candidates_to_enrich_dicts(candidates: list[DiscoverCandidate]) -> list[dict]:
     """Convert lightweight DiscoverCandidate objects to the dict format expected by enrich.run().
 
@@ -270,9 +286,9 @@ async def analyze(
             candidates, discover_sources, discover_threat_scores = await discover.run(company_profile, linkup)
             competitor_dicts = _candidates_to_enrich_dicts(candidates)
 
-            competitor_profiles = await enrich.run(competitor_dicts, linkup, run_id, byok=linkup.byok)
+            competitor_profiles = await enrich.run(competitor_dicts, linkup, run_id, byok=linkup.byok, domain=domain)
 
-            radar_scores = synthesize.run(company_profile, competitor_profiles)
+            radar_scores = _synthesize_safe(company_profile, competitor_profiles, run_id)
 
         run = PipelineRun(
             id=run_id,
@@ -338,8 +354,8 @@ async def scan(
                 company_profile = await understand.run(domain, linkup, run_id, claude=app.state.claude)
                 candidates, discover_sources, discover_threat_scores = await discover.run(company_profile, linkup)
                 competitor_dicts = _candidates_to_enrich_dicts(candidates)
-                competitor_profiles = await enrich.run(competitor_dicts, linkup, run_id, byok=linkup.byok)
-                radar_scores = synthesize.run(company_profile, competitor_profiles)
+                competitor_profiles = await enrich.run(competitor_dicts, linkup, run_id, byok=linkup.byok, domain=domain)
+                radar_scores = _synthesize_safe(company_profile, competitor_profiles, run_id)
 
         run = PipelineRun(
             id=run_id,
@@ -415,11 +431,11 @@ async def scan_stream(
                         await queue.put({"phase": "DISCOVER", "status": "ok", "count": len(candidates)})
 
                         await queue.put({"phase": "ENRICH", "status": "start"})
-                        competitor_profiles = await enrich.run(competitor_dicts, linkup, run_id, event_cb=emit, byok=linkup.byok)
+                        competitor_profiles = await enrich.run(competitor_dicts, linkup, run_id, event_cb=emit, byok=linkup.byok, domain=domain)
                         await queue.put({"phase": "ENRICH", "status": "ok", "count": len(competitor_profiles)})
 
                         await queue.put({"phase": "SYNTHESIZE", "status": "start"})
-                        radar_scores = synthesize.run(company_profile, competitor_profiles)
+                        radar_scores = _synthesize_safe(company_profile, competitor_profiles, run_id)
                         await queue.put({"phase": "SYNTHESIZE", "status": "ok", "count": len(radar_scores)})
 
                 run = PipelineRun(
@@ -639,7 +655,7 @@ async def scan_enrich_stream(
                         "status": "start", "startedAt": created_at,
                     })
                     await queue.put({"phase": "ENRICH", "status": "start"})
-                    competitor_profiles = await enrich.run(competitor_dicts, linkup, run_id, event_cb=emit, byok=linkup.byok)
+                    competitor_profiles = await enrich.run(competitor_dicts, linkup, run_id, event_cb=emit, byok=linkup.byok, domain=company_profile.domain)
                     cache_set_progress(run_id, {
                         "runId": run_id, "domain": company_profile.domain, "phase": "ENRICH",
                         "status": "ok", "startedAt": created_at, "count": len(competitor_profiles),
@@ -651,7 +667,7 @@ async def scan_enrich_stream(
                         "status": "start", "startedAt": created_at,
                     })
                     await queue.put({"phase": "SYNTHESIZE", "status": "start"})
-                    radar_scores = synthesize.run(company_profile, competitor_profiles)
+                    radar_scores = _synthesize_safe(company_profile, competitor_profiles, run_id)
                     await queue.put({"phase": "SYNTHESIZE", "status": "ok", "count": len(radar_scores)})
 
             run = PipelineRun(

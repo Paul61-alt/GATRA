@@ -1449,12 +1449,40 @@ def _merge_one_competitor(
 # ═════════════════════════════════════════════════════════════════════════════
 
 
+def _persist_raw_lanes(run_id: str, domain: Optional[str], lanes: list[tuple]) -> None:
+    """Serialize (lane_name, query, raw) tuples and hand them to the cache layer.
+
+    `raw` may be an Exception (asyncio.gather return_exceptions=True) — store it
+    as an error marker rather than dropping it, so a failed-but-billed lane is
+    still accounted for. Never raises: this is the safety net, not a gate.
+    """
+    try:
+        payload = []
+        for lane_name, query, raw in lanes:
+            if isinstance(raw, Exception):
+                payload.append({
+                    "lane": lane_name, "query": query,
+                    "raw": None, "is_error": True, "error": str(raw),
+                })
+            else:
+                payload.append({
+                    "lane": lane_name, "query": query,
+                    "raw": raw, "is_error": False,
+                })
+        from utils import cache_set_raw_lanes
+        cache_set_raw_lanes(run_id, domain, payload)
+    except Exception as e:  # belt + suspenders — capture must never break a scan
+        logger.error("raw lanes capture failed run_id=%s: %s", run_id, e, exc_info=True)
+
+
 async def run(
     competitors: list[dict],
     linkup: LinkupClient,
     run_id: str,
     event_cb=None,
     subject: dict | None = None,
+    byok: bool = False,
+    domain: str | None = None,
 ) -> list[CompetitorProfile]:
     t0 = time.monotonic()
     now = datetime.now(timezone.utc).isoformat()
@@ -1466,16 +1494,19 @@ async def run(
     if ENRICH_MODE == "5_lanes":
         # 4 × /research depth=M + 1 × /search deep = 4 × €0.50 + €0.055 = €2.055
         estimated = 4 * RESEARCH_COST_EUR + 0.055
-        cumul = estimate_today_cost_eur()
-        if cumul + estimated > DAILY_HARD_CAP_EUR:
-            raise BudgetExceededError(
-                f"scan would exceed daily cap €{DAILY_HARD_CAP_EUR:.2f} "
-                f"(today={cumul:.2f} + scan={estimated:.2f})"
-            )
-        if cumul + estimated > DAILY_WARN_CAP_EUR:
-            logger.warning(
-                "daily linkup spend nearing cap: today=%.2f + scan=%.2f", cumul, estimated
-            )
+        # BYOK: a tester's own-key spend is theirs — don't gate it on our daily
+        # cap nor read our ledger for it.
+        if not byok:
+            cumul = estimate_today_cost_eur()
+            if cumul + estimated > DAILY_HARD_CAP_EUR:
+                raise BudgetExceededError(
+                    f"scan would exceed daily cap €{DAILY_HARD_CAP_EUR:.2f} "
+                    f"(today={cumul:.2f} + scan={estimated:.2f})"
+                )
+            if cumul + estimated > DAILY_WARN_CAP_EUR:
+                logger.warning(
+                    "daily linkup spend nearing cap: today=%.2f + scan=%.2f", cumul, estimated
+                )
 
         logger.info(
             "phase=ENRICH mode=5_lanes status=start total=%d depth=%s estimated_eur=%.2f",
@@ -1484,13 +1515,35 @@ async def run(
 
         coords_task = asyncio.create_task(_geocode_all(competitors))
 
+        # Build queries up-front so we can persist them alongside their raw
+        # responses (the "calls I launched" + "the data I got back").
+        q1 = _lane1_query(competitors)
+        q2 = _lane2_query(competitors)
+        q3 = _lane3_query(competitors)
+        q4 = _lane4_query(competitors)
+        q5 = _lane5_query(competitors, subject)
+
         lane1_raw, lane2_raw, lane3_raw, lane4_raw, lane5_raw = await asyncio.gather(
-            _run_research_lane("identity_funding", competitors, _lane1_query(competitors), LANE1_SCHEMA, linkup, event_cb),
-            _run_research_lane("pricing", competitors, _lane2_query(competitors), LANE2_SCHEMA, linkup, event_cb),
-            _run_search_lane("linkedin", competitors, _lane3_query(competitors), LANE3_SCHEMA, linkup, event_cb),
-            _run_research_lane("news_gtm", competitors, _lane4_query(competitors), LANE4_SCHEMA, linkup, event_cb),
-            _run_research_lane("features", competitors, _lane5_query(competitors, subject), LANE5_SCHEMA, linkup, event_cb),
+            _run_research_lane("identity_funding", competitors, q1, LANE1_SCHEMA, linkup, event_cb),
+            _run_research_lane("pricing", competitors, q2, LANE2_SCHEMA, linkup, event_cb),
+            _run_search_lane("linkedin", competitors, q3, LANE3_SCHEMA, linkup, event_cb),
+            _run_research_lane("news_gtm", competitors, q4, LANE4_SCHEMA, linkup, event_cb),
+            _run_research_lane("features", competitors, q5, LANE5_SCHEMA, linkup, event_cb),
             return_exceptions=True,
+        )
+
+        # ── CAPTURE RAW NOW — Linkup has already billed. Persist before any
+        # fragile parsing/synthesis downstream can lose the paid data. Wrapped
+        # so a capture failure can never crash the scan it is protecting. ──
+        _persist_raw_lanes(
+            run_id, domain,
+            [
+                ("identity_funding", q1, lane1_raw),
+                ("pricing", q2, lane2_raw),
+                ("linkedin", q3, lane3_raw),
+                ("news_gtm", q4, lane4_raw),
+                ("features", q5, lane5_raw),
+            ],
         )
 
         coords_map = await coords_task
