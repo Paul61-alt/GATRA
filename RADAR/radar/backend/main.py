@@ -739,5 +739,6 @@ async def get_scan_latest(request: Request, domain: str, _auth: None = Depends(v
 
 
 @app.get("/health")
+@limiter.exempt
 async def health() -> dict:
     return {"status": "ok"}
