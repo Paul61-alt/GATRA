@@ -22,6 +22,11 @@ _RETRY_STATUSES = {429, 500, 502, 503}
 RESEARCH_COST_EUR: float = 1.50
 SEARCH_COST_EUR: dict[str, float] = {"standard": 0.006, "deep": 0.055, "structured": 0.055}
 FETCH_COST_EUR = 0.005
+
+# /research async jobs cover ~10 competitors each and routinely exceed 10 min.
+# At 600s the poller threw the (already-billed) job away mid-run, losing the lane.
+# Env-tunable so the wait can be raised without a code deploy. 1200s (20 min) by default.
+RESEARCH_MAX_WAIT_S: int = int(os.environ.get("RADAR_RESEARCH_MAX_WAIT_S", "1200"))
 # Env-overridable so a scan can be sandboxed below the default cap.
 DAILY_HARD_CAP_EUR = float(os.environ.get("RADAR_DAILY_HARD_CAP_EUR", "8.0"))
 DAILY_WARN_CAP_EUR = float(os.environ.get("RADAR_DAILY_WARN_CAP_EUR", "5.0"))
@@ -389,12 +394,13 @@ class LinkupClient:
     async def wait_for_research(
         self,
         job_id: str,
-        max_wait: int = 600,
+        max_wait: int = RESEARCH_MAX_WAIT_S,
         initial_interval: int = 2,
         max_interval: int = 10,
         on_poll=None,
     ) -> dict:
-        """Poll /research/{id} until status in {completed, failed} or max_wait elapsed.
+        """Poll /research/{id} until status in {completed, failed} or max_wait elapsed
+        (default RESEARCH_MAX_WAIT_S, env RADAR_RESEARCH_MAX_WAIT_S).
 
         Polling GETs are budget-exempt (see _check_daily_budget).
         Optional on_poll(dict) async callback fires each iteration (for SSE progress).
@@ -445,7 +451,7 @@ class LinkupClient:
         query: str,
         depth: Literal["S", "M", "L", "XL"] = "S",
         structured_schema: Optional[dict] = None,
-        max_wait: int = 600,
+        max_wait: int = RESEARCH_MAX_WAIT_S,
         initial_interval: int = 2,
         max_interval: int = 10,
         on_poll=None,

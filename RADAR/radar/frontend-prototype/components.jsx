@@ -78,11 +78,11 @@ const Icons = {
 };
 
 // âââ Sidebar ââââââââââââââââââââââââââââââââââââââââââââââââââ
-function Sidebar({ view, onView, currentSubjectName }) {
+function Sidebar({ view, onView, currentSubjectName, hasCurrent }) {
   const items = [
     { key: "new",     label: "New scan",     icon: "zap" },
     { key: "home",    label: "Home",         icon: "list" },
-    { key: "current", label: "Current scan", icon: "overview", meta: currentSubjectName || null },
+    { key: "current", label: "Current scan", icon: "overview", meta: currentSubjectName || null, disabled: !hasCurrent },
   ];
   return (
     <aside className="sb">
@@ -102,8 +102,9 @@ function Sidebar({ view, onView, currentSubjectName }) {
       <div style={{marginTop: 32}} />
       {items.map(it => (
         <div key={it.key}
-             className={"sb-item " + (view === it.key ? "active" : "")}
-             onClick={() => onView(it.key)}>
+             className={"sb-item " + (view === it.key ? "active " : "") + (it.disabled ? "disabled" : "")}
+             title={it.disabled ? "Run a scan or open one from Home first" : undefined}
+             onClick={() => { if (!it.disabled) onView(it.key); }}>
           <span className="ic">{Icons[it.icon]}</span>
           <span>{it.label}</span>
           {it.meta && (
