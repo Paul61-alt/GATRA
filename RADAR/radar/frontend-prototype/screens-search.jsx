@@ -93,9 +93,9 @@ function SearchScreen({ active, onComplete, onScanStart, onDiscoverComplete, onC
 
       setSources((s) => {
         const elapsedSec = (Date.now() - startedAtRef.current) / 1000;
-        const target = 1200 + elapsedSec * 8;
-        const delta = (target - s) * 0.07 + Math.random() * 6;
-        return Math.max(s, Math.floor(s + delta));
+        const target = 300 * (1 - Math.exp(-elapsedSec / 12));
+        const delta = (target - s) * 0.07 + Math.random() * 2;
+        return Math.min(300, Math.max(s, Math.floor(s + delta)));
       });
 
       timer = setTimeout(schedule, interval);
