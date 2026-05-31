@@ -333,4 +333,10 @@ Pour chaque tâche :
 
 ---
 
+## 📝 Changelog pipeline
+
+- **2026-05-31** — `transform.py._map_competitor` étendu pour mapper `arr`, `avg_contract`, `funding_rounds`, `funding_stage`, `acquisition`, `recent_news`, `growth_signals` côté competitors (symétrique avec `_map_subject`). Nouveau champ `Company.arr` (EUR) dans `radar_output.py`. Helper `_parse_money_usd` ajouté. Adapter `utils/eval_to_data_js.py` créé pour régénérer `frontend-prototype/data.js` depuis un eval enrichi (cohort démo HR-tech : TestGorilla subject + HireVue/Paradox/Harver). Conséquence : 4 nouveaux graphiques dans l'onglet Positioning (Capital Efficiency Matrix, Funding Round Timeline, Investor Concentration Graph, Customer Logo Overlap). Autres onglets (Pricing, Timeline) à vérifier — peuvent afficher données stale du cohort précédent.
+
+---
+
 *CLAUDE.md v1.0 — Radar — Hackathon Linkup Mai 2026*

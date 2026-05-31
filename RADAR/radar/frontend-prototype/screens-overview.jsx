@@ -338,7 +338,7 @@ function OverviewScreen({ data, onOpenCompany, loadingPhase = 2 }) {
               </p>
               <hr className="divider" style={{margin:"12px 0"}}/>
               <div style={{display:"flex", gap:8, flexWrap:"wrap"}}>
-                {subject.notable.map(n => (
+                {(subject.notable || []).map(n => (
                   <span key={n} className="tag" style={{fontSize:11}}>{n}</span>
                 ))}
               </div>
