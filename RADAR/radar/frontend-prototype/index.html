@@ -44,20 +44,34 @@ window.radarClearToken = function () {
   try { localStorage.removeItem(window.RADAR_TOKEN_KEY); } catch {}
 };
 
+// ─── BYOK: tester's own LinkUp key (gates access + pays for their own scans) ───
+window.RADAR_LINKUP_KEY_KEY = "radar:linkupKey";
+
+window.radarGetLinkupKey = function () {
+  try { return localStorage.getItem(window.RADAR_LINKUP_KEY_KEY) || ""; } catch { return ""; }
+};
+window.radarSetLinkupKey = function (k) {
+  try { localStorage.setItem(window.RADAR_LINKUP_KEY_KEY, k || ""); } catch {}
+};
+window.radarClearLinkupKey = function () {
+  try { localStorage.removeItem(window.RADAR_LINKUP_KEY_KEY); } catch {}
+};
+
 // Monkey-patch fetch so every call to window.RADAR_API auto-attaches the bearer
-// token. Zero changes needed at fetch sites in app.jsx / screens-*.jsx.
+// token AND the BYOK LinkUp key. Zero changes needed at fetch sites in
+// app.jsx / screens-*.jsx — discover, enrich, memo, status, scans, SSE all inherit.
 (function () {
   const _origFetch = window.fetch;
   window.fetch = function (input, init) {
     init = init || {};
     const url = typeof input === "string" ? input : (input && input.url) || "";
     if (window.RADAR_API && url.startsWith(window.RADAR_API)) {
+      const headers = Object.assign({}, init.headers || {});
       const token = window.radarGetToken();
-      if (token) {
-        init.headers = Object.assign({}, init.headers || {}, {
-          Authorization: "Bearer " + token,
-        });
-      }
+      if (token) headers["Authorization"] = "Bearer " + token;
+      const linkupKey = window.radarGetLinkupKey();
+      if (linkupKey) headers["X-Linkup-Key"] = linkupKey;
+      init.headers = headers;
     }
     return _origFetch(input, init);
   };
@@ -70,6 +84,7 @@ window.radarClearToken = function () {
 <script src="data.js"></script>
 <script type="text/babel" src="tweaks-panel.jsx"></script>
 <script type="text/babel" src="components.jsx"></script>
+<script type="text/babel" src="screens-landing.jsx"></script>
 <script type="text/babel" src="screens-search.jsx"></script>
 <script type="text/babel" src="screens-select.jsx"></script>
 <script type="text/babel" src="screens-home.jsx"></script>
