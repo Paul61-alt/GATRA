@@ -55,16 +55,20 @@ MAX_ENRICH = int(os.environ.get("RADAR_MAX_ENRICH", "5"))
 DEPTH_TOP: Literal["M"] = "M"
 DEPTH_REST: Literal["S"] = "S"
 DEPTH_BATCH: Literal["M"] = "M"  # Single call, mid-depth covers cohort breadth
-# depth=S: 2-5 min, €0.25; depth=M: 3-7 min, €0.50 (Linkup docs).
-# S chosen for latency floor — env override to "M" if quality regresses.
+# /research is $1.50 FLAT regardless of depth (S/M/L/XL) — see linkup_client.
+# So S is strictly worse: same price, shallowest result. Live probe on the
+# Finary cohort showed depth=S returned near-empty funding/employee data for
+# all 10 competitors, while depth=L returned full profiles (employees, founding
+# year, funding rounds, investors). Default to L: same cost, far richer data.
+# Latency cost ~ a few extra minutes per lane.
 _ALLOWED_DEPTHS = {"S", "M", "L", "XL"}
-_raw_depth = os.environ.get("RADAR_ENRICH_DEPTH_LANE", "S").upper()
+_raw_depth = os.environ.get("RADAR_ENRICH_DEPTH_LANE", "L").upper()
 if _raw_depth not in _ALLOWED_DEPTHS:
     logger.warning(
-        "invalid RADAR_ENRICH_DEPTH_LANE=%s → fallback to S (allowed: %s)",
+        "invalid RADAR_ENRICH_DEPTH_LANE=%s → fallback to L (allowed: %s)",
         _raw_depth, sorted(_ALLOWED_DEPTHS),
     )
-    _raw_depth = "S"
+    _raw_depth = "L"
 DEPTH_LANE: Literal["S", "M", "L", "XL"] = _raw_depth  # type: ignore[assignment]
 
 COMPETITOR_SCHEMA = {
@@ -1531,6 +1535,30 @@ async def run(
             _run_research_lane("features", competitors, q5, LANE5_SCHEMA, linkup, event_cb),
             return_exceptions=True,
         )
+
+        # ── STOP THE SILENCE — a lane that raised is swallowed by
+        # return_exceptions=True and degrades to empty data downstream, which is
+        # indistinguishable from "genuinely no data". Surface failed lanes loudly
+        # (ERROR log + SSE event) so a paid-but-empty lane is never silent. ──
+        _lane_results = [
+            ("identity_funding", lane1_raw), ("pricing", lane2_raw),
+            ("linkedin", lane3_raw), ("news_gtm", lane4_raw), ("features", lane5_raw),
+        ]
+        failed_lanes = [name for name, raw in _lane_results if isinstance(raw, Exception)]
+        if failed_lanes:
+            for name, raw in _lane_results:
+                if isinstance(raw, Exception):
+                    logger.error(
+                        "phase=ENRICH lane=%s FAILED run_id=%s error=%s",
+                        name, run_id, raw, exc_info=raw,
+                    )
+            if event_cb:
+                await event_cb({
+                    "phase": "ENRICH", "status": "lane_errors",
+                    "failed_lanes": failed_lanes,
+                    "detail": f"{len(failed_lanes)}/5 enrichment lanes failed — "
+                              "some competitor data unavailable (not 'not found').",
+                })
 
         # ── CAPTURE RAW NOW — Linkup has already billed. Persist before any
         # fragile parsing/synthesis downstream can lose the paid data. Wrapped
