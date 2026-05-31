@@ -51,13 +51,18 @@ def _check_kill_switch() -> None:
         raise HTTPException(status_code=503, detail="Service temporarily disabled")
 
 
-def _check_daily_budget_eur() -> None:
+def _check_daily_budget_eur(byok: bool = False) -> None:
     """Refuse new scans when today's Linkup spend is over the EUR cap.
 
     Stops a single bad actor from running the budget to zero. Independent of the
     per-call ledger budget in linkup_client._check_daily_budget (which caps call
     count, not euro spend).
+
+    BYOK scans run on the tester's own LinkUp key — their spend is theirs, so it
+    neither counts against nor is blocked by our EUR cap.
     """
+    if byok:
+        return
     cap = float(os.environ.get("RADAR_DAILY_BUDGET_EUR", "30"))
     spent = estimate_today_cost_eur()
     if spent >= cap:
@@ -71,15 +76,16 @@ def _check_daily_budget_eur() -> None:
 def verify_token(authorization: str | None = Header(default=None)) -> None:
     """Bearer-token gate on /scan* endpoints.
 
-    Token comes from RADAR_SHARED_TOKEN env var; if unset, auth is disabled
-    (dev mode). In prod, MUST be set — boot will refuse with a clear error
-    on first request if missing while RADAR_REQUIRE_AUTH=1.
+    Fail-closed: the token comes from RADAR_SHARED_TOKEN. If it is unset, the
+    API refuses every request UNLESS RADAR_ALLOW_NO_AUTH is explicitly enabled
+    (local dev only). This way a forgotten env var locks the API down instead
+    of leaving a paid backend (Linkup + Claude) wide open.
     """
     expected = os.environ.get("RADAR_SHARED_TOKEN", "").strip()
     if not expected:
-        if os.environ.get("RADAR_REQUIRE_AUTH", "").lower() in ("1", "true", "on"):
-            raise HTTPException(status_code=500, detail="Server misconfigured: RADAR_SHARED_TOKEN unset")
-        return  # dev mode, no auth
+        if os.environ.get("RADAR_ALLOW_NO_AUTH", "").lower() not in ("1", "true", "on"):
+            raise HTTPException(status_code=503, detail="Server misconfigured: RADAR_SHARED_TOKEN unset")
+        return  # dev mode — auth explicitly disabled via RADAR_ALLOW_NO_AUTH
     if not authorization or not authorization.startswith("Bearer "):
         raise HTTPException(status_code=401, detail="Missing bearer token")
     token = authorization.removeprefix("Bearer ").strip()
@@ -131,11 +137,13 @@ _ALLOWED_ORIGINS = [
     os.environ.get("FRONTEND_URL", ""),
 ]
 
-# allow_origin_regex covers Vercel preview deploys (frontend-prototype-xxxx-paul-pietras-projects.vercel.app)
+# allow_origin_regex covers THIS project's Vercel preview deploys only —
+# e.g. frontend-prototype-ab12cd-paul-pietras-projects.vercel.app — not every
+# *.vercel.app site (which would let any attacker-hosted page call the API).
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[o for o in _ALLOWED_ORIGINS if o],
-    allow_origin_regex=r"https://.*\.vercel\.app",
+    allow_origin_regex=r"https://frontend-prototype-[a-z0-9-]+-paul-pietras-projects\.vercel\.app",
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -159,6 +167,18 @@ def _normalize_domain(url: str) -> str:
     return parsed.netloc.lstrip("www.").rstrip("/") or parsed.path.lstrip("www.").rstrip("/")
 
 
+def _resolve_linkup(x_linkup_key: str | None) -> LinkupClient:
+    """Pick the LinkUp client for a request.
+
+    BYOK: when a tester supplies their own key via the X-Linkup-Key header, build
+    a request-scoped client on that key (their account pays, our caps/ledger are
+    bypassed — see LinkupClient.byok). Otherwise reuse our shared singleton.
+    """
+    if x_linkup_key and x_linkup_key.strip():
+        return LinkupClient(api_key=x_linkup_key.strip())
+    return app.state.linkup
+
+
 @asynccontextmanager
 async def _capture_scan_cost(linkup: LinkupClient, scan_id: str, phase: str):
     """Bracket a scan with GET /v1/credits/balance before/after to record true USD cost.
@@ -171,7 +191,13 @@ async def _capture_scan_cost(linkup: LinkupClient, scan_id: str, phase: str):
     scans gated by RADAR_MAX_CONCURRENT, other dev machines, prod) will pollute the
     measurement. For audit-grade precision, set RADAR_MAX_CONCURRENT=1 and avoid
     sharing the API key during the audit window.
+
+    BYOK: skip the bracket entirely — it would read the tester's account balance and
+    write their numbers into our ledger/Supabase. Their spend stays off our books.
     """
+    if getattr(linkup, "byok", False):
+        yield
+        return
     balance_before = await linkup.balance()
     t0 = time.monotonic()
     try:
@@ -214,9 +240,14 @@ class EnrichRequest(BaseModel):
 
 @app.post("/analyze")
 @limiter.limit("3/minute")
-async def analyze(request: Request, req: AnalyzeRequest, _auth: None = Depends(verify_token)) -> dict:
+async def analyze(
+    request: Request,
+    req: AnalyzeRequest,
+    x_linkup_key: str | None = Header(default=None, alias="X-Linkup-Key"),
+    _auth: None = Depends(verify_token),
+) -> dict:
     _check_kill_switch()
-    _check_daily_budget_eur()
+    _check_daily_budget_eur(byok=bool(x_linkup_key))
     domain = _normalize_domain(req.url)
     if not domain:
         raise HTTPException(status_code=422, detail="Invalid URL")
@@ -231,7 +262,7 @@ async def analyze(request: Request, req: AnalyzeRequest, _auth: None = Depends(v
     t0 = time.monotonic()
 
     try:
-        linkup: LinkupClient = app.state.linkup
+        linkup = _resolve_linkup(x_linkup_key)
 
         async with app.state.pipeline_sem:
             company_profile = await understand.run(domain, linkup, run_id, claude=app.state.claude)
@@ -239,7 +270,7 @@ async def analyze(request: Request, req: AnalyzeRequest, _auth: None = Depends(v
             candidates, discover_sources, discover_threat_scores = await discover.run(company_profile, linkup)
             competitor_dicts = _candidates_to_enrich_dicts(candidates)
 
-            competitor_profiles = await enrich.run(competitor_dicts, linkup, run_id)
+            competitor_profiles = await enrich.run(competitor_dicts, linkup, run_id, byok=linkup.byok)
 
             radar_scores = synthesize.run(company_profile, competitor_profiles)
 
@@ -276,10 +307,15 @@ async def analyze(request: Request, req: AnalyzeRequest, _auth: None = Depends(v
 
 @app.post("/scan")
 @limiter.limit("3/minute")
-async def scan(request: Request, req: AnalyzeRequest, _auth: None = Depends(verify_token)) -> dict:
+async def scan(
+    request: Request,
+    req: AnalyzeRequest,
+    x_linkup_key: str | None = Header(default=None, alias="X-Linkup-Key"),
+    _auth: None = Depends(verify_token),
+) -> dict:
     """Like /analyze but returns RadarOutput (camelCase, frontend-ready)."""
     _check_kill_switch()
-    _check_daily_budget_eur()
+    _check_daily_budget_eur(byok=bool(x_linkup_key))
     domain = _normalize_domain(req.url)
     if not domain:
         raise HTTPException(status_code=422, detail="Invalid URL")
@@ -295,14 +331,14 @@ async def scan(request: Request, req: AnalyzeRequest, _auth: None = Depends(veri
     t0 = time.monotonic()
 
     try:
-        linkup: LinkupClient = app.state.linkup
+        linkup = _resolve_linkup(x_linkup_key)
 
         async with app.state.pipeline_sem:
             async with _capture_scan_cost(linkup, run_id, "full_scan"):
                 company_profile = await understand.run(domain, linkup, run_id, claude=app.state.claude)
                 candidates, discover_sources, discover_threat_scores = await discover.run(company_profile, linkup)
                 competitor_dicts = _candidates_to_enrich_dicts(candidates)
-                competitor_profiles = await enrich.run(competitor_dicts, linkup, run_id)
+                competitor_profiles = await enrich.run(competitor_dicts, linkup, run_id, byok=linkup.byok)
                 radar_scores = synthesize.run(company_profile, competitor_profiles)
 
         run = PipelineRun(
@@ -331,10 +367,15 @@ async def scan(request: Request, req: AnalyzeRequest, _auth: None = Depends(veri
 
 @app.post("/scan/stream")
 @limiter.limit("3/minute")
-async def scan_stream(request: Request, req: AnalyzeRequest, _auth: None = Depends(verify_token)) -> StreamingResponse:
+async def scan_stream(
+    request: Request,
+    req: AnalyzeRequest,
+    x_linkup_key: str | None = Header(default=None, alias="X-Linkup-Key"),
+    _auth: None = Depends(verify_token),
+) -> StreamingResponse:
     """SSE endpoint — emits fine-grained progress events then final result."""
     _check_kill_switch()
-    _check_daily_budget_eur()
+    _check_daily_budget_eur(byok=bool(x_linkup_key))
     domain = _normalize_domain(req.url)
     if not domain:
         raise HTTPException(status_code=422, detail="Invalid URL")
@@ -361,7 +402,7 @@ async def scan_stream(request: Request, req: AnalyzeRequest, _auth: None = Depen
             created_at = datetime.now(timezone.utc).isoformat()
             t0 = time.monotonic()
             try:
-                linkup: LinkupClient = app.state.linkup
+                linkup = _resolve_linkup(x_linkup_key)
                 async with app.state.pipeline_sem:
                     async with _capture_scan_cost(linkup, run_id, "full_scan_stream"):
                         await queue.put({"phase": "UNDERSTAND", "status": "start"})
@@ -374,7 +415,7 @@ async def scan_stream(request: Request, req: AnalyzeRequest, _auth: None = Depen
                         await queue.put({"phase": "DISCOVER", "status": "ok", "count": len(candidates)})
 
                         await queue.put({"phase": "ENRICH", "status": "start"})
-                        competitor_profiles = await enrich.run(competitor_dicts, linkup, run_id, event_cb=emit)
+                        competitor_profiles = await enrich.run(competitor_dicts, linkup, run_id, event_cb=emit, byok=linkup.byok)
                         await queue.put({"phase": "ENRICH", "status": "ok", "count": len(competitor_profiles)})
 
                         await queue.put({"phase": "SYNTHESIZE", "status": "start"})
@@ -440,14 +481,19 @@ async def scan_stream(request: Request, req: AnalyzeRequest, _auth: None = Depen
 
 @app.post("/scan/discover")
 @limiter.limit("3/minute")
-async def scan_discover(request: Request, req: AnalyzeRequest, _auth: None = Depends(verify_token)) -> dict:
+async def scan_discover(
+    request: Request,
+    req: AnalyzeRequest,
+    x_linkup_key: str | None = Header(default=None, alias="X-Linkup-Key"),
+    _auth: None = Depends(verify_token),
+) -> dict:
     """Phase 1+2: UNDERSTAND + DISCOVER only. Returns lightweight candidate list.
 
     Response cached by run_id for 2h so /scan/enrich can resume without re-running.
     Client can supply run_id for refresh recovery via /scan/status/{run_id}.
     """
     _check_kill_switch()
-    _check_daily_budget_eur()
+    _check_daily_budget_eur(byok=bool(x_linkup_key))
     domain = _normalize_domain(req.url)
     if not domain:
         raise HTTPException(status_code=422, detail="Invalid URL")
@@ -462,7 +508,7 @@ async def scan_discover(request: Request, req: AnalyzeRequest, _auth: None = Dep
     })
 
     try:
-        linkup: LinkupClient = app.state.linkup
+        linkup = _resolve_linkup(x_linkup_key)
 
         async with app.state.pipeline_sem:
             async with _capture_scan_cost(linkup, run_id, "discover_only"):
@@ -513,14 +559,19 @@ async def scan_discover(request: Request, req: AnalyzeRequest, _auth: None = Dep
 
 @app.post("/scan/enrich")
 @limiter.limit("3/minute")
-async def scan_enrich_stream(request: Request, req: EnrichRequest, _auth: None = Depends(verify_token)) -> StreamingResponse:
+async def scan_enrich_stream(
+    request: Request,
+    req: EnrichRequest,
+    x_linkup_key: str | None = Header(default=None, alias="X-Linkup-Key"),
+    _auth: None = Depends(verify_token),
+) -> StreamingResponse:
     """Phase 3+4: ENRICH + SYNTHESIZE on VC-selected candidates. SSE stream → RadarOutput.
 
     Requires a valid run_id from a prior /scan/discover call (2h TTL).
     'selected' is a list of bare domains to enrich, e.g. ["notion.so", "coda.io"].
     """
     _check_kill_switch()
-    _check_daily_budget_eur()
+    _check_daily_budget_eur(byok=bool(x_linkup_key))
     _validate_run_id(req.run_id)
 
     cached_discover = cache_get_discover(req.run_id)
@@ -579,7 +630,7 @@ async def scan_enrich_stream(request: Request, req: EnrichRequest, _auth: None =
 
             competitor_dicts = _candidates_to_enrich_dicts(selected_candidates)
 
-            linkup: LinkupClient = app.state.linkup
+            linkup = _resolve_linkup(x_linkup_key)
 
             async with app.state.pipeline_sem:
                 async with _capture_scan_cost(linkup, run_id, "enrich_only"):
@@ -588,7 +639,7 @@ async def scan_enrich_stream(request: Request, req: EnrichRequest, _auth: None =
                         "status": "start", "startedAt": created_at,
                     })
                     await queue.put({"phase": "ENRICH", "status": "start"})
-                    competitor_profiles = await enrich.run(competitor_dicts, linkup, run_id, event_cb=emit)
+                    competitor_profiles = await enrich.run(competitor_dicts, linkup, run_id, event_cb=emit, byok=linkup.byok)
                     cache_set_progress(run_id, {
                         "runId": run_id, "domain": company_profile.domain, "phase": "ENRICH",
                         "status": "ok", "startedAt": created_at, "count": len(competitor_profiles),

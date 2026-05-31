@@ -12,7 +12,6 @@ Architecture v2 — "Fetch First":
 Total: ~€0.082/scan
 """
 import asyncio
-import json
 import logging
 import time
 from datetime import datetime, timezone

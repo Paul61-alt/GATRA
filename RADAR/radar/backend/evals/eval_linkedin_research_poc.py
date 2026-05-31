@@ -191,7 +191,7 @@ async def _research_one(linkup: LinkupClient, company: dict, event_log: list) ->
 
 
 async def main() -> int:
-    print(f"\n=== POC Lane 3 LinkedIn — /research depth=S per company ===")
+    print("\n=== POC Lane 3 LinkedIn — /research depth=S per company ===")
     print(f"Companies ({len(COMPETITORS)}):")
     for c in COMPETITORS:
         print(f"  - {c['name']} ({c['website']})")
@@ -244,7 +244,7 @@ async def main() -> int:
             items.append(data)
 
     # ── Apply filter ──────────────────────────────────────────────────────────
-    print(f"\n=== Post-parsing filter ===\n")
+    print("\n=== Post-parsing filter ===\n")
     for it in items:
         name = it.get("name", "?")
         raw_people = it.get("key_people") or []
@@ -263,7 +263,7 @@ async def main() -> int:
                 print(f"     - {tag} (linkedin={p.get('linkedin')!r})")
 
     # ── Side-by-side comparison ───────────────────────────────────────────────
-    print(f"\n=== Per-company summary ===\n")
+    print("\n=== Per-company summary ===\n")
     for it in items:
         n = it.get("name", "?")
         url = it.get("linkedin_url")
@@ -283,7 +283,7 @@ async def main() -> int:
         print()
 
     # ── Assertions ────────────────────────────────────────────────────────────
-    print(f"=== Assertions ===\n")
+    print("=== Assertions ===\n")
     failures: list[str] = []
 
     if len(items) != len(COMPETITORS):
@@ -295,7 +295,7 @@ async def main() -> int:
     if li_url_count < len(items):
         failures.append(f"linkedin_url missing: {[it.get('name') for it in items if not it.get('linkedin_url')]}")
 
-    print(f"[C] real employees post-filter (≥ 2 ideal):")
+    print("[C] real employees post-filter (≥ 2 ideal):")
     for it in items:
         n = it.get("name", "?")
         k = len(it.get("key_people") or [])
