@@ -6,6 +6,7 @@ import re
 import time
 from contextlib import asynccontextmanager
 from datetime import datetime, timezone
+from typing import Optional
 from uuid import uuid4
 
 from dotenv import load_dotenv
@@ -26,6 +27,7 @@ logging.basicConfig(level=logging.INFO, format="%(levelname)s %(name)s %(message
 logger = logging.getLogger(__name__)
 
 from clients import ClaudeClient, LinkupClient
+from clients.linkup_client import record_scan_delta
 from models import PipelineRun, PipelineStatus
 from models.competitor import DiscoverCandidate, DiscoverResult
 from pipeline import discover, enrich, synthesize, understand
@@ -37,6 +39,8 @@ from utils import (
     cache_set_discover,
     cache_get_progress,
     cache_set_progress,
+    cache_get_latest,
+    cache_list_all,
     normalize_domain as _norm_domain_util,
 )
 
@@ -111,6 +115,37 @@ def _normalize_domain(url: str) -> str:
         url = "https://" + url
     parsed = urlparse(url)
     return parsed.netloc.lstrip("www.").rstrip("/") or parsed.path.lstrip("www.").rstrip("/")
+
+
+@asynccontextmanager
+async def _capture_scan_cost(linkup: LinkupClient, scan_id: str, phase: str):
+    """Bracket a scan with GET /v1/credits/balance before/after to record true USD cost.
+
+    Ground-truth cost recorded to cache/linkup_usage.jsonl + Supabase as endpoint=scan_delta.
+    Independent of the per-call cost_eur estimates already logged by _record_call.
+
+    Caveat: the delta reflects ACCOUNT-level spend during the bracketed window, not
+    scan-level isolated spend. Any other consumer of the same Linkup API key (parallel
+    scans gated by RADAR_MAX_CONCURRENT, other dev machines, prod) will pollute the
+    measurement. For audit-grade precision, set RADAR_MAX_CONCURRENT=1 and avoid
+    sharing the API key during the audit window.
+    """
+    balance_before = await linkup.balance()
+    t0 = time.monotonic()
+    try:
+        yield
+    finally:
+        balance_after = await linkup.balance()
+        try:
+            record_scan_delta(
+                scan_id=scan_id,
+                phase=phase,
+                balance_before_usd=balance_before,
+                balance_after_usd=balance_after,
+                duration_s=time.monotonic() - t0,
+            )
+        except Exception as e:
+            logger.warning("scan delta record failed run_id=%s phase=%s error=%s", scan_id, phase, e)
 
 
 def _candidates_to_enrich_dicts(candidates: list[DiscoverCandidate]) -> list[dict]:
@@ -219,11 +254,12 @@ async def scan(request: Request, req: AnalyzeRequest) -> dict:
         linkup: LinkupClient = app.state.linkup
 
         async with app.state.pipeline_sem:
-            company_profile = await understand.run(domain, linkup, run_id, claude=app.state.claude)
-            candidates, discover_sources, discover_threat_scores = await discover.run(company_profile, linkup)
-            competitor_dicts = _candidates_to_enrich_dicts(candidates)
-            competitor_profiles = await enrich.run(competitor_dicts, linkup, run_id)
-            radar_scores = synthesize.run(company_profile, competitor_profiles)
+            async with _capture_scan_cost(linkup, run_id, "full_scan"):
+                company_profile = await understand.run(domain, linkup, run_id, claude=app.state.claude)
+                candidates, discover_sources, discover_threat_scores = await discover.run(company_profile, linkup)
+                competitor_dicts = _candidates_to_enrich_dicts(candidates)
+                competitor_profiles = await enrich.run(competitor_dicts, linkup, run_id)
+                radar_scores = synthesize.run(company_profile, competitor_profiles)
 
         run = PipelineRun(
             id=run_id,
@@ -282,22 +318,23 @@ async def scan_stream(request: Request, req: AnalyzeRequest) -> StreamingRespons
             try:
                 linkup: LinkupClient = app.state.linkup
                 async with app.state.pipeline_sem:
-                    await queue.put({"phase": "UNDERSTAND", "status": "start"})
-                    company_profile = await understand.run(domain, linkup, run_id, claude=app.state.claude, event_cb=emit)
-                    await queue.put({"phase": "UNDERSTAND", "status": "ok", "name": company_profile.name})
+                    async with _capture_scan_cost(linkup, run_id, "full_scan_stream"):
+                        await queue.put({"phase": "UNDERSTAND", "status": "start"})
+                        company_profile = await understand.run(domain, linkup, run_id, claude=app.state.claude, event_cb=emit)
+                        await queue.put({"phase": "UNDERSTAND", "status": "ok", "name": company_profile.name})
 
-                    await queue.put({"phase": "DISCOVER", "status": "start"})
-                    candidates, discover_sources, _ = await discover.run(company_profile, linkup, event_cb=emit)
-                    competitor_dicts = _candidates_to_enrich_dicts(candidates)
-                    await queue.put({"phase": "DISCOVER", "status": "ok", "count": len(candidates)})
+                        await queue.put({"phase": "DISCOVER", "status": "start"})
+                        candidates, discover_sources, _ = await discover.run(company_profile, linkup, event_cb=emit)
+                        competitor_dicts = _candidates_to_enrich_dicts(candidates)
+                        await queue.put({"phase": "DISCOVER", "status": "ok", "count": len(candidates)})
 
-                    await queue.put({"phase": "ENRICH", "status": "start"})
-                    competitor_profiles = await enrich.run(competitor_dicts, linkup, run_id, event_cb=emit)
-                    await queue.put({"phase": "ENRICH", "status": "ok", "count": len(competitor_profiles)})
+                        await queue.put({"phase": "ENRICH", "status": "start"})
+                        competitor_profiles = await enrich.run(competitor_dicts, linkup, run_id, event_cb=emit)
+                        await queue.put({"phase": "ENRICH", "status": "ok", "count": len(competitor_profiles)})
 
-                    await queue.put({"phase": "SYNTHESIZE", "status": "start"})
-                    radar_scores = synthesize.run(company_profile, competitor_profiles)
-                    await queue.put({"phase": "SYNTHESIZE", "status": "ok", "count": len(radar_scores)})
+                        await queue.put({"phase": "SYNTHESIZE", "status": "start"})
+                        radar_scores = synthesize.run(company_profile, competitor_profiles)
+                        await queue.put({"phase": "SYNTHESIZE", "status": "ok", "count": len(radar_scores)})
 
                 run = PipelineRun(
                     id=run_id,
@@ -382,12 +419,13 @@ async def scan_discover(request: Request, req: AnalyzeRequest) -> dict:
         linkup: LinkupClient = app.state.linkup
 
         async with app.state.pipeline_sem:
-            company_profile = await understand.run(domain, linkup, run_id, claude=app.state.claude)
-            cache_set_progress(run_id, {
-                "runId": run_id, "domain": domain, "phase": "DISCOVER", "status": "start",
-                "startedAt": created_at,
-            })
-            candidates, discover_sources, _ = await discover.run(company_profile, linkup)
+            async with _capture_scan_cost(linkup, run_id, "discover_only"):
+                company_profile = await understand.run(domain, linkup, run_id, claude=app.state.claude)
+                cache_set_progress(run_id, {
+                    "runId": run_id, "domain": domain, "phase": "DISCOVER", "status": "start",
+                    "startedAt": created_at,
+                })
+                candidates, discover_sources, _ = await discover.run(company_profile, linkup)
 
         # Persist intermediate state so /scan/enrich can resume with selected subset
         run_id = company_profile.pipeline_run_id  # propagated UUID
@@ -497,25 +535,26 @@ async def scan_enrich_stream(request: Request, req: EnrichRequest) -> StreamingR
             linkup: LinkupClient = app.state.linkup
 
             async with app.state.pipeline_sem:
-                cache_set_progress(run_id, {
-                    "runId": run_id, "domain": company_profile.domain, "phase": "ENRICH",
-                    "status": "start", "startedAt": created_at,
-                })
-                await queue.put({"phase": "ENRICH", "status": "start"})
-                competitor_profiles = await enrich.run(competitor_dicts, linkup, run_id, event_cb=emit)
-                cache_set_progress(run_id, {
-                    "runId": run_id, "domain": company_profile.domain, "phase": "ENRICH",
-                    "status": "ok", "startedAt": created_at, "count": len(competitor_profiles),
-                })
-                await queue.put({"phase": "ENRICH", "status": "ok", "count": len(competitor_profiles)})
+                async with _capture_scan_cost(linkup, run_id, "enrich_only"):
+                    cache_set_progress(run_id, {
+                        "runId": run_id, "domain": company_profile.domain, "phase": "ENRICH",
+                        "status": "start", "startedAt": created_at,
+                    })
+                    await queue.put({"phase": "ENRICH", "status": "start"})
+                    competitor_profiles = await enrich.run(competitor_dicts, linkup, run_id, event_cb=emit)
+                    cache_set_progress(run_id, {
+                        "runId": run_id, "domain": company_profile.domain, "phase": "ENRICH",
+                        "status": "ok", "startedAt": created_at, "count": len(competitor_profiles),
+                    })
+                    await queue.put({"phase": "ENRICH", "status": "ok", "count": len(competitor_profiles)})
 
-                cache_set_progress(run_id, {
-                    "runId": run_id, "domain": company_profile.domain, "phase": "SYNTHESIZE",
-                    "status": "start", "startedAt": created_at,
-                })
-                await queue.put({"phase": "SYNTHESIZE", "status": "start"})
-                radar_scores = synthesize.run(company_profile, competitor_profiles)
-                await queue.put({"phase": "SYNTHESIZE", "status": "ok", "count": len(radar_scores)})
+                    cache_set_progress(run_id, {
+                        "runId": run_id, "domain": company_profile.domain, "phase": "SYNTHESIZE",
+                        "status": "start", "startedAt": created_at,
+                    })
+                    await queue.put({"phase": "SYNTHESIZE", "status": "start"})
+                    radar_scores = synthesize.run(company_profile, competitor_profiles)
+                    await queue.put({"phase": "SYNTHESIZE", "status": "ok", "count": len(radar_scores)})
 
             run = PipelineRun(
                 id=run_id,
@@ -603,6 +642,56 @@ async def scan_status(request: Request, run_id: str) -> dict:
         )
     progress["running"] = run_id in app.state.enrich_jobs
     return progress
+
+
+def _status_from_iso(iso: Optional[str]) -> str:
+    """Derive Fresh/Stale/Archived from a scannedAt ISO timestamp.
+
+    <7d → fresh, <30d → stale, otherwise → archived. Bad input → archived.
+    """
+    if not iso:
+        return "archived"
+    try:
+        ts = datetime.fromisoformat(iso.replace("Z", "+00:00"))
+    except ValueError:
+        return "archived"
+    if ts.tzinfo is None:
+        ts = ts.replace(tzinfo=timezone.utc)
+    age = datetime.now(timezone.utc) - ts
+    if age.days < 7:
+        return "fresh"
+    if age.days < 30:
+        return "stale"
+    return "archived"
+
+
+@app.get("/scans")
+@limiter.exempt
+async def list_scans(request: Request) -> list[dict]:
+    """List all known scans (dedup by domain, most recent first).
+
+    Reads Supabase first, file glob fallback. Read-only, never triggers Linkup.
+    """
+    items = cache_list_all()
+    for it in items:
+        it["status"] = _status_from_iso(it.get("scannedAt"))
+    return items
+
+
+@app.get("/scans/{domain}/latest")
+@limiter.exempt
+async def get_scan_latest(request: Request, domain: str) -> dict:
+    """Return the most recent full RadarOutput for `domain`.
+
+    404 if no cached scan exists. Read-only, never triggers Linkup.
+    """
+    bare = _norm_domain_util(domain) if domain else ""
+    if not bare:
+        raise HTTPException(status_code=422, detail="Invalid domain")
+    payload = cache_get_latest(bare)
+    if not payload:
+        raise HTTPException(status_code=404, detail=f"No cached scan for domain '{bare}'.")
+    return payload
 
 
 @app.get("/health")
