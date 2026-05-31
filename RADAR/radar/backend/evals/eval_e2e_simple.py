@@ -107,7 +107,7 @@ async def main(url: str, no_cache: bool = False) -> None:
             print("⚡ --no-cache: skipping cache inject.")
             print()
             print("For animation — start backend with RADAR_MAX_ENRICH=1, then search:")
-            print(f"  RADAR_MAX_ENRICH=1 uvicorn main:app --reload")
+            print("  RADAR_MAX_ENRICH=1 uvicorn main:app --reload")
             print(f"  domain to search: {domain}")
         else:
             cache_key = f"radar_{domain}"

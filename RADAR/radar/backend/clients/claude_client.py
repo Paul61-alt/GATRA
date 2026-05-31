@@ -1,7 +1,7 @@
 import json
 import logging
 import os
-from typing import Any, Optional, Type, TypeVar
+from typing import Optional, Type, TypeVar
 
 import anthropic
 from braintrust import traced
@@ -245,54 +245,6 @@ class ClaudeClient:
             profile = profile.model_copy(update=updates)
 
         return profile
-
-    @traced
-    def discover_competitors_fallback(
-        self,
-        company_name: str,
-        company_domain: str,
-        positioning: str,
-        markets_str: str,
-        max_candidates: int = 20,
-    ) -> list[dict]:
-        """Fallback: use Claude training data to list competitors when Linkup returns nothing.
-
-        Returns list of {name, domain, tagline} dicts. Zero Linkup cost.
-        Falls back to [] on parse failure.
-        """
-        system = (
-            "You are a competitive intelligence analyst. "
-            f"Based on your training data, list up to {max_candidates} direct competitors "
-            f"of {company_name} ({company_domain}). "
-            f"Context: {positioning}. Market: {markets_str}. "
-            f"Exclude {company_name} ({company_domain}) itself. "
-            "For each competitor: name (string), domain (bare domain, no https/www), "
-            "tagline (1-sentence elevator pitch). "
-            "Return ONLY strict JSON with key 'competitors'. No prose, no markdown fences.\n"
-            '{"competitors": [{"name": "...", "domain": "...", "tagline": "..."}, ...]}'
-        )
-        user = (
-            f"List the main direct competitors of {company_name} ({company_domain}), "
-            f"a {positioning} in the {markets_str} market."
-        )
-        try:
-            result = self.extract_json(system, user, max_tokens=2048)
-            raw_list = result.get("competitors", [])
-            if not isinstance(raw_list, list):
-                return []
-            out = []
-            for item in raw_list:
-                if not isinstance(item, dict):
-                    continue
-                name = str(item.get("name", "")).strip()
-                domain = str(item.get("domain", "")).strip()
-                tagline = str(item.get("tagline", "")).strip()
-                if name and domain:
-                    out.append({"name": name, "domain": domain, "tagline": tagline})
-            return out[:max_candidates]
-        except Exception as e:
-            logger.warning("discover_competitors_fallback failed error=%s", e)
-            return []
 
     @traced
     def extract_discover_candidates(

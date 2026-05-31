@@ -372,8 +372,8 @@ async def main() -> int:
         print(f"  - {c['name']} ({c['website']})")
     print(f"\nExpected cost: {len(COMPETITORS)} × €{RESEARCH_COST_EUR:.2f} = "
           f"€{len(COMPETITORS) * RESEARCH_COST_EUR:.2f}")
-    print(f"\nLaunching… live progress will appear below. "
-          f"Watch evals/eval_enrich_4comp_result.json grow as jobs complete.\n")
+    print("\nLaunching… live progress will appear below. "
+          "Watch evals/eval_enrich_4comp_result.json grow as jobs complete.\n")
 
     out_path = Path(__file__).resolve().parent / "eval_enrich_4comp_result.json"
     tracker = LinkupTracker(
@@ -405,7 +405,7 @@ async def main() -> int:
     print(f"  Failed:    {summary['failed']}")
     print(f"  Cost:      ~€{summary['cost_eur_estimated']:.2f}")
     print(f"\nResult file: {out_path}")
-    print(f"\nField coverage per competitor:")
+    print("\nField coverage per competitor:")
     for r in results:
         name = r["company"]["name"]
         payload = r.get("payload") or {}
