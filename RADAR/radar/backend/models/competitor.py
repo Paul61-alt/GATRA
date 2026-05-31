@@ -1,9 +1,18 @@
-from typing import List, Optional
+from typing import List, Literal, Optional
 from pydantic import BaseModel, ConfigDict, field_validator
 from pydantic.alias_generators import to_camel
 from urllib.parse import urlparse
 
-from models.company import AcquisitionInfo, CustomerExample, DataPoint, HQ, PricingTier
+from models.company import (
+    AcquisitionInfo,
+    CustomerExample,
+    DataPoint,
+    Funding,
+    HQ,
+    Investor,
+    KeyPerson,
+    PricingTier,
+)
 
 
 # ── DISCOVER phase models ──────────────────────────────────────────────────────
@@ -51,6 +60,8 @@ class DiscoverResult(_CamelDiscoverModel):
 class PricingSignal(BaseModel):
     tiers: List[PricingTier] = []
     free_plan: Optional[bool] = None
+    mention: Optional[str] = None              # UI tagline straight from the LLM
+    starts_at_usd: Optional[float] = None      # lowest paid tier; None = sales-gated
     recent_changes: Optional[str] = None
     source_url: Optional[str] = None
     extracted_at: str
@@ -70,6 +81,18 @@ class RecentSignal(BaseModel):
     type: Optional[str] = None  # funding | product | hiring | partnership | press
 
 
+class Feature(BaseModel):
+    """One axis of the features matrix, shared across all competitors of a run."""
+    label: str
+    group: Optional[str] = None  # e.g. "Core", "Pricing", "Integrations"
+
+
+class CapabilityCell(BaseModel):
+    """A competitor's coverage on one Feature axis."""
+    feature: str  # matches Feature.label
+    value: Literal["full", "part", "none", "soon"]
+
+
 class CompetitorProfile(BaseModel):
     # ── Core identity ─────────────────────────────────────────────
     name: str
@@ -83,11 +106,20 @@ class CompetitorProfile(BaseModel):
     last_round_amount_usd: Optional[int] = None
     last_round_date: Optional[str] = None
     last_round_type: Optional[str] = None
-    key_investors: List[str] = []
+    key_investors: List[str] = []                   # kept for legacy mode compat (string list)
+    notable_investors: List[Investor] = []          # NEW: structured investors with optional domains
+    funding: Optional[Funding] = None               # NEW: multi-round history for Timeline tab
     acquisition: Optional[AcquisitionInfo] = None
 
     # ── Team & size ───────────────────────────────────────────────
     employee_count: Optional[DataPoint] = None
+    employee_growth_yoy: Optional[float] = None     # NEW: fraction (0.12 = +12%)
+    key_people: List[KeyPerson] = []                # NEW: name/role/background/linkedin
+
+    # ── Traction ──────────────────────────────────────────────────
+    arr_usd: Optional[DataPoint] = None             # NEW
+    customer_count: Optional[DataPoint] = None      # NEW
+    avg_contract_usd: Optional[float] = None        # NEW
 
     # ── Positioning ───────────────────────────────────────────────
     one_liner: Optional[str] = None
@@ -97,8 +129,18 @@ class CompetitorProfile(BaseModel):
     notable_customers: List[CustomerExample] = []
     weaknesses: List[str] = []
 
+    # ── GTM dimensions (NEW) ──────────────────────────────────────
+    business_model: Optional[DataPoint] = None      # B2B / B2C / B2B2C / Marketplace / API
+    gtm_motion: Optional[DataPoint] = None          # sales-led / product-led / marketing-led / community-led
+    pricing_model_kind: Optional[DataPoint] = None  # Freemium / Subscription / Usage / Enterprise / Hybrid
+    geo_coverage: Optional[str] = None              # Local / National / Regional / Global
+
     # ── Pricing ───────────────────────────────────────────────────
     pricing: Optional[PricingSignal] = None
+
+    # ── Features matrix (NEW, Lane 5) ─────────────────────────────
+    features: List[Feature] = []                    # ⚠ same axes across cohort (run-level)
+    capabilities: List[CapabilityCell] = []         # this competitor's coverage per feature
 
     # ── Signals ───────────────────────────────────────────────────
     recent_signals: List[str] = []                  # kept for compat with transform.py (List[str])
@@ -114,4 +156,4 @@ class CompetitorProfile(BaseModel):
 
     # ── Meta ──────────────────────────────────────────────────────
     pipeline_run_id: str
-    analysis_version: str = "4.0"
+    analysis_version: str = "5.0"  # bumped: 5-lanes architecture

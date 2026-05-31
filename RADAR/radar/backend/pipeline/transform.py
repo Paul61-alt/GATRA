@@ -1,7 +1,9 @@
 """Maps PipelineRun → RadarOutput for data.js generation.
 
-Fields that require a future synthesize phase (similarity, threat, features matrix,
-radar scores, arr, customers, avg_contract) are filled with neutral placeholders.
+Fields that require a future synthesize phase (features matrix, radar scores)
+are filled with neutral placeholders. Similarity and threat are derived from
+heuristics. All Positioning-chart fields (arr, funding_rounds, acquisition,
+notable_*) are mapped symmetrically for subject and competitors.
 """
 from __future__ import annotations
 
@@ -13,12 +15,18 @@ from models.company import CompanyProfile, FundingRound, HQ
 from models.competitor import CompetitorProfile
 from models.pipeline import PipelineRun
 from models.radar_output import (
+    AcquisitionOut,
     Company,
+    ConfidencedValue,
     Feature,
     FundingEvent,
     FundingInfo,
+    FundingRoundOut,
+    FundingStatus,
     KeyPerson,
+    MarketOut,
     NamedEntity,
+    NewsItemOut,
     PricingSummary,
     PricingTier,
     RadarConfig,
@@ -150,6 +158,99 @@ def _coerce_float(raw) -> float | None:
         return None
 
 
+def _derive_funding_status(profile) -> FundingStatus:
+    """F2: classify funding posture so the frontend can render distinct empty-states.
+    LLM-explicit only — no founded_year heuristic (per F2 plan decision)."""
+    if profile is None:
+        return "pending"
+    stage_raw = getattr(profile, "funding_stage", None)
+    stage_val = ""
+    if stage_raw is not None:
+        sv = stage_raw.value if hasattr(stage_raw, "value") else stage_raw
+        stage_val = (sv or "").strip().lower()
+    if stage_val in ("bootstrapped", "self-funded"):
+        return "bootstrapped"
+    if stage_val == "stealth":
+        return "stealth"
+    f = getattr(profile, "funding", None)
+    has_money = bool(
+        (f and (f.rounds or f.total_raised_eur))
+        or getattr(profile, "funding_total_usd", None)
+        or getattr(profile, "last_round_type", None)
+    )
+    return "enriched" if has_money else "not_found"
+
+
+def _build_funding_info(profile) -> FundingInfo:
+    """F2: always return a FundingInfo (never None) so the frontend can branch on status.
+    Backwards-compat fields (total / last_round / last_round_at) kept populated."""
+    status = _derive_funding_status(profile)
+    total_eur = 0.0
+    last_round = ""
+    last_round_at = ""
+    rounds_out: list[FundingRoundOut] = []
+    source_url = None
+    evidence = None
+    extracted_at = None
+    confidence = "low"
+
+    f = getattr(profile, "funding", None) if profile is not None else None
+    if f:
+        if f.total_raised_eur:
+            total_eur = float(_coerce_float(f.total_raised_eur.value) or 0.0)
+            source_url = f.total_raised_eur.source_url
+            evidence = f.total_raised_eur.evidence
+            extracted_at = f.total_raised_eur.extracted_at
+            confidence = f.total_raised_eur.confidence or "low"
+        last_round = f.last_round or getattr(profile, "last_round_type", None) or ""
+        last_round_at = f.last_round_date or getattr(profile, "last_round_date", None) or ""
+        for r in (f.rounds or []):
+            rounds_out.append(FundingRoundOut(
+                round=r.round,
+                amount_eur=float(r.amount_eur) if r.amount_eur is not None else None,
+                date=r.date,
+                lead=r.lead,
+            ))
+    elif profile is not None and (getattr(profile, "funding_total_usd", None) or getattr(profile, "last_round_type", None)):
+        # Competitor fallback: USD → EUR (rough)
+        total_eur = float(getattr(profile, "funding_total_usd", None) or 0) * 0.92
+        last_round = getattr(profile, "last_round_type", None) or ""
+        last_round_at = getattr(profile, "last_round_date", None) or ""
+
+    # Derive last_round_amount_eur: prefer most recent dated round, fall back to USD field
+    last_round_amount_eur: Optional[float] = None
+    dated_rounds = [r for r in rounds_out if r.amount_eur is not None and r.date]
+    if dated_rounds:
+        latest = max(dated_rounds, key=lambda r: r.date or "")
+        last_round_amount_eur = latest.amount_eur
+    elif profile is not None and getattr(profile, "last_round_amount_usd", None):
+        last_round_amount_eur = float(profile.last_round_amount_usd) * 0.92
+
+    # Backwards-compat fallback labels
+    if not last_round:
+        last_round = {
+            "bootstrapped": "Bootstrapped",
+            "stealth": "Stealth",
+            "pending": "Pending",
+            "not_found": "Unknown",
+        }.get(status, "Unknown")
+
+    return FundingInfo(
+        total=total_eur,
+        last_round=last_round,
+        last_round_at=last_round_at,
+        status=status,
+        rounds=rounds_out,
+        total_raised_eur=total_eur if total_eur > 0 else None,
+        last_round_amount_eur=last_round_amount_eur,
+        last_round_date=last_round_at or None,
+        confidence=confidence,
+        source_url=source_url,
+        evidence=evidence,
+        extracted_at=extracted_at,
+    )
+
+
 def _map_subject(profile: CompanyProfile) -> Company:
     hq_str = _format_hq(profile.hq)
     hq_coords: tuple[float, float] = (
@@ -163,15 +264,57 @@ def _map_subject(profile: CompanyProfile) -> Company:
         profile.markets[0].label if profile.markets else "Technology",
     )
 
-    funding_info = None
-    if profile.funding:
-        f = profile.funding
-        total = (_coerce_float(f.total_raised_eur.value) or 0.0) if f.total_raised_eur else 0.0
-        funding_info = FundingInfo(
-            total=total,
-            last_round=f.last_round or "Unknown",
-            last_round_at=f.last_round_date or "",
+    funding_info = _build_funding_info(profile)
+
+    # ARR (USD → EUR) for subject
+    arr_eur: float | None = None
+    if profile.arr_usd:
+        arr_usd_val = _parse_money_usd(profile.arr_usd.value)
+        arr_eur = arr_usd_val * 0.92 if arr_usd_val is not None else None
+
+    # V2 Overview field mapping — additive plumbing for the redesigned screen
+    key_diff = None
+    if profile.key_differentiator:
+        kd = profile.key_differentiator
+        key_diff = ConfidencedValue(
+            value=str(kd.value) if kd.value is not None else None,
+            confidence=kd.confidence,
+            source_url=kd.source_url,
+            evidence=kd.evidence,
+            extracted_at=kd.extracted_at,
         )
+
+    funding_rounds_out = []
+    if profile.funding and profile.funding.rounds:
+        for r in profile.funding.rounds:
+            funding_rounds_out.append(FundingRoundOut(
+                round=r.round,
+                amount_eur=float(r.amount_eur) if r.amount_eur is not None else None,
+                date=r.date,
+                lead=r.lead,
+            ))
+
+    news_out = [
+        NewsItemOut(date=n.date, headline=n.headline, source_url=n.source_url)
+        for n in (profile.recent_news or [])
+        if n.headline
+    ]
+
+    acquisition_out = None
+    if profile.acquisition:
+        a = profile.acquisition
+        acquisition_out = AcquisitionOut(
+            acquired=a.acquired,
+            acquirer=a.acquirer,
+            amount_eur=float(a.amount_eur) if a.amount_eur is not None else None,
+            year=a.year,
+            source_url=a.source_url,
+        )
+
+    markets_out = [
+        MarketOut(id=m.id, label=m.label, primary=m.primary)
+        for m in (profile.markets or [])
+    ]
 
     return Company(
         id=_slug(profile.name),
@@ -188,15 +331,16 @@ def _map_subject(profile: CompanyProfile) -> Company:
         employee_growth=profile.employee_growth_yoy or 0.0,
         funding=funding_info,
         investors=[inv.name for inv in profile.notable_investors] if profile.notable_investors else [],
-        pricing=PricingSummary(model="Custom", starts_at=0, mention="Contact sales"),
-        arr=_coerce_float(profile.arr_usd.value) if profile.arr_usd else None,
+        pricing=PricingSummary(model="Custom", starts_at=None, mention="Contact sales", sales_gated=True),
         customers=_coerce_int(profile.customer_count.value) if profile.customer_count else None,
+        arr=arr_eur,
         notable=profile.growth_signals[:5],
         notable_customers=[
             NamedEntity(
                 name=c.name,
                 domain=c.domain,
                 segment=c.segment,
+                industry=c.industry,
                 evidence=c.evidence,
             )
             for c in profile.notable_customers
@@ -214,7 +358,7 @@ def _map_subject(profile: CompanyProfile) -> Company:
                 linkedin=p.linkedin,
                 background=p.background,
             )
-            for p in (profile.key_people or [])[:5]
+            for p in (profile.key_people or [])
             if p.name
         ],
         is_subject=True,
@@ -223,6 +367,19 @@ def _map_subject(profile: CompanyProfile) -> Company:
         pricing_model_kind=profile.pricing_model.value if profile.pricing_model else None,
         target_segment=profile.target_segment.value if profile.target_segment else None,
         geo_coverage=profile.geo_coverage,
+        # V2 fields
+        positioning=profile.positioning,
+        key_differentiator=key_diff,
+        top_3_features=list(profile.top_3_features or []),
+        tech_stack=list(profile.tech_stack or []),
+        recent_news=news_out,
+        growth_signals=list(profile.growth_signals or []),
+        funding_rounds=funding_rounds_out,
+        funding_stage=profile.funding_stage,
+        equity_story=profile.equity_story,
+        acquisition=acquisition_out,
+        target_verticals=list(profile.target_verticals or []),
+        markets=markets_out,
     )
 
 
@@ -279,6 +436,26 @@ def _compute_similarity(subject: CompanyProfile, competitor: CompetitorProfile) 
     return round(min(1.0, 0.5 + jaccard * 4), 2)
 
 
+def _parse_money_usd(raw) -> float | None:
+    """Parse a DataPoint.value or raw number into a USD float, tolerating "$12M"/"12000000"/12000000."""
+    if raw is None:
+        return None
+    if isinstance(raw, (int, float)):
+        return float(raw)
+    s = str(raw).strip().replace(",", "").replace("$", "").replace("€", "").upper()
+    mult = 1.0
+    if s.endswith("B"):
+        mult, s = 1_000_000_000.0, s[:-1]
+    elif s.endswith("M"):
+        mult, s = 1_000_000.0, s[:-1]
+    elif s.endswith("K"):
+        mult, s = 1_000.0, s[:-1]
+    try:
+        return float(s) * mult
+    except ValueError:
+        return None
+
+
 def _map_competitor(
     profile: CompetitorProfile,
     threat_score: int = 50,
@@ -291,9 +468,72 @@ def _map_competitor(
         else (0.0, 0.0)
     )
 
-    pricing_model = "Custom"
-    if profile.funding_stage and profile.funding_stage.value:
-        pricing_model = f"{profile.funding_stage.value} stage"
+    # Funding info object — always populated (F2: status enum drives empty-state rendering)
+    funding_info = _build_funding_info(profile)
+
+    # ARR + avg contract: USD → EUR
+    arr_eur: float | None = None
+    if profile.arr_usd:
+        arr_usd_val = _parse_money_usd(profile.arr_usd.value)
+        arr_eur = arr_usd_val * 0.92 if arr_usd_val is not None else None
+    avg_contract_eur: float | None = None
+    if profile.avg_contract_usd is not None:
+        avg_contract_eur = float(profile.avg_contract_usd) * 0.92
+
+    funding_rounds_out: list[FundingRoundOut] = []
+    if profile.funding and profile.funding.rounds:
+        for r in profile.funding.rounds:
+            funding_rounds_out.append(FundingRoundOut(
+                round=r.round,
+                amount_eur=float(r.amount_eur) if r.amount_eur is not None else None,
+                date=r.date,
+                lead=r.lead,
+            ))
+
+    acquisition_out: AcquisitionOut | None = None
+    if profile.acquisition:
+        a = profile.acquisition
+        acquisition_out = AcquisitionOut(
+            acquired=a.acquired,
+            acquirer=a.acquirer,
+            amount_eur=float(a.amount_eur) if a.amount_eur is not None else None,
+            year=a.year,
+            source_url=a.source_url,
+        )
+
+    news_out: list[NewsItemOut] = []
+    for s in (profile.structured_signals or []):
+        if s.headline:
+            news_out.append(NewsItemOut(date=s.date, headline=s.headline, source_url=s.source_url))
+
+    # Pricing summary (Lane 2)
+    pricing_summary = PricingSummary(model="Custom", starts_at=None, mention="Contact sales", sales_gated=True)
+    if profile.pricing:
+        model_kind = profile.pricing_model_kind.value if profile.pricing_model_kind else "Custom"
+        # Prefer the LLM-extracted entry price; fall back to scanning tiers.
+        starts_at = profile.pricing.starts_at_usd
+        if starts_at is None:
+            for t in profile.pricing.tiers:
+                if t.price_monthly_usd is not None and t.price_monthly_usd > 0:
+                    starts_at = int(t.price_monthly_usd)
+                    break
+        # Sales-gated = no public entry price and no free plan. A known entry
+        # price (even for Enterprise-model vendors) is shown, not hidden.
+        sales_gated = (not profile.pricing.free_plan) and (
+            starts_at is None or starts_at == 0
+        )
+        # Use the LLM mention verbatim; only synthesize one when missing.
+        mention = profile.pricing.mention
+        if not mention:
+            if profile.pricing.free_plan:
+                mention = f"Free + paid from ${int(starts_at)}/mo" if starts_at else "Free plan available"
+            elif starts_at:
+                mention = f"Starts at ${int(starts_at)}/mo"
+            else:
+                mention = "Contact sales"
+        pricing_summary = PricingSummary(
+            model=model_kind, starts_at=starts_at, mention=mention, sales_gated=sales_gated
+        )
 
     return Company(
         id=_slug(profile.name),
@@ -309,10 +549,50 @@ def _map_competitor(
         employees=_employees_int(
             profile.employee_count.value if profile.employee_count else None
         ),
-        employee_growth=0.0,
-        investors=[],
-        pricing=PricingSummary(model=pricing_model, starts_at=0, mention="Contact sales"),
+        employee_growth=profile.employee_growth_yoy or 0.0,
+        funding=funding_info,
+        investors=[i.name for i in profile.notable_investors] if profile.notable_investors else [],
+        pricing=pricing_summary,
+        customers=int(profile.customer_count.value) if profile.customer_count and profile.customer_count.value else None,
         notable=profile.recent_signals[:5],
+        notable_customers=[
+            NamedEntity(
+                name=c.name,
+                domain=c.domain,
+                segment=c.segment,
+                evidence=c.evidence,
+            )
+            for c in (profile.notable_customers or [])
+            if c.name
+        ],
+        notable_investors=[
+            NamedEntity(name=i.name, domain=i.domain)
+            for i in (profile.notable_investors or [])
+            if i.name
+        ],
+        key_people=[
+            KeyPerson(
+                name=p.name,
+                role=p.role,
+                linkedin=p.linkedin,
+                background=p.background,
+            )
+            for p in (profile.key_people or [])[:5]
+            if p.name
+        ],
+        business_model=profile.business_model.value if profile.business_model else None,
+        gtm_motion=profile.gtm_motion.value if profile.gtm_motion else None,
+        pricing_model_kind=profile.pricing_model_kind.value if profile.pricing_model_kind else None,
+        target_segment=profile.target_segment,
+        geo_coverage=profile.geo_coverage,
+        # Extended fields — symmetric with _map_subject for Positioning charts
+        arr=arr_eur,
+        avg_contract=avg_contract_eur,
+        funding_rounds=funding_rounds_out,
+        funding_stage=profile.funding_stage.value if profile.funding_stage else None,
+        acquisition=acquisition_out,
+        recent_news=news_out,
+        growth_signals=list(profile.recent_signals or []),
         similarity=similarity,
         threat=_threat_from_score(threat_score),
     )
@@ -337,17 +617,42 @@ def pipeline_run_to_radar_output(run: PipelineRun) -> RadarOutput:
 
     all_ids = [subject.id] + [c.id for c in competitors]
 
-    # Funding events (subject only; competitors have no round history in current models)
+    # Funding events — subject + competitors (5-lanes Lane 1 populates competitor funding.rounds)
     funding_dict: dict[str, list[FundingEvent]] = {cid: [] for cid in all_ids}
     if run.company_profile.funding and run.company_profile.funding.rounds:
         funding_dict[subject.id] = _map_funding_events(
             run.company_profile.funding.rounds
         )
+    for c_profile, c_company in zip(run.competitors, competitors):
+        if c_profile.funding and c_profile.funding.rounds:
+            funding_dict[c_company.id] = _map_funding_events(c_profile.funding.rounds)
 
     # Map pricing tiers from enriched competitor profiles
     pricing_dict: dict[str, list[PricingTier]] = {subject.id: []}
     for c_profile, c_company in zip(run.competitors, competitors):
         pricing_dict[c_company.id] = _map_pricing_tiers(c_profile)
+
+    # Features + capabilities (Lane 5). Shared features identical across all competitors
+    # of the run — take from the first competitor that has them populated.
+    shared_features_pyd: list[Feature] = []
+    for c_profile in run.competitors:
+        if c_profile.features:
+            shared_features_pyd = [
+                Feature(group=f.group or "Core", label=f.label)
+                for f in c_profile.features
+            ]
+            break
+
+    capabilities_dict: dict[str, list[str]] = {cid: [] for cid in all_ids}
+    if shared_features_pyd:
+        feature_labels = [f.label for f in shared_features_pyd]
+        for c_profile, c_company in zip(run.competitors, competitors):
+            # Build a lookup of this competitor's capability values
+            cap_map = {cell.feature: cell.value for cell in (c_profile.capabilities or [])}
+            # For each shared feature label, get value (default "none")
+            capabilities_dict[c_company.id] = [
+                cap_map.get(label, "none") for label in feature_labels
+            ]
 
     # Radar scores: from synthesize phase if available, else neutral 50/100 fallback
     if run.radar_scores:
@@ -395,8 +700,8 @@ def pipeline_run_to_radar_output(run: PipelineRun) -> RadarOutput:
         ),
         subject=subject,
         competitors=competitors,
-        features=[],                                    # populated by synthesize phase
-        capabilities={cid: [] for cid in all_ids},     # populated by synthesize phase
+        features=shared_features_pyd,
+        capabilities=capabilities_dict,
         pricing=pricing_dict,
         funding=funding_dict,
         radar=radar,

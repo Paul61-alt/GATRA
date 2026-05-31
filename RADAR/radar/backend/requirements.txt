@@ -7,3 +7,5 @@ python-dotenv>=1.0.0
 slowapi>=0.1.9
 braintrust>=0.0.160
 autoevals>=0.0.99
+rich>=13.7.0
+supabase>=2.0.0
