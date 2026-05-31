@@ -86,6 +86,66 @@ def _coerce_str_field(v) -> str | None:
     return _strip_citation(v)
 
 
+def _price_str(annual_usd, monthly_usd) -> tuple[str, str]:
+    """(price, per) display strings in EUR. 0 → 'Free'. None/None → 'Custom'."""
+    if annual_usd is not None:
+        if annual_usd == 0:
+            return "Free", ""
+        return f"€{round(annual_usd * USD_TO_EUR):,}", "/yr"
+    if monthly_usd is not None:
+        if monthly_usd == 0:
+            return "Free", ""
+        return f"€{round(monthly_usd * USD_TO_EUR):,}", "/mo"
+    return "Custom", ""
+
+
+def _pricing_block(raw: dict) -> tuple[dict, list[dict]]:
+    """Build (per-company meta, tier list) from eval `pricing` field.
+
+    meta  → {model, starts_at, mention, salesGated} for the snapshot table.
+    tiers → [{name, price, per, features}] for the tier-breakdown cards.
+    """
+    pricing = raw.get("pricing") or {}
+    model = _strip_citation(raw.get("pricing_model_kind")) or "Custom"
+    mention = _strip_citation(pricing.get("mention")) or ""
+
+    tiers: list[dict] = []
+    entry_eur: float | None = None
+    for t in (pricing.get("tiers") or []):
+        name = _strip_citation(t.get("name")) or ""
+        annual = _to_num(t.get("price_annual_usd"))
+        monthly = _to_num(t.get("price_monthly_usd"))
+        # Enterprise/custom tiers are contact-sales — eval stores 0 or bogus
+        # numbers for them, so never show a price and exclude from entry calc.
+        is_custom = any(w in name.lower() for w in ("enterprise", "custom"))
+        if is_custom:
+            price, per = "Custom", ""
+        else:
+            price, per = _price_str(annual, monthly)
+        tiers.append({
+            "name": name,
+            "price": price,
+            "per": per,
+            "features": [_strip_citation(f) for f in (t.get("features") or []) if f],
+        })
+        if is_custom:
+            continue
+        # entry tier = lowest annual-equivalent EUR across priced tiers
+        eur = (annual * USD_TO_EUR if annual else
+               monthly * 12 * USD_TO_EUR if monthly else None)
+        if eur is not None and (entry_eur is None or eur < entry_eur):
+            entry_eur = eur
+
+    sales_gated = not any(t["price"] not in ("Custom",) for t in tiers)
+    meta = {
+        "model": model,
+        "starts_at": round(entry_eur) if entry_eur is not None else 0,
+        "mention": mention or ("Contact sales" if sales_gated else ""),
+        "salesGated": sales_gated,
+    }
+    return meta, tiers
+
+
 def _convert(raw: dict, *, is_subject: bool, similarity: float, threat: str) -> dict:
     name = raw["name"]
 
@@ -151,6 +211,8 @@ def _convert(raw: dict, *, is_subject: bool, similarity: float, threat: str) -> 
 
     funding_stage_clean = _coerce_str_field(raw.get("funding_stage"))
 
+    pricing_meta, pricing_tiers = _pricing_block(raw)
+
     return {
         "id": _slug(name),
         "name": name,
@@ -181,15 +243,18 @@ def _convert(raw: dict, *, is_subject: bool, similarity: float, threat: str) -> 
         "acquisition": acquisition,
         "recentNews": raw.get("recent_news") or [],
         "recentLinkedinPosts": [
-            {
-                "date": s.get("date"),
-                "author": s.get("author"),
-                "excerpt": (s.get("excerpt") or s.get("signal") or "").strip(),
-                "imageUrl": s.get("image_url"),
-                "sourceUrl": s.get("source_url"),
-            }
-            for s in (raw.get("recent_linkedin_signals") or [])[:5]
-            if (s.get("excerpt") or s.get("signal"))
+            post for post in (
+                {
+                    "date": s.get("date"),
+                    "author": s.get("author"),
+                    # cap 300 (frontend shows 280); strip+skip parity with transform._linkedin_posts_out
+                    "excerpt": (s.get("excerpt") or s.get("signal") or "").strip()[:300],
+                    "imageUrl": s.get("image_url"),
+                    "sourceUrl": s.get("source_url"),
+                }
+                for s in (raw.get("recent_linkedin_signals") or [])[:5]
+            )
+            if post["excerpt"]
         ],
         "growthSignals": raw.get("growth_signals") or [],
         "top3Features": raw.get("top_3_features") or [],
@@ -197,7 +262,8 @@ def _convert(raw: dict, *, is_subject: bool, similarity: float, threat: str) -> 
         "isSubject": is_subject,
         "similarity": similarity,
         "threat": threat,
-        "pricing": {"model": "Custom", "starts_at": 0, "mention": "Contact sales"},
+        "pricing": pricing_meta,
+        "_tiers": pricing_tiers,
     }
 
 
@@ -222,6 +288,11 @@ def main() -> None:
         re.DOTALL,
     )
     existing = json.loads(m.group(1)) if m else {}
+
+    # Top-level pricing keyed by real company id (consumed by PricingScreen).
+    existing["pricing"] = {
+        c["id"]: c.pop("_tiers") for c in [subject, *competitors]
+    }
 
     existing["subject"] = subject
     existing["competitors"] = competitors

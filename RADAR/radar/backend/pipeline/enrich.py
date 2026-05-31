@@ -273,7 +273,7 @@ def _parse_result(
             source_url=s.get("source_url"),
         )
         for s in data.get("recent_linkedin_signals", [])
-        if s.get("signal")
+        if s.get("signal") or s.get("excerpt")
     ]
 
     differentiators = data.get("key_differentiators", [])
@@ -1339,7 +1339,7 @@ def _merge_one_competitor(
             source_url=s.get("source_url"),
         )
         for s in (l3.get("recent_linkedin_signals") or [])
-        if isinstance(s, dict) and s.get("signal")
+        if isinstance(s, dict) and (s.get("signal") or s.get("excerpt"))
     ]
     linkedin_url = l3.get("linkedin_url")
     founder_linkedin_urls = [p.linkedin for p in key_people if p.linkedin]

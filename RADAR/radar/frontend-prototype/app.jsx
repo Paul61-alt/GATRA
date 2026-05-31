@@ -82,6 +82,7 @@ const SCAN_TABS = [
   // { key: "features",  label: "Features",    icon: "features" },  // hidden
   { key: "pricing",   label: "Pricing",     icon: "pricing" },
   { key: "timeline",  label: "Timeline",    icon: "timeline" },
+  { key: "memo",      label: "Mémo",        icon: "memo" },
 ];
 
 function App() {
@@ -97,6 +98,18 @@ function App() {
   const [scanInProgress, setScanInProgress] = _uS_app(null);
   // HITL: result of /scan/discover, fed to SelectScreen
   const [discoverResult, setDiscoverResult] = _uS_app(null);
+
+  // Skeleton staging: show full skeleton, then reveal the subject frame after a beat.
+  // Held in a ref so we can cancel a pending reveal if the scan bounces back to "new".
+  const phaseTimerRef = _uR_app(null);
+  const stageSubject = () => {
+    setLoadingPhase(0);
+    if (phaseTimerRef.current) clearTimeout(phaseTimerRef.current);
+    phaseTimerRef.current = setTimeout(() => setLoadingPhase(1), 1800);
+  };
+  const cancelStage = () => {
+    if (phaseTimerRef.current) { clearTimeout(phaseTimerRef.current); phaseTimerRef.current = null; }
+  };
 
   _uE_app(() => {
     document.documentElement.setAttribute("data-density", tweaks.density);
@@ -145,9 +158,8 @@ function App() {
       setScanInProgress({
         url: saved.url, domain: saved.domain, runId: saved.runId, startedAt: saved.startedAt,
       });
-      setLoadingPhase(0);
       setView("current");
-      setTimeout(() => setLoadingPhase(1), 1800);
+      stageSubject();
       pollScanStatus(saved.runId);
     })();
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -177,8 +189,12 @@ function App() {
     const startedAt = new Date().toISOString();
     setScanInProgress({ url, domain, runId, startedAt });
     _writeActiveScan({ runId, url, domain, phase: "DISCOVER", startedAt });
-    // Stay on the search screen during DISCOVER (its scanning UI shows progress).
-    // handleDiscoverComplete auto-flips to "current" with skeleton + runs enrich.
+    // Jump straight to the dashboard so the user can read the Understand section
+    // while DISCOVER + ENRICH fill the rest in progressively. SearchScreen stays
+    // mounted (display:none) so its DISCOVER timers/SSE keep running.
+    setActiveTab("overview");
+    setView("current");
+    if (!data) stageSubject();
   };
 
   // Auto-enrich: DISCOVER finished → pick top 10 by threat_score and trigger enrich
@@ -188,6 +204,9 @@ function App() {
     const topDomains = candidates.slice(0, Math.min(10, candidates.length)).map(c => c.domain);
 
     if (topDomains.length === 0) {
+      cancelStage();
+      setScanInProgress(null);
+      _clearActiveScan();
       setToast({ label: "No competitors found — try another URL", action: null });
       setView("new");
       return;
@@ -333,9 +352,9 @@ function App() {
 
   // Triggered when user clicks "Analyser X concurrents" — switch to skeleton view immediately
   const handleEnrichStart = (domain) => {
-    setLoadingPhase(0);
+    // Skeleton staging is owned by handleScanStart / refresh-recovery; just keep
+    // the view on "current" here so DISCOVER-complete doesn't re-flash the skeleton.
     setView("current");
-    setTimeout(() => setLoadingPhase(1), 1800);
   };
 
   // Toast: null | { label, action }
@@ -465,6 +484,7 @@ function App() {
               {activeTab === "features"  && <FeaturesScreen  data={displayData} onOpenCompany={openCompany} />}
               {activeTab === "pricing"   && <PricingScreen   data={displayData} onOpenCompany={openCompany} />}
               {activeTab === "timeline"  && <TimelineScreen  data={displayData} onOpenCompany={openCompany} />}
+              {activeTab === "memo"      && <MemoScreen      data={displayData} />}
               {openCompanyIds.map(id => (
                 activeTab === "company:" + id && (
                   <CompanyScreen key={id} data={displayData} companyId={id} onOpenCompany={openCompany} />

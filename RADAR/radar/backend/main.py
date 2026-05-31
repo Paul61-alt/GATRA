@@ -30,7 +30,8 @@ from clients import ClaudeClient, LinkupClient
 from clients.linkup_client import estimate_today_cost_eur, record_scan_delta
 from models import PipelineRun, PipelineStatus
 from models.competitor import DiscoverCandidate, DiscoverResult
-from pipeline import discover, enrich, synthesize, understand
+from models.memo import TemplateSpec
+from pipeline import discover, enrich, memo as memo_pipeline, synthesize, understand
 from pipeline.transform import pipeline_run_to_radar_output
 from utils import (
     cache_get,
@@ -124,6 +125,8 @@ _ALLOWED_ORIGINS = [
     "http://localhost:3000",
     "http://localhost:5173",
     "http://localhost:8080",
+    "http://localhost:8731",  # static frontend-prototype dev server
+    "http://127.0.0.1:8731",
     "https://frontend-prototype-opal.vercel.app",
     os.environ.get("FRONTEND_URL", ""),
 ]
@@ -666,6 +669,44 @@ async def scan_enrich_stream(request: Request, req: EnrichRequest, _auth: None =
         media_type="text/event-stream",
         headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
     )
+
+
+class MemoRequest(BaseModel):
+    model_config = ConfigDict(alias_generator=to_camel, populate_by_name=True)
+    domain: str
+    template: dict  # TemplateSpec (built-in generalist or VC custom) from the frontend
+
+
+@app.post("/scan/memo")
+@limiter.limit("6/minute")
+async def scan_memo(request: Request, req: MemoRequest, _auth: None = Depends(verify_token)) -> dict:
+    """Generate a comparative VC memo from an already-cached scan + a template.
+
+    On-demand, downstream of the pipeline. Re-reads the authoritative RadarOutput
+    from cache by domain (never trusts a client-supplied blob), feeds a closed,
+    citation-tagged payload to Claude, and returns a grounded Memo (camelCase).
+    """
+    _check_kill_switch()
+    domain = _normalize_domain(req.domain)
+    if not domain:
+        raise HTTPException(status_code=422, detail="Invalid domain")
+
+    cached = cache_get(f"radar_{domain}") or cache_get_latest(domain)
+    if not cached:
+        raise HTTPException(status_code=404, detail="No scan found for domain — run a scan first.")
+
+    try:
+        template = TemplateSpec.model_validate(req.template)
+    except Exception as e:
+        raise HTTPException(status_code=422, detail=f"Invalid template: {e}")
+
+    try:
+        memo = memo_pipeline.run(cached, template, app.state.claude)
+    except Exception as e:
+        logger.error("scan_memo=error domain=%s error=%s", domain, e, exc_info=True)
+        raise HTTPException(status_code=500, detail=str(e))
+
+    return memo.model_dump(by_alias=True, mode="json", exclude_none=True)
 
 
 @app.get("/scan/status/{run_id}")

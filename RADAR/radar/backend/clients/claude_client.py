@@ -75,6 +75,52 @@ class ClaudeClient:
         return self.complete(system, user, max_tokens=1500)
 
     @traced
+    def generate_comparative_memo(self, payload: dict, template: dict) -> dict:
+        """Generate a comparative VC investment memo (subject vs competitors).
+
+        `payload` is a CLOSED data object: the subject + competitors, each slimmed to
+        citation-bearing fields with their source_url/confidence inline. The model may
+        only cite URLs that physically appear in `payload` — there are no others.
+        `template` is a TemplateSpec dict {id, name, sections:[{id,title,instruction}]}.
+        Returns a Memo dict (camelCase) validated by the caller. Strict grounding:
+        no prior knowledge, no invented numbers, gaps marked "Non disponible".
+        """
+        section_briefs = "\n".join(
+            f'- id="{s.get("id")}" | title="{s.get("title")}" | instruction: {s.get("instruction")}'
+            for s in template.get("sections", [])
+        )
+        system = (
+            "You are a VC analyst writing a COMPARATIVE investment memo: the subject company "
+            "versus its competitive landscape. You write in the language of the data provided "
+            "(default French for UI labels like 'Non disponible').\n\n"
+            "ABSOLUTE RULES — violating any of these makes the memo worthless to an investor:\n"
+            "1. CLOSED WORLD: Use ONLY facts present in the DATA object. No prior knowledge, "
+            "no estimation, no extrapolation, no rounding of unprovided numbers.\n"
+            "2. NO INVENTED SOURCES: Every citation's `sourceUrl` MUST be copied verbatim from a "
+            "`source_url` value present in DATA. NEVER write a URL that is not in DATA. If a claim "
+            "has no source_url in DATA, omit the citation and lower the section confidence.\n"
+            "3. EXPLICIT GAPS: If DATA lacks information a section needs, write exactly "
+            "`Non disponible` for that point and set that section's `hasGaps` to true. Never guess.\n"
+            "4. NO FABRICATED NUMBERS: funding amounts, employee counts, dates, ARR, customer counts "
+            "— only those present in DATA. If absent → `Non disponible`.\n"
+            "5. CONFIDENCE INHERITANCE: set each citation's `confidence` to the `confidence` value "
+            "DATA carries for that fact (default 'medium' if none). Set each section's `confidence` "
+            "to the LOWEST confidence among its load-bearing cited claims.\n"
+            "6. Be specific, comparative and direct. Reference competitors by name. No fluff, no hedging.\n\n"
+            "OUTPUT: Return ONLY strict JSON (no prose, no markdown fences) matching exactly:\n"
+            '{"sections":[{"id":<section id>,"title":<section title>,"body":<markdown string>,'
+            '"citations":[{"claim":<string>,"sourceUrl":<string from DATA>,"confidence":<"high"|"medium"|"low">,'
+            '"company":<company name>}],"confidence":<"high"|"medium"|"low">,"hasGaps":<bool>}]}\n'
+            "Produce exactly one object per requested section, in the given order, preserving each id."
+        )
+        user = (
+            f"TEMPLATE SECTIONS (generate one memo section per line, in order):\n{section_briefs}\n\n"
+            f"DATA (the only facts you may use):\n"
+            f"{json.dumps(payload, ensure_ascii=False, indent=2, default=str)}"
+        )
+        return self.extract_json(system, user, max_tokens=8000)
+
+    @traced
     def enrich_company_profile(self, profile):
         """Post-process CompanyProfile: fill equity_story + customer segments/industry.
 

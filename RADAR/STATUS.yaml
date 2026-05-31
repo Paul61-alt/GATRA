@@ -8,7 +8,7 @@ project:
   context: "Hackathon Linkup — ship > perfect"
   demo_date: 2026-05-29          # remplir
   cut_line_date: 2026-05-25      # J-3 démo, freeze features
-  updated_at: 2026-05-19
+  updated_at: 2026-05-31
 
 # ─────────────────────────────────────────────────────────────
 # HEALTH — état global, scan rapide
@@ -47,6 +47,7 @@ components:
       last_bench_s: "17–22s sur 4 domains"
       target_s: 60
       issue: "Tail enrichment skipped → features/pricing/capabilities/funding vides. Voir G6."
+      note_2026_05_31: "Lane 3 (LinkedIn) extrait désormais excerpt (≤300c) + image_url par post, pour la carte 'Recent LinkedIn activity' du CompanyScreen. Même appel /search deep, coût inchangé. image_url quasi toujours null (validé eval round 6) → carte text-only en pratique."
     pipeline_synthesize:
       path: radar/backend/pipeline/synthesize.py
       status: "❌ Phase manquante. Scores radar hardcodés [50,50,50,50,50,50] dans transform.py:192. Voir G7."

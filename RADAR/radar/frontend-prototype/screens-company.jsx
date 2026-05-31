@@ -66,8 +66,22 @@ function LandingScreenshot({ domain }) {
   );
 }
 
+// Grapheme-safe truncation — avoids splitting emoji / flags (🇫🇷) mid-cluster.
+function _truncGraphemes(s, max) {
+  if (!s) return "";
+  let units;
+  try {
+    const seg = new Intl.Segmenter(undefined, { granularity: "grapheme" });
+    units = Array.from(seg.segment(s), x => x.segment);
+  } catch (e) {
+    units = Array.from(s); // fallback: code points (old browsers)
+  }
+  return units.length > max ? units.slice(0, max).join("").trimEnd() + "…" : s;
+}
+
 // ─── Main screen ──────────────────────────────────────────────────────────────
 function CompanyScreen({ data, companyId }) {
+  const [liShowAll, setLiShowAll] = _uS_co(false);
   let c = null;
   try {
     c = companyId === data.subject.id
@@ -84,7 +98,6 @@ function CompanyScreen({ data, companyId }) {
   );
 
   const { flag, iso } = _flag(c.hq);
-  const fundingEvents = ((data.funding || {})[c.id] || []).filter(e => e.amt > 0);
   const caps = ((data.capabilities || {})[c.id]) || [];
   const features = data.features || [];
   const fullCount = caps.filter(x => x === "full").length;
@@ -213,103 +226,65 @@ function CompanyScreen({ data, companyId }) {
         </div>
       </div>
 
-      {/* ── Funding history ── */}
-      {fundingEvents.length > 0 && (
-        <div className="card" style={{ marginBottom: 20 }}>
-          <div className="card-h">
-            <h3>Funding history</h3>
-            <span className="meta">{fmtMoney(c.funding?.total || 0)} total raised</span>
-          </div>
-          <div style={{ padding: "4px 0" }}>
-            {fundingEvents.map((ev, i) => {
-              const maxAmt = Math.max(...fundingEvents.map(e => e.amt));
-              return (
-                <div key={i} style={{
-                  display: "grid", gridTemplateColumns: "80px 100px 1fr 90px",
-                  alignItems: "center", gap: 16, padding: "10px 16px",
-                  borderBottom: i < fundingEvents.length - 1 ? "1px solid var(--border-dim)" : "none",
-                }}>
-                  <span className="mono" style={{ fontSize: 11, color: "var(--fg-3)" }}>Q{ev.q} {ev.y}</span>
-                  <span className="tag" style={{ fontSize: 10 }}>{ev.round}</span>
-                  <div style={{ height: 6, background: "var(--bg-3)", borderRadius: 3, overflow: "hidden" }}>
-                    <div style={{
-                      height: "100%", borderRadius: 3,
-                      width: Math.max(4, (ev.amt / maxAmt) * 100) + "%",
-                      background: "var(--accent)",
-                    }} />
-                  </div>
-                  <span className="mono" style={{ fontSize: 12, fontWeight: 500, textAlign: "right" }}>
-                    {ev.amt >= 1 ? fmtMoney(ev.amt * 1e6) : "undisclosed"}
-                  </span>
-                </div>
-              );
-            })}
-          </div>
-        </div>
-      )}
-
       {/* ── Recent LinkedIn activity (only if posts exist) ── */}
-      {liPosts.length > 0 && (
+      {liPosts.length > 0 && (() => {
+        const visibleLi = liShowAll ? liPosts : liPosts.slice(0, 3);
+        return (
         <div className="card" style={{ marginBottom: 20 }}>
           <div className="card-h">
             <h3>Recent LinkedIn activity</h3>
-            <span className="meta">{liPosts.length} latest post{liPosts.length > 1 ? "s" : ""}</span>
+            <span className="meta">
+              <span className="li-mono" style={{ marginRight: 6, verticalAlign: "middle" }}>in</span>
+              Last 12 months · {liPosts.length} post{liPosts.length > 1 ? "s" : ""}
+            </span>
           </div>
-          <div style={{ padding: "4px 0" }}>
-            {liPosts.map((p, i) => {
-              const text = (p.excerpt || "").trim();
-              const preview = text.length > 280 ? text.slice(0, 280).trimEnd() + "…" : text;
+          <div style={{ padding: "2px 0" }}>
+            {visibleLi.map((p, i) => {
+              // Backend caps excerpt at 300c (payload guard); we render up to 220 graphemes here.
+              const preview = _truncGraphemes((p.excerpt || "").trim(), 220);
+              let host = "";
+              try { host = new URL(p.sourceUrl).host.replace(/^www\./, ""); } catch (e) {}
               return (
                 <a
                   key={i}
+                  className="li-post"
                   href={p.sourceUrl || undefined}
                   target="_blank"
                   rel="noopener noreferrer"
-                  style={{
-                    display: "flex", gap: 14, padding: "14px 16px", textDecoration: "none",
-                    color: "inherit", alignItems: "flex-start",
-                    borderBottom: i < liPosts.length - 1 ? "1px solid var(--border-dim)" : "none",
-                    cursor: p.sourceUrl ? "pointer" : "default",
-                  }}
+                  style={{ animationDelay: (i * 60) + "ms", cursor: p.sourceUrl ? "pointer" : "default" }}
                 >
-                  {p.imageUrl && (
-                    <img
-                      src={p.imageUrl}
-                      alt=""
-                      onError={(e) => { e.currentTarget.style.display = "none"; }}
-                      style={{
-                        width: 56, height: 56, borderRadius: 8, objectFit: "cover",
-                        flexShrink: 0, background: "var(--bg-3)",
-                      }}
-                    />
-                  )}
-                  <div style={{ flex: 1, minWidth: 0 }}>
-                    <div style={{ display: "flex", alignItems: "baseline", gap: 8, marginBottom: 5 }}>
-                      <span style={{ fontSize: 12, fontWeight: 600, color: "var(--fg-2)" }}>
-                        {p.author || "LinkedIn"}
-                      </span>
-                      {p.date && (
-                        <span className="mono" style={{ fontSize: 10, color: "var(--fg-3)" }}>
-                          {fmtDate(p.date)}
-                        </span>
-                      )}
-                      <span style={{ marginLeft: "auto", fontSize: 10, color: "var(--fg-4)" }}>
-                        in {Icons.ext}
-                      </span>
+                  {p.imageUrl
+                    ? <img className="li-thumb" src={p.imageUrl} alt=""
+                        onError={(e) => { e.currentTarget.style.display = "none"; }} />
+                    : <LogoMark name={p.author || c.name} domain={c.domain} size="sm" />}
+                  <div className="li-body">
+                    <div className="li-meta">
+                      <span className="li-author">{p.author || c.name}</span>
+                      <span className="li-mono" style={{ verticalAlign: "middle" }}>in</span>
+                      {p.date && <span className="li-date">{fmtDate(p.date)}</span>}
+                      <span className="li-cta">view post {Icons.ext}</span>
                     </div>
-                    <p style={{
-                      margin: 0, fontSize: 12.5, lineHeight: 1.6, color: "var(--fg-3)",
-                      whiteSpace: "pre-wrap", wordBreak: "break-word",
-                    }}>
-                      {preview}
-                    </p>
+                    <p className="li-excerpt">{preview}</p>
+                    {host && <span className="li-source">{Icons.ext} {host}</span>}
                   </div>
                 </a>
               );
             })}
           </div>
+          {liPosts.length > 3 && (
+            <button className="li-more" onClick={() => setLiShowAll(v => !v)}>
+              {liShowAll ? "show less" : `+${liPosts.length - 3} more`}
+            </button>
+          )}
         </div>
-      )}
+        );
+      })()}
+
+      {/* ── Funding · Team · Customers · Investors (reuse Overview-v2 cards) ── */}
+      <FundingTimelineCard subject={c} />
+      <div style={{ marginBottom: 20 }}><TeamCard subject={c} /></div>
+      <CustomersStrip subject={c} />
+      <InvestorsStrip subject={c} />
 
       {/* ── Feature coverage (only if features exist) ── */}
       {features.length > 0 && (
@@ -346,6 +321,9 @@ function CompanyScreen({ data, companyId }) {
           <div style={{ height: 8 }} />
         </div>
       )}
+
+      {/* ── Footprint / verticals (reuse Overview-v2 card) ── */}
+      <div style={{ marginTop: 20 }}><FootprintCard subject={c} /></div>
 
     </div>
   );

@@ -40,9 +40,9 @@ function PricingScreen({ data, onOpenCompany }) {
                   <td>{
                     c.pricing.salesGated
                       ? <span className="muted">Sur devis</span>
-                      : (c.pricing.startsAt == null || c.pricing.startsAt === 0)
+                      : (c.pricing.starts_at == null || c.pricing.starts_at === 0)
                         ? <span className="muted">Free / Usage</span>
-                        : "€" + c.pricing.startsAt.toLocaleString()
+                        : "€" + c.pricing.starts_at.toLocaleString()
                   }</td>
                   <td className="mono" style={{fontSize:11.5}}>{c.pricing.mention}</td>
                   <td className="num">{fmtMoney(c.avgContract)}</td>
@@ -66,6 +66,7 @@ function PricingScreen({ data, onOpenCompany }) {
 }
 
 function PricingCompany({ c, tiers, onOpenCompany }) {
+  tiers = tiers || [];
   return (
     <div className="card" style={{
       borderColor: c.isSubject ? "var(--accent-bg-2)" : "var(--border)",
@@ -83,6 +84,11 @@ function PricingCompany({ c, tiers, onOpenCompany }) {
         <span className="muted" style={{fontSize:11.5}}>Â· {c.pricing.model}</span>
         <span className="meta">{tiers.length} tier{tiers.length !== 1 ? "s" : ""}</span>
       </div>
+      {tiers.length === 0 ? (
+        <div style={{padding:16, fontSize:12, color:"var(--fg-3)"}}>
+          {c.pricing.mention || "Custom enterprise pricing — contact sales."}
+        </div>
+      ) : (
       <div style={{display:"grid", gridTemplateColumns:`repeat(${tiers.length}, 1fr)`}}>
         {tiers.map((t, i) => (
           <div key={t.name} style={{
@@ -118,6 +124,7 @@ function PricingCompany({ c, tiers, onOpenCompany }) {
           </div>
         ))}
       </div>
+      )}
     </div>
   );
 }

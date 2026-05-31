@@ -195,6 +195,7 @@ window.RADAR_DATA = {
         "source_url": "https://tracxn.com/d/companies/testgorilla/__R2kvquwDSxYmt-AXwK9Qt8l_ReBLCwOIrxWBihbXqPo"
       }
     ],
+    "recentLinkedinPosts": [],
     "growthSignals": [
       "TestGorilla's revenue reached $36.2M ARR in 2025, with the company's valuation reported at $108.6M. [TestGorilla Revenue 2025: $36.2M ARR, $108.6M Valuation](https://getlatka.com/companies/testgorilla.com)",
       "As of March 2026, TestGorilla reports that more than 60,000 organizations use the platform, which assesses approximately 7 million candidates annually. [TestGorilla Launches New AI Readiness and AI Fluency Assessments - Morningstar](https://www.morningstar.com/news/business-wire/20260303398545/testgorilla-launches-new-ai-readiness-and-ai-fluency-assessments-to-help-companies-hire-for-the-skills-that-matter-now)",
@@ -215,9 +216,10 @@ window.RADAR_DATA = {
     "similarity": 1.0,
     "threat": "high",
     "pricing": {
-      "model": "Custom",
-      "starts_at": 0,
-      "mention": "Contact sales"
+      "model": "Usage-based",
+      "starts_at": 1568,
+      "mention": "Credit-based usage model where credits are consumed per candidate assessment.",
+      "salesGated": false
     }
   },
   "competitors": [
@@ -412,6 +414,7 @@ window.RADAR_DATA = {
           "source_url": "https://www.globenewswire.com/search/organization/Hirevue"
         }
       ],
+      "recentLinkedinPosts": [],
       "growthSignals": [
         "Acquired Hireguide in March 2026 to accelerate its AI strategy and strengthen conversational hiring technology.",
         "Joined the Workday AI Agent Partner Network in January 2026 to accelerate the shift toward skills-based hiring.",
@@ -434,8 +437,9 @@ window.RADAR_DATA = {
       "threat": "high",
       "pricing": {
         "model": "Custom",
-        "starts_at": 0,
-        "mention": "Contact sales"
+        "starts_at": 32200,
+        "mention": "Starting price is approximately $35,000 USD per year for the Essentials package, excluding $10k-$40k implementation fees.",
+        "salesGated": false
       }
     },
     {
@@ -626,6 +630,7 @@ window.RADAR_DATA = {
           "source_url": "https://www.prnewswire.com/news-releases/paradox-conversational-applicant-tracking-system-ats-now-available-through-workday-helping-organizations-hire-frontline-workers-faster-302656477.html"
         }
       ],
+      "recentLinkedinPosts": [],
       "growthSignals": [
         "Paradox achieved a 276% three-year growth rate as of its 2025 Inc. 5000 listing [Paradox Named to Fifth Consecutive Inc. 5000 List -- Among the Fastest Growing HR Technology Companies](https://www.prnewswire.com/news-releases/paradox-named-to-fifth-consecutive-inc-5000-list--among-the-fastest-growing-hr-technology-companies-302528360.html).",
         "Workday generated over $100 million in new annual contract value (ACV) from emerging AI products including Paradox in Q4 fiscal 2026 [Workday Stock Hits a Five-Year Low as $400 Million in AI ARR Goes Unnoticed | TIKR.com](https://www.tikr.com/blog/workday-stock-hits-a-five-year-low-as-400-million-in-ai-arr-goes-unnoticed).",
@@ -647,9 +652,10 @@ window.RADAR_DATA = {
       "similarity": 0.78,
       "threat": "high",
       "pricing": {
-        "model": "Custom",
+        "model": "Enterprise",
         "starts_at": 0,
-        "mention": "Contact sales"
+        "mention": "Custom enterprise pricing starting at $1,000 per month for basic functionality, with annual costs typically ranging from $25,000 to $100,000+",
+        "salesGated": true
       }
     },
     {
@@ -828,6 +834,7 @@ window.RADAR_DATA = {
           "source_url": "https://tracxn.com/d/companies/harver/__gjUW2iOTksxTBn3an7-rdB7W-NNpeKLIuWvPflf0-Gw"
         }
       ],
+      "recentLinkedinPosts": [],
       "growthSignals": [
         "Harver reached $146.5 million in revenue in June 2024. [How Harver hit $146.5M revenue with a 214 person team in 2024.](https://getlatka.com/companies/Harver)",
         "Harver acquired pymetrics in August 2022 to bolster its talent acquisition solutions. [Harver Acquires Pymetrics: One Team, One Mission | Harver](https://harver.com/harver-acquires-pymetrics/)",
@@ -849,9 +856,10 @@ window.RADAR_DATA = {
       "similarity": 0.72,
       "threat": "medium",
       "pricing": {
-        "model": "Custom",
-        "starts_at": 0,
-        "mention": "Contact sales"
+        "model": "Subscription",
+        "starts_at": 110,
+        "mention": "Pricing starts at $10 per user per month for small businesses, with annual licenses ranging from $5,000 to $20,000+.",
+        "salesGated": false
       }
     }
   ],
@@ -864,11 +872,104 @@ window.RADAR_DATA = {
     "pending_co": []
   },
   "pricing": {
-    "maki_people": [],
-    "basecamp": [],
-    "stealth_co": [],
-    "obscure_hr": [],
-    "pending_co": []
+    "testgorilla": [
+      {
+        "name": "Free",
+        "price": "Free",
+        "per": "",
+        "features": [
+          "10 free credits every month",
+          "5 specific skills tests",
+          "AI resume scoring",
+          "1 full access seat"
+        ]
+      },
+      {
+        "name": "Core",
+        "price": "€1,568",
+        "per": "/yr",
+        "features": [
+          "Full library of 350+ tests",
+          "One-way AI video interviews",
+          "Talent sourcing from a pool of 2M+ candidates",
+          "2 full access seats"
+        ]
+      },
+      {
+        "name": "Plus",
+        "price": "€4,416",
+        "per": "/yr",
+        "features": [
+          "Conversational AI video interviews",
+          "Custom tests and coding challenges",
+          "ATS integrations",
+          "Unlimited full access seats"
+        ]
+      },
+      {
+        "name": "Enterprise",
+        "price": "Custom",
+        "per": "",
+        "features": [
+          "Scientific validation",
+          "Security and compliance reviews",
+          "Tailored agreements"
+        ]
+      }
+    ],
+    "hirevue": [
+      {
+        "name": "Essentials",
+        "price": "€32,200",
+        "per": "/yr",
+        "features": [
+          "Live and on-demand interviewing",
+          "Custom branding",
+          "Single language configuration"
+        ]
+      },
+      {
+        "name": "Enterprise",
+        "price": "Custom",
+        "per": "",
+        "features": [
+          "Scheduling",
+          "Chatbots",
+          "Pre-built ATS integrations",
+          "Analytics",
+          "NLP-based candidate scoring"
+        ]
+      },
+      {
+        "name": "Premium",
+        "price": "Custom",
+        "per": "",
+        "features": [
+          "White-glove service"
+        ]
+      }
+    ],
+    "paradox": [],
+    "harver": [
+      {
+        "name": "Starter",
+        "price": "€9",
+        "per": "/mo",
+        "features": []
+      },
+      {
+        "name": "Pro",
+        "price": "€18",
+        "per": "/mo",
+        "features": []
+      },
+      {
+        "name": "Enterprise",
+        "price": "Custom",
+        "per": "",
+        "features": []
+      }
+    ]
   },
   "funding": {
     "maki_people": [
@@ -1109,6 +1210,7 @@ window.RADAR_DATA.allCompanies = [
         "source_url": "https://tracxn.com/d/companies/testgorilla/__R2kvquwDSxYmt-AXwK9Qt8l_ReBLCwOIrxWBihbXqPo"
       }
     ],
+    "recentLinkedinPosts": [],
     "growthSignals": [
       "TestGorilla's revenue reached $36.2M ARR in 2025, with the company's valuation reported at $108.6M. [TestGorilla Revenue 2025: $36.2M ARR, $108.6M Valuation](https://getlatka.com/companies/testgorilla.com)",
       "As of March 2026, TestGorilla reports that more than 60,000 organizations use the platform, which assesses approximately 7 million candidates annually. [TestGorilla Launches New AI Readiness and AI Fluency Assessments - Morningstar](https://www.morningstar.com/news/business-wire/20260303398545/testgorilla-launches-new-ai-readiness-and-ai-fluency-assessments-to-help-companies-hire-for-the-skills-that-matter-now)",
@@ -1129,9 +1231,10 @@ window.RADAR_DATA.allCompanies = [
     "similarity": 1.0,
     "threat": "high",
     "pricing": {
-      "model": "Custom",
-      "starts_at": 0,
-      "mention": "Contact sales"
+      "model": "Usage-based",
+      "starts_at": 1568,
+      "mention": "Credit-based usage model where credits are consumed per candidate assessment.",
+      "salesGated": false
     }
   },
   {
@@ -1325,6 +1428,7 @@ window.RADAR_DATA.allCompanies = [
         "source_url": "https://www.globenewswire.com/search/organization/Hirevue"
       }
     ],
+    "recentLinkedinPosts": [],
     "growthSignals": [
       "Acquired Hireguide in March 2026 to accelerate its AI strategy and strengthen conversational hiring technology.",
       "Joined the Workday AI Agent Partner Network in January 2026 to accelerate the shift toward skills-based hiring.",
@@ -1347,8 +1451,9 @@ window.RADAR_DATA.allCompanies = [
     "threat": "high",
     "pricing": {
       "model": "Custom",
-      "starts_at": 0,
-      "mention": "Contact sales"
+      "starts_at": 32200,
+      "mention": "Starting price is approximately $35,000 USD per year for the Essentials package, excluding $10k-$40k implementation fees.",
+      "salesGated": false
     }
   },
   {
@@ -1539,6 +1644,7 @@ window.RADAR_DATA.allCompanies = [
         "source_url": "https://www.prnewswire.com/news-releases/paradox-conversational-applicant-tracking-system-ats-now-available-through-workday-helping-organizations-hire-frontline-workers-faster-302656477.html"
       }
     ],
+    "recentLinkedinPosts": [],
     "growthSignals": [
       "Paradox achieved a 276% three-year growth rate as of its 2025 Inc. 5000 listing [Paradox Named to Fifth Consecutive Inc. 5000 List -- Among the Fastest Growing HR Technology Companies](https://www.prnewswire.com/news-releases/paradox-named-to-fifth-consecutive-inc-5000-list--among-the-fastest-growing-hr-technology-companies-302528360.html).",
       "Workday generated over $100 million in new annual contract value (ACV) from emerging AI products including Paradox in Q4 fiscal 2026 [Workday Stock Hits a Five-Year Low as $400 Million in AI ARR Goes Unnoticed | TIKR.com](https://www.tikr.com/blog/workday-stock-hits-a-five-year-low-as-400-million-in-ai-arr-goes-unnoticed).",
@@ -1560,9 +1666,10 @@ window.RADAR_DATA.allCompanies = [
     "similarity": 0.78,
     "threat": "high",
     "pricing": {
-      "model": "Custom",
+      "model": "Enterprise",
       "starts_at": 0,
-      "mention": "Contact sales"
+      "mention": "Custom enterprise pricing starting at $1,000 per month for basic functionality, with annual costs typically ranging from $25,000 to $100,000+",
+      "salesGated": true
     }
   },
   {
@@ -1741,6 +1848,7 @@ window.RADAR_DATA.allCompanies = [
         "source_url": "https://tracxn.com/d/companies/harver/__gjUW2iOTksxTBn3an7-rdB7W-NNpeKLIuWvPflf0-Gw"
       }
     ],
+    "recentLinkedinPosts": [],
     "growthSignals": [
       "Harver reached $146.5 million in revenue in June 2024. [How Harver hit $146.5M revenue with a 214 person team in 2024.](https://getlatka.com/companies/Harver)",
       "Harver acquired pymetrics in August 2022 to bolster its talent acquisition solutions. [Harver Acquires Pymetrics: One Team, One Mission | Harver](https://harver.com/harver-acquires-pymetrics/)",
@@ -1762,9 +1870,10 @@ window.RADAR_DATA.allCompanies = [
     "similarity": 0.72,
     "threat": "medium",
     "pricing": {
-      "model": "Custom",
-      "starts_at": 0,
-      "mention": "Contact sales"
+      "model": "Subscription",
+      "starts_at": 110,
+      "mention": "Pricing starts at $10 per user per month for small businesses, with annual licenses ranging from $5,000 to $20,000+.",
+      "salesGated": false
     }
   }
 ];

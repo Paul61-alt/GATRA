@@ -58,7 +58,9 @@ def _linkedin_posts_out(profile) -> list[LinkedInPostOut]:
     """
     out: list[LinkedInPostOut] = []
     for s in (getattr(profile, "recent_linkedin_signals", None) or [])[:5]:
-        excerpt = (s.excerpt or s.signal or "").strip()
+        # Cap at 300 chars at ingestion — frontend only renders 280, no point
+        # shipping full ~900-char post bodies in data.js.
+        excerpt = (s.excerpt or s.signal or "").strip()[:300]
         if not excerpt:
             continue
         out.append(LinkedInPostOut(
