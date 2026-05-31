@@ -170,6 +170,38 @@ function App() {
     setView("home");
   };
 
+  // Open a saved scan from Home/history: fetch the full RadarOutput for that
+  // domain from the backend, then show it. Without this the app would render
+  // whatever `data` is already in memory (e.g. the bundled data.js demo blob),
+  // so every history click looked like the same wrong company.
+  const handleOpenScan = async (scan) => {
+    const domain = scan?.domain;
+    if (!domain) { setView("current"); return; }
+    let resp;
+    try {
+      resp = await fetch(`${window.RADAR_API}/scans/${encodeURIComponent(domain)}/latest`);
+    } catch (err) {
+      setToast({ label: `Chargement échoué (réseau) pour ${domain}`, action: null });
+      return;
+    }
+    if (!resp.ok) {
+      setToast({
+        label: resp.status === 404
+          ? `Aucun scan enregistré pour ${domain}.`
+          : `Chargement échoué ${resp.status} pour ${domain}.`,
+        action: null,
+      });
+      return;
+    }
+    const full = await resp.json();
+    window.RADAR_DATA = full;
+    setData(full);
+    setLoadingPhase(2);
+    setActiveTab("overview");
+    setOpenCompanyIds([]);
+    setView("current");
+  };
+
   // Resume loading view from Home when user clicks the in-flight scan row.
   // If no prior data, synth a stub so OverviewScreen can render skeletons.
   const handleResumeLoading = () => {
@@ -433,10 +465,10 @@ function App() {
 
         {view === "home" && (
           <HomeScreen
-            onOpenCurrent={() => setView("current")}
+            onOpenCurrent={handleOpenScan}
+            onResumeLoading={handleResumeLoading}
             onNewScan={() => setView("new")}
             scanInProgress={scanInProgress}
-            onResumeLoading={handleResumeLoading}
             showToast={(t) => setToast(t)}
           />
         )}
