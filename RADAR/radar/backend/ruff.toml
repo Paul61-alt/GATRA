@@ -1,0 +1,8 @@
+# Ruff config for the Radar backend.
+#
+# E402 (module-import-not-at-top-of-file) is intentional across this codebase:
+#   - main.py calls load_dotenv() before importing env-reading clients
+#   - eval/script files insert sys.path before their imports
+# Suppress it globally rather than scattering `# noqa: E402` everywhere.
+[lint]
+ignore = ["E402"]

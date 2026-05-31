@@ -8,7 +8,6 @@ Run from backend/:
     python evals/recover_indy.py
 """
 import asyncio
-import json
 import logging
 import os
 import sys
@@ -51,7 +50,7 @@ async def main() -> None:
     company_profile = await understand.run(DOMAIN, linkup, run_id)
     print(f"✓ {company_profile.name}")
 
-    print(f"\n⏳ Re-running discover...")
+    print("\n⏳ Re-running discover...")
     competitors, discover_sources = await discover.run(company_profile, linkup)
     print(f"✓ {len(competitors)} competitors found, {len(discover_sources)} sources")
 
@@ -64,7 +63,7 @@ async def main() -> None:
         top = competitors[0]
     print(f"→ Top competitor: {top.get('name')} ({top.get('website')})")
 
-    print(f"\n⏳ Geocoding + parsing recovered research output...")
+    print("\n⏳ Geocoding + parsing recovered research output...")
     coords = await geocode(top.get("hq_city", ""), top.get("hq_country", ""))
     top_profile = _parse_result(research, top, now, run_id, coords)
 

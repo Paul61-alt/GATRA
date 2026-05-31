@@ -222,7 +222,7 @@ async def main() -> int:
     linkup = LinkupClient()
 
     t0 = time.monotonic()
-    print(f"\nSubmitting /search depth=deep structured (cost ≈ €0.055)...\n")
+    print("\nSubmitting /search depth=deep structured (cost ≈ €0.055)...\n")
 
     try:
         raw = await linkup.search(
@@ -250,17 +250,17 @@ async def main() -> int:
         try:
             data = json.loads(data)
         except json.JSONDecodeError:
-            print(f"FAIL — could not decode 'answer' field as JSON", file=sys.stderr)
+            print("FAIL — could not decode 'answer' field as JSON", file=sys.stderr)
             return 1
 
     items = data.get("competitors", []) if isinstance(data, dict) else []
     if not items:
-        print(f"FAIL — no 'competitors' array in response", file=sys.stderr)
+        print("FAIL — no 'competitors' array in response", file=sys.stderr)
         print(f"Raw data keys: {list(data.keys()) if isinstance(data, dict) else type(data)}", file=sys.stderr)
         return 1
 
     # ── Post-parsing filter: reject null padding + external partners/speakers ──
-    print(f"=== Post-parsing filter ===\n")
+    print("=== Post-parsing filter ===\n")
     filtered_summary = []
     for it in items:
         name = it.get("name", "?")
@@ -285,7 +285,7 @@ async def main() -> int:
         print(f"  → {name}: kept={k}, rejected={r}")
 
     # ── Assertions v2 ─────────────────────────────────────────────────────────
-    print(f"\n=== Assertions v2 ===\n")
+    print("\n=== Assertions v2 ===\n")
 
     failures: list[str] = []
 
@@ -304,7 +304,7 @@ async def main() -> int:
     # C) ≥ 1 REAL employee per competitor (post-filter)
     # Lowered from 2 → 1 after observing Linkup variance: poorly-indexed startups
     # may only yield 1 verified employee. We still warn when < 2 (nice-to-have).
-    print(f"[C] real employees per company (post-filter, ≥ 1 required, ≥ 2 ideal):")
+    print("[C] real employees per company (post-filter, ≥ 1 required, ≥ 2 ideal):")
     for it in items:
         name = it.get("name", "?")
         n = len(it.get("key_people") or [])

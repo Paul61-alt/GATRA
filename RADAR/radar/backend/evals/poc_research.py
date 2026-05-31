@@ -132,8 +132,8 @@ async def run_research(domain: str, depth: str = "S", structured: bool = False) 
 
     print(f"\n{'='*60}")
     print(f"TARGET       : {domain}")
-    print(f"ENDPOINT     : POST /v1/research")
-    print(f"MODE         : Investigate")
+    print("ENDPOINT     : POST /v1/research")
+    print("MODE         : Investigate")
     print(f"DEPTH        : {depth}  (est. ${COST_BY_DEPTH.get(depth, '?')} / {_depth_eta(depth)})")
     print(f"OUTPUT TYPE  : {output_type}")
     print(f"QUERY        : {query[:120]}...")
@@ -196,7 +196,7 @@ async def run_research(domain: str, depth: str = "S", structured: bool = False) 
         print(json.dumps(data, indent=2, ensure_ascii=False))
 
         # Field completeness check
-        print(f"\n--- FIELD COMPLETENESS ---")
+        print("\n--- FIELD COMPLETENESS ---")
         top_fields = [
             "name", "website", "linkedin_url", "hq_city", "founded_year",
             "employee_count", "funding_stage", "funding_total_usd",
@@ -244,11 +244,11 @@ async def run_research(domain: str, depth: str = "S", structured: bool = False) 
             d = urlparse(s.get("url", "")).netloc.lstrip("www.")
             source_domains[d] = source_domains.get(d, 0) + 1
 
-        print(f"\n--- SOURCE DOMAIN BREAKDOWN ---")
+        print("\n--- SOURCE DOMAIN BREAKDOWN ---")
         for domain_s, count in sorted(source_domains.items(), key=lambda x: -x[1]):
             print(f"  {count:2}x  {domain_s}")
 
-    print(f"\n--- SUMMARY ---")
+    print("\n--- SUMMARY ---")
     print(f"  Latency       : {total:.1f}s")
     print(f"  Est. cost     : ${COST_BY_DEPTH.get(depth, '?')}")
     print(f"  Output type   : {output_type}")

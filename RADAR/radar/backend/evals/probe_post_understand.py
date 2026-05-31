@@ -126,13 +126,12 @@ def _print_enrich_results(profiles: list[CompetitorProfile], duration: float) ->
         pricing_src = (
             p.pricing.source_url[:50] if p.pricing and p.pricing.source_url else "no pricing"
         )
-        signals_count = len(p.recent_signals)
         print(f"  {p.name:<30} pricing_src={pricing_src}")
         if p.recent_signals:
             for sig in p.recent_signals[:3]:
                 print(f"    • {sig[:80]}")
         else:
-            print(f"    • (no signals)")
+            print("    • (no signals)")
         print()
 
 
@@ -147,11 +146,11 @@ async def probe(domain: str, understand_strategy: str, force: bool) -> None:
     # ── Step 1: DISCOVER ──────────────────────────────────────────────────────
     discover_cached = _cache_load(domain, "discover") if not force else None
     if discover_cached:
-        print(f"  [discover] cache hit")
+        print("  [discover] cache hit")
         competitors = discover_cached["competitors"]
         discover_duration = discover_cached.get("duration", 0.0)
     else:
-        print(f"  [discover] calling Linkup (depth=deep)…")
+        print("  [discover] calling Linkup (depth=deep)…")
         linkup = LinkupClient()
         t0 = time.monotonic()
         competitors, _discover_sources = await discover_run(profile, linkup)
@@ -170,7 +169,7 @@ async def probe(domain: str, understand_strategy: str, force: bool) -> None:
     # ── Step 2: ENRICH ────────────────────────────────────────────────────────
     enrich_cached = _cache_load(domain, "enrich") if not force else None
     if enrich_cached:
-        print(f"  [enrich] cache hit")
+        print("  [enrich] cache hit")
         profiles = [CompetitorProfile.model_validate(p) for p in enrich_cached["profiles"]]
         enrich_duration = enrich_cached.get("duration", 0.0)
     else:
