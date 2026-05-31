@@ -541,11 +541,7 @@ function App() {
             />
             <Tabs tabs={tabs} active={activeTab} onTab={setActiveTab} />
             <div className="content">
-              {activeTab === "overview"  && (
-                tweaks.overviewVersion === "v2"
-                  ? <OverviewScreenV2 data={displayData} onOpenCompany={openCompany} loadingPhase={loadingPhase} />
-                  : <OverviewScreen   data={displayData} onOpenCompany={openCompany} loadingPhase={loadingPhase} />
-              )}
+              {activeTab === "overview"  && <OverviewScreenV2 data={displayData} onOpenCompany={openCompany} loadingPhase={loadingPhase} />}
               {activeTab === "list"      && <ListScreen      data={displayData} onOpenCompany={openCompany} />}
               {activeTab === "compare"   && <CompareScreen   data={displayData} onOpenCompany={openCompany} />}
               {activeTab === "map"         && <MapScreen         data={displayData} onOpenCompany={openCompany} />}
@@ -614,8 +610,6 @@ function RadarTweaksPanel({ t, setTweak, onJumpToSearch }) {
       <TweakSection label="Display" />
       <TweakRadio label="Density" value={t.density} options={["compact", "comfortable"]}
         onChange={(v) => setTweak("density", v)} />
-      <TweakRadio label="Overview" value={t.overviewVersion || "v1"} options={["v1", "v2"]}
-        onChange={(v) => setTweak("overviewVersion", v)} />
       <TweakSection label="Brand accent" />
       <TweakColor label="Subject highlight" value={t.accent}
         options={["#b34a1f", "#1f6b3d", "#1a3a6b", "#5a3d8a", "#0a0a0a"]}

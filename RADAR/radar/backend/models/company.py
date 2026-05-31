@@ -50,6 +50,15 @@ class NewsItem(BaseModel):
     source_url: Optional[str] = None
 
 
+class LinkedInSignal(BaseModel):
+    date: Optional[str] = None
+    author: Optional[str] = None
+    signal: str
+    excerpt: Optional[str] = None   # first ~280 chars of post body, for preview card
+    image_url: Optional[str] = None  # post og:image if any (rare — usually text-only)
+    source_url: Optional[str] = None
+
+
 class CustomerExample(BaseModel):
     """A named customer with size/segment classification."""
     name: str
@@ -137,6 +146,8 @@ class CompanyProfile(BaseModel):
     # Signals
     growth_signals: List[str] = []
     recent_news: List[NewsItem] = []
+    recent_linkedin_signals: List[LinkedInSignal] = []
+    founder_linkedin_urls: List[str] = []
 
     # Sources
     source_urls: List[str] = []

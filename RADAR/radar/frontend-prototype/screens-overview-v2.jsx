@@ -496,6 +496,60 @@ function FootprintCard({ subject }) {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
+// Recent LinkedIn activity (subject) — mirrors the competitor Company-screen card
+// ─────────────────────────────────────────────────────────────────────────────
+
+function LinkedInActivityCard({ subject }) {
+  const [showAll, setShowAll] = _uS_v2(false);
+  const posts = (subject.recentLinkedinPosts || []).filter(p => p && (p.excerpt || "").trim());
+  if (posts.length === 0) return null;
+  const visible = showAll ? posts : posts.slice(0, 3);
+  return (
+    <div className="card" style={{marginBottom: 20}}>
+      <div className="card-h">
+        <h3>Recent LinkedIn activity</h3>
+        <span className="meta">
+          <span className="li-mono" style={{marginRight: 6, verticalAlign: "middle"}}>in</span>
+          Last 12 months · {posts.length} post{posts.length > 1 ? "s" : ""}
+        </span>
+      </div>
+      <div style={{padding: "2px 0"}}>
+        {visible.map((p, i) => {
+          const preview = (p.excerpt || "").trim().slice(0, 220);
+          let host = "";
+          try { host = new URL(p.sourceUrl).host.replace(/^www\./, ""); } catch (e) {}
+          return (
+            <a key={i} className="li-post" href={p.sourceUrl || undefined}
+              target="_blank" rel="noopener noreferrer"
+              style={{animationDelay: (i * 60) + "ms", cursor: p.sourceUrl ? "pointer" : "default"}}>
+              {p.imageUrl
+                ? <img className="li-thumb" src={p.imageUrl} alt=""
+                    onError={(e) => { e.currentTarget.style.display = "none"; }} />
+                : <LogoMark name={p.author || subject.name} domain={subject.domain} size="sm" />}
+              <div className="li-body">
+                <div className="li-meta">
+                  <span className="li-author">{p.author || subject.name}</span>
+                  <span className="li-mono" style={{verticalAlign: "middle"}}>in</span>
+                  {p.date && <span className="li-date">{fmtDate(p.date)}</span>}
+                  <span className="li-cta">view post {Icons.ext}</span>
+                </div>
+                <p className="li-excerpt">{preview}</p>
+                {host && <span className="li-source">{Icons.ext} {host}</span>}
+              </div>
+            </a>
+          );
+        })}
+      </div>
+      {posts.length > 3 && (
+        <button className="li-more" onClick={() => setShowAll(v => !v)}>
+          {showAll ? "show less" : `+${posts.length - 3} more`}
+        </button>
+      )}
+    </div>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
 // Main screen
 // ─────────────────────────────────────────────────────────────────────────────
 
@@ -531,6 +585,9 @@ function OverviewScreenV2({ data, onOpenCompany, loadingPhase = 2 }) {
         <MoatCard subject={subject} />
         <NewsMomentumCard subject={subject} />
       </div>
+
+      {/* Recent LinkedIn activity */}
+      <LinkedInActivityCard subject={subject} />
 
       {/* Zone E */}
       <FundingTimelineCard subject={subject} />
