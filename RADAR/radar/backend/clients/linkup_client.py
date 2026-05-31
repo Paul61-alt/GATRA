@@ -234,10 +234,7 @@ class LinkupClient:
         # (a tester's own LinkUp key), this client must NOT count against our
         # daily caps nor write to our usage ledger — their spend is on their
         # account. Falls back to our env key for our own scans (byok=False).
-        # bool() not "is not None": an empty string must resolve to byok=False so
-        # it consistently falls back to the env key below (never flagged BYOK
-        # while secretly spending our credits).
-        self.byok = bool(api_key)
+        self.byok = api_key is not None
         self._api_key = api_key or os.environ["LINKUP_API_KEY"]
         self._headers = {
             "Authorization": f"Bearer {self._api_key}",
@@ -267,12 +264,15 @@ class LinkupClient:
                         await asyncio.sleep(wait)
                         continue
                     r.raise_for_status()
-                    self._record(path, "ok", cost_eur=cost_eur)
+                    if not self.byok:
+                        _record_call(path, "ok", cost_eur=cost_eur)
                     return r.json()
         except Exception:
-            self._record(path, "error")
+            if not self.byok:
+                _record_call(path, "error")
             raise
-        self._record(path, "error")
+        if not self.byok:
+            _record_call(path, "error")
         raise RuntimeError("Linkup max retries exceeded")
 
     async def _get(self, path: str) -> Any:
@@ -291,12 +291,15 @@ class LinkupClient:
                         await asyncio.sleep(wait)
                         continue
                     r.raise_for_status()
-                    self._record(path, "ok")
+                    if not self.byok:
+                        _record_call(path, "ok")
                     return r.json()
         except Exception:
-            self._record(path, "error")
+            if not self.byok:
+                _record_call(path, "error")
             raise
-        self._record(path, "error")
+        if not self.byok:
+            _record_call(path, "error")
         raise RuntimeError("Linkup GET max retries exceeded")
 
     async def search(
