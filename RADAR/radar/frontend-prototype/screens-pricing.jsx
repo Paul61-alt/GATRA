@@ -1,5 +1,5 @@
 // screens-pricing.jsx â pricing tiers comparison
-function PricingScreen({ data }) {
+function PricingScreen({ data, onOpenCompany }) {
   const { subject, competitors, pricing } = data;
   const all = [subject, ...competitors];
 
@@ -23,24 +23,30 @@ function PricingScreen({ data }) {
                 <th>Headline</th>
                 <th className="num">Avg. contract</th>
                 <th className="num">Customers</th>
-                <th className="num">ARR</th>
               </tr>
             </thead>
             <tbody>
               {all.map(c => (
-                <tr key={c.id} className={c.isSubject ? "subject-row" : ""}>
+                <tr key={c.id} className={c.isSubject ? "subject-row" : ""}
+                  onClick={() => !c.isSubject && onOpenCompany && onOpenCompany(c.id)}
+                  style={{cursor: c.isSubject ? "default" : "pointer"}}>
                   <td>
                     <div className="name-cell">
-                      <LogoMark name={c.name} subject={c.isSubject} size="sm" />
+                      <LogoMark name={c.name} domain={c.domain} subject={c.isSubject} size="sm" />
                       <span className="nm">{c.name}</span>
                     </div>
                   </td>
                   <td>{c.pricing.model}</td>
-                  <td>{c.pricing.startsAt === 0 ? <span className="muted">Free / Usage</span> : "$" + c.pricing.startsAt.toLocaleString()}</td>
+                  <td>{
+                    c.pricing.salesGated
+                      ? <span className="muted">Sur devis</span>
+                      : (c.pricing.starts_at == null || c.pricing.starts_at === 0)
+                        ? <span className="muted">Free / Usage</span>
+                        : "€" + c.pricing.starts_at.toLocaleString()
+                  }</td>
                   <td className="mono" style={{fontSize:11.5}}>{c.pricing.mention}</td>
                   <td className="num">{fmtMoney(c.avgContract)}</td>
                   <td className="num">{fmtNum(c.customers)}</td>
-                  <td className="num">{fmtMoney(c.arr)}</td>
                 </tr>
               ))}
             </tbody>
@@ -52,28 +58,37 @@ function PricingScreen({ data }) {
       <SectionH title="Tier breakdown" meta={`${all.length} pricing pages parsed`} />
       <div style={{display:"flex", flexDirection:"column", gap: 14}}>
         {all.map(c => (
-          <PricingCompany key={c.id} c={c} tiers={pricing[c.id]} />
+          <PricingCompany key={c.id} c={c} tiers={pricing[c.id]} onOpenCompany={onOpenCompany} />
         ))}
       </div>
     </div>
   );
 }
 
-function PricingCompany({ c, tiers }) {
+function PricingCompany({ c, tiers, onOpenCompany }) {
+  tiers = tiers || [];
   return (
     <div className="card" style={{
       borderColor: c.isSubject ? "var(--accent-bg-2)" : "var(--border)",
     }}>
-      <div className="card-h" style={{
-        background: c.isSubject ? "var(--accent-bg)" : "transparent",
-        borderColor: c.isSubject ? "var(--accent-bg-2)" : "var(--border)",
-      }}>
-        <LogoMark name={c.name} subject={c.isSubject} size="sm" />
+      <div className="card-h"
+        onClick={() => !c.isSubject && onOpenCompany && onOpenCompany(c.id)}
+        style={{
+          background: c.isSubject ? "var(--accent-bg)" : "transparent",
+          borderColor: c.isSubject ? "var(--accent-bg-2)" : "var(--border)",
+          cursor: c.isSubject ? "default" : "pointer",
+        }}>
+        <LogoMark name={c.name} domain={c.domain} subject={c.isSubject} size="sm" />
         <h3 style={{color: c.isSubject ? "var(--accent-fg)" : "var(--fg)"}}>{c.name}</h3>
         {c.isSubject && <span className="tag subject mono" style={{fontSize:9}}>SUBJECT</span>}
         <span className="muted" style={{fontSize:11.5}}>Â· {c.pricing.model}</span>
         <span className="meta">{tiers.length} tier{tiers.length !== 1 ? "s" : ""}</span>
       </div>
+      {tiers.length === 0 ? (
+        <div style={{padding:16, fontSize:12, color:"var(--fg-3)"}}>
+          {c.pricing.mention || "Custom enterprise pricing — contact sales."}
+        </div>
+      ) : (
       <div style={{display:"grid", gridTemplateColumns:`repeat(${tiers.length}, 1fr)`}}>
         {tiers.map((t, i) => (
           <div key={t.name} style={{
@@ -109,6 +124,7 @@ function PricingCompany({ c, tiers }) {
           </div>
         ))}
       </div>
+      )}
     </div>
   );
 }

@@ -1,0 +1,29 @@
+[
+  {
+    "company": {
+      "name": "Linear",
+      "website": "linear.app"
+    },
+    "raw": null,
+    "elapsed": 643.0433425409719,
+    "error": ""
+  },
+  {
+    "company": {
+      "name": "Notion",
+      "website": "notion.so"
+    },
+    "raw": null,
+    "elapsed": 643.0189430839964,
+    "error": ""
+  },
+  {
+    "company": {
+      "name": "Maki People",
+      "website": "makipeople.com"
+    },
+    "raw": null,
+    "elapsed": 643.0055891669763,
+    "error": ""
+  }
+]

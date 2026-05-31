@@ -6,7 +6,7 @@
 <title>Radar — Competitive Analysis</title>
 <link rel="preconnect" href="https://fonts.googleapis.com" />
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@300;400;500;600;700&family=IBM+Plex+Serif:wght@400;500;600&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet" />
+<link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;600;700&family=Roboto+Slab:wght@400;500;600&family=Roboto+Mono:wght@400;500;600&display=swap" rel="stylesheet" />
 <link rel="stylesheet" href="styles.css" />
 
 <script src="https://unpkg.com/react@18.3.1/umd/react.development.js" integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L" crossorigin="anonymous"></script>
@@ -21,28 +21,70 @@
 window.RADAR_TWEAK_DEFAULTS = /*EDITMODE-BEGIN*/{
   "density": "comfortable",
   "accent": "#b34a1f",
-  "showSubjectAccent": true
+  "showSubjectAccent": true,
+  "overviewVersion": "v1"
 }/*EDITMODE-END*/;
 
 // Populated after a real scan; starts empty so the app boots into Home/New scan
 window.RADAR_DATA = null;
 
-// Backend URL — change if your backend runs on a different port
-window.RADAR_API = "http://localhost:8000";
+// Backend URL — Render-hosted prod backend (change to localhost:8000 for local dev)
+window.RADAR_API = "https://radar-backend-je6o.onrender.com";
+
+// ─── Bearer token auth helpers (shared secret, gates /scan* endpoints) ────────
+window.RADAR_TOKEN_KEY = "radar:token";
+
+window.radarGetToken = function () {
+  try { return localStorage.getItem(window.RADAR_TOKEN_KEY) || ""; } catch { return ""; }
+};
+window.radarSetToken = function (t) {
+  try { localStorage.setItem(window.RADAR_TOKEN_KEY, t || ""); } catch {}
+};
+window.radarClearToken = function () {
+  try { localStorage.removeItem(window.RADAR_TOKEN_KEY); } catch {}
+};
+
+// Monkey-patch fetch so every call to window.RADAR_API auto-attaches the bearer
+// token. Zero changes needed at fetch sites in app.jsx / screens-*.jsx.
+(function () {
+  const _origFetch = window.fetch;
+  window.fetch = function (input, init) {
+    init = init || {};
+    const url = typeof input === "string" ? input : (input && input.url) || "";
+    if (window.RADAR_API && url.startsWith(window.RADAR_API)) {
+      const token = window.radarGetToken();
+      if (token) {
+        init.headers = Object.assign({}, init.headers || {}, {
+          Authorization: "Bearer " + token,
+        });
+      }
+    }
+    return _origFetch(input, init);
+  };
+})();
 </script>
 
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" crossorigin=""/>
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin=""></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
 <script src="data.js"></script>
 <script type="text/babel" src="tweaks-panel.jsx"></script>
 <script type="text/babel" src="components.jsx"></script>
 <script type="text/babel" src="screens-search.jsx"></script>
+<script type="text/babel" src="screens-select.jsx"></script>
 <script type="text/babel" src="screens-home.jsx"></script>
 <script type="text/babel" src="screens-overview.jsx"></script>
+<script type="text/babel" src="screens-overview-v2.jsx"></script>
 <script type="text/babel" src="screens-list.jsx"></script>
 <script type="text/babel" src="screens-compare.jsx"></script>
 <script type="text/babel" src="screens-map.jsx"></script>
+<script type="text/babel" src="screens-positioning.jsx"></script>
 <script type="text/babel" src="screens-features.jsx"></script>
 <script type="text/babel" src="screens-pricing.jsx"></script>
 <script type="text/babel" src="screens-timeline.jsx"></script>
+<script type="text/babel" src="screens-company.jsx"></script>
+<script type="text/babel" src="screens-memo.jsx"></script>
 <script type="text/babel" src="app.jsx"></script>
 </body>
 </html>
+<!-- vercel-git-test -->

@@ -271,6 +271,7 @@ python scripts/precompute_demo.py  # à créer en semaine 3
 3. **Coût Linkup** — ~0.60€ par analyse complète. Ne jamais lancer un pipeline complet en boucle pour débugger — utiliser les mocks dans `tests/fixtures/`
 4. **CORS** — le backend FastAPI doit autoriser `localhost:3000` en dev et le domaine Vercel en prod
 5. **Rate limiting Nominatim** — 1 req/s max, ajouter `asyncio.sleep(1)` entre les calls dans `geocoding.py`
+6. **Refresh-recovery — pipeline ne s'annule PLUS au disconnect** : `/scan/enrich` lance la pipeline en background task et NE l'annule pas si le client SSE se déconnecte. Le résultat atterrit toujours dans `cache_set(f"radar_{domain}", ...)` + `cache_set_progress(run_id, ...)`. Conséquence : un refresh client ne récupère pas les crédits Linkup, mais évite un re-scan complet (~€4.50). Le frontend stocke `run_id` dans `localStorage["radar:activeScan"]` et poll `GET /scan/status/{run_id}` (exempt du rate limit). Si tu ajoutes une nouvelle phase au pipeline, écris dans `cache_set_progress` au début + à la fin pour que la recovery la couvre.
 
 ---
 
@@ -329,6 +330,12 @@ Pour chaque tâche :
 3. **Code** : diff minimal (pas de fichiers entiers si pas nécessaire)
 4. **Risques** : ce qui pourrait casser, edge cases identifiés
 5. **Test rapide** : la commande pour valider que ça marche
+
+---
+
+## 📝 Changelog pipeline
+
+- **2026-05-31** — `transform.py._map_competitor` étendu pour mapper `arr`, `avg_contract`, `funding_rounds`, `funding_stage`, `acquisition`, `recent_news`, `growth_signals` côté competitors (symétrique avec `_map_subject`). Nouveau champ `Company.arr` (EUR) dans `radar_output.py`. Helper `_parse_money_usd` ajouté. Adapter `utils/eval_to_data_js.py` créé pour régénérer `frontend-prototype/data.js` depuis un eval enrichi (cohort démo HR-tech : TestGorilla subject + HireVue/Paradox/Harver). Conséquence : 4 nouveaux graphiques dans l'onglet Positioning (Capital Efficiency Matrix, Funding Round Timeline, Investor Concentration Graph, Customer Logo Overlap). Autres onglets (Pricing, Timeline) à vérifier — peuvent afficher données stale du cohort précédent.
 
 ---
 
