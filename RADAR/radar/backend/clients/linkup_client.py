@@ -241,6 +241,11 @@ class LinkupClient:
             "Content-Type": "application/json",
         }
 
+    def _record(self, path: str, status: str, cost_eur: float = 0.0) -> None:
+        # No-op for BYOK: a tester's own-key spend never touches our ledger/Supabase.
+        if not self.byok:
+            _record_call(path, status, cost_eur=cost_eur)
+
     async def _post(self, path: str, body: dict, cost_eur: float = 0.0) -> Any:
         # BYOK: kill-switch still applies (our emergency brake) but neither our
         # daily budget nor our ledger track a tester's own-key spend.

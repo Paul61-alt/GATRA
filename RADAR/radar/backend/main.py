@@ -73,6 +73,32 @@ def _check_daily_budget_eur(byok: bool = False) -> None:
         )
 
 
+def _check_byok_scan_cap(x_linkup_key: str | None) -> None:
+    """Coarse daily cap on BYOK scans to protect OUR Claude spend.
+
+    A BYOK tester pays their own LinkUp bill, but synthesis + memo still run on
+    OUR Claude key (~$0.15-0.50/scan). This caps how many tester scans/day we
+    underwrite, on top of the per-IP rate limit. Counter is in-process: fine for
+    the single Render instance; it resets on spin-down/redeploy (acceptable — low
+    unit cost, trusted testers). Move to the Supabase ledger if it ever goes
+    multi-instance or untrusted. No-op for our own (non-BYOK) traffic, which the
+    EUR budget already governs.
+    """
+    if not (x_linkup_key and x_linkup_key.strip()):
+        return
+    cap = int(os.environ.get("RADAR_BYOK_DAILY_SCAN_CAP", "50"))
+    today = datetime.now(timezone.utc).date().isoformat()
+    counts = app.state.byok_scan_count
+    used = counts.get(today, 0)
+    if used >= cap:
+        logger.warning("byok_daily_cap_reached used=%d cap=%d", used, cap)
+        raise HTTPException(
+            status_code=429,
+            detail={"error": "byok_daily_cap_reached", "used": used, "cap": cap},
+        )
+    counts[today] = used + 1
+
+
 def verify_token(authorization: str | None = Header(default=None)) -> None:
     """Bearer-token gate on /scan* endpoints.
 
@@ -91,6 +117,25 @@ def verify_token(authorization: str | None = Header(default=None)) -> None:
     token = authorization.removeprefix("Bearer ").strip()
     if token != expected:
         raise HTTPException(status_code=401, detail="Invalid token")
+
+
+def verify_access(
+    authorization: str | None = Header(default=None),
+    x_linkup_key: str | None = Header(default=None, alias="X-Linkup-Key"),
+) -> None:
+    """Gate for /scan* endpoints: a valid LinkUp key OR our shared token.
+
+    BYOK testers reach the app with just their own LinkUp key (the key is the
+    sésame — no shared token to hand out). Presence is enough to pass the gate;
+    validity is enforced implicitly (an invalid key fails at the first LinkUp
+    call) and up-front by the public /linkup/validate endpoint the landing page
+    calls. Our own internal access still uses RADAR_SHARED_TOKEN via verify_token.
+    Abuse of our Claude spend by anyone-with-a-key is bounded by the per-IP rate
+    limit + the BYOK daily scan cap (_check_byok_scan_cap).
+    """
+    if x_linkup_key and x_linkup_key.strip():
+        return  # BYOK present → access granted
+    verify_token(authorization)
 
 
 # run_id is used as a filename in the cache (progress, discover). Reject anything that
@@ -116,6 +161,8 @@ async def lifespan(app: FastAPI):
     )
     # Running enrich pipelines keyed by run_id — used to dedupe concurrent POSTs after a refresh.
     app.state.enrich_jobs = {}
+    # BYOK daily scan counter {date: count} — caps how many tester scans we underwrite (Claude).
+    app.state.byok_scan_count = {}
     yield
 
 
@@ -260,10 +307,11 @@ async def analyze(
     request: Request,
     req: AnalyzeRequest,
     x_linkup_key: str | None = Header(default=None, alias="X-Linkup-Key"),
-    _auth: None = Depends(verify_token),
+    _auth: None = Depends(verify_access),
 ) -> dict:
     _check_kill_switch()
     _check_daily_budget_eur(byok=bool(x_linkup_key))
+    _check_byok_scan_cap(x_linkup_key)
     domain = _normalize_domain(req.url)
     if not domain:
         raise HTTPException(status_code=422, detail="Invalid URL")
@@ -327,11 +375,12 @@ async def scan(
     request: Request,
     req: AnalyzeRequest,
     x_linkup_key: str | None = Header(default=None, alias="X-Linkup-Key"),
-    _auth: None = Depends(verify_token),
+    _auth: None = Depends(verify_access),
 ) -> dict:
     """Like /analyze but returns RadarOutput (camelCase, frontend-ready)."""
     _check_kill_switch()
     _check_daily_budget_eur(byok=bool(x_linkup_key))
+    _check_byok_scan_cap(x_linkup_key)
     domain = _normalize_domain(req.url)
     if not domain:
         raise HTTPException(status_code=422, detail="Invalid URL")
@@ -387,11 +436,12 @@ async def scan_stream(
     request: Request,
     req: AnalyzeRequest,
     x_linkup_key: str | None = Header(default=None, alias="X-Linkup-Key"),
-    _auth: None = Depends(verify_token),
+    _auth: None = Depends(verify_access),
 ) -> StreamingResponse:
     """SSE endpoint — emits fine-grained progress events then final result."""
     _check_kill_switch()
     _check_daily_budget_eur(byok=bool(x_linkup_key))
+    _check_byok_scan_cap(x_linkup_key)
     domain = _normalize_domain(req.url)
     if not domain:
         raise HTTPException(status_code=422, detail="Invalid URL")
@@ -501,7 +551,7 @@ async def scan_discover(
     request: Request,
     req: AnalyzeRequest,
     x_linkup_key: str | None = Header(default=None, alias="X-Linkup-Key"),
-    _auth: None = Depends(verify_token),
+    _auth: None = Depends(verify_access),
 ) -> dict:
     """Phase 1+2: UNDERSTAND + DISCOVER only. Returns lightweight candidate list.
 
@@ -510,6 +560,7 @@ async def scan_discover(
     """
     _check_kill_switch()
     _check_daily_budget_eur(byok=bool(x_linkup_key))
+    _check_byok_scan_cap(x_linkup_key)
     domain = _normalize_domain(req.url)
     if not domain:
         raise HTTPException(status_code=422, detail="Invalid URL")
@@ -579,7 +630,7 @@ async def scan_enrich_stream(
     request: Request,
     req: EnrichRequest,
     x_linkup_key: str | None = Header(default=None, alias="X-Linkup-Key"),
-    _auth: None = Depends(verify_token),
+    _auth: None = Depends(verify_access),
 ) -> StreamingResponse:
     """Phase 3+4: ENRICH + SYNTHESIZE on VC-selected candidates. SSE stream → RadarOutput.
 
@@ -588,6 +639,7 @@ async def scan_enrich_stream(
     """
     _check_kill_switch()
     _check_daily_budget_eur(byok=bool(x_linkup_key))
+    _check_byok_scan_cap(x_linkup_key)
     _validate_run_id(req.run_id)
 
     cached_discover = cache_get_discover(req.run_id)
@@ -746,7 +798,12 @@ class MemoRequest(BaseModel):
 
 @app.post("/scan/memo")
 @limiter.limit("6/minute")
-async def scan_memo(request: Request, req: MemoRequest, _auth: None = Depends(verify_token)) -> dict:
+async def scan_memo(
+    request: Request,
+    req: MemoRequest,
+    x_linkup_key: str | None = Header(default=None, alias="X-Linkup-Key"),
+    _auth: None = Depends(verify_access),
+) -> dict:
     """Generate a comparative VC memo from an already-cached scan + a template.
 
     On-demand, downstream of the pipeline. Re-reads the authoritative RadarOutput
@@ -754,6 +811,7 @@ async def scan_memo(request: Request, req: MemoRequest, _auth: None = Depends(ve
     citation-tagged payload to Claude, and returns a grounded Memo (camelCase).
     """
     _check_kill_switch()
+    _check_byok_scan_cap(x_linkup_key)  # memo runs on OUR Claude — cap BYOK usage
     domain = _normalize_domain(req.domain)
     if not domain:
         raise HTTPException(status_code=422, detail="Invalid domain")
@@ -778,7 +836,7 @@ async def scan_memo(request: Request, req: MemoRequest, _auth: None = Depends(ve
 
 @app.get("/scan/status/{run_id}")
 @limiter.exempt
-async def scan_status(request: Request, run_id: str, _auth: None = Depends(verify_token)) -> dict:
+async def scan_status(request: Request, run_id: str, _auth: None = Depends(verify_access)) -> dict:
     """Return the latest progress snapshot for a run_id (refresh recovery).
 
     Frontend localStorage stashes run_id on scan start; after a refresh it polls
@@ -819,7 +877,7 @@ def _status_from_iso(iso: Optional[str]) -> str:
 
 @app.get("/scans")
 @limiter.exempt
-async def list_scans(request: Request, _auth: None = Depends(verify_token)) -> list[dict]:
+async def list_scans(request: Request, _auth: None = Depends(verify_access)) -> list[dict]:
     """List all known scans (dedup by domain, most recent first).
 
     Reads Supabase first, file glob fallback. Read-only, never triggers Linkup.
@@ -832,7 +890,7 @@ async def list_scans(request: Request, _auth: None = Depends(verify_token)) -> l
 
 @app.get("/scans/{domain}/latest")
 @limiter.exempt
-async def get_scan_latest(request: Request, domain: str, _auth: None = Depends(verify_token)) -> dict:
+async def get_scan_latest(request: Request, domain: str, _auth: None = Depends(verify_access)) -> dict:
     """Return the most recent full RadarOutput for `domain`.
 
     404 if no cached scan exists. Read-only, never triggers Linkup.
@@ -844,6 +902,28 @@ async def get_scan_latest(request: Request, domain: str, _auth: None = Depends(v
     if not payload:
         raise HTTPException(status_code=404, detail=f"No cached scan for domain '{bare}'.")
     return payload
+
+
+@app.post("/linkup/validate")
+@limiter.limit("6/minute")
+async def validate_linkup_key(
+    request: Request,
+    x_linkup_key: str | None = Header(default=None, alias="X-Linkup-Key"),
+) -> dict:
+    """Public: check a tester's LinkUp key and return their credit balance.
+
+    The landing page calls this before letting a tester in, so they see their
+    own balance and get a clean valid/invalid signal. No shared-token gate (the
+    key IS the credential). Uses balance() which bypasses our budget/ledger and
+    returns None on any error — so a bad key yields {valid:false}, not a 500.
+    The key is read from the header (never a request body) and never logged.
+    """
+    _check_kill_switch()
+    if not (x_linkup_key and x_linkup_key.strip()):
+        raise HTTPException(status_code=422, detail="Missing X-Linkup-Key header")
+    client = LinkupClient(api_key=x_linkup_key.strip())
+    balance = await client.balance()
+    return {"valid": balance is not None, "balanceUsd": balance}
 
 
 @app.get("/health")

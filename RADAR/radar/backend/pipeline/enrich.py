@@ -1575,16 +1575,18 @@ async def run(
             len(competitors), DEPTH_BATCH,
         )
         estimated = RESEARCH_COST_EUR
-        cumul = estimate_today_cost_eur()
-        if cumul + estimated > DAILY_HARD_CAP_EUR:
-            raise BudgetExceededError(
-                f"scan would exceed daily cap €{DAILY_HARD_CAP_EUR:.2f} "
-                f"(today={cumul:.2f} + scan={estimated:.2f})"
-            )
-        if cumul + estimated > DAILY_WARN_CAP_EUR:
-            logger.warning(
-                "daily linkup spend nearing cap: today=%.2f + scan=%.2f", cumul, estimated
-            )
+        # BYOK: tester's own-key spend — skip our cap/ledger (see 5_lanes note above).
+        if not byok:
+            cumul = estimate_today_cost_eur()
+            if cumul + estimated > DAILY_HARD_CAP_EUR:
+                raise BudgetExceededError(
+                    f"scan would exceed daily cap €{DAILY_HARD_CAP_EUR:.2f} "
+                    f"(today={cumul:.2f} + scan={estimated:.2f})"
+                )
+            if cumul + estimated > DAILY_WARN_CAP_EUR:
+                logger.warning(
+                    "daily linkup spend nearing cap: today=%.2f + scan=%.2f", cumul, estimated
+                )
 
         coords_map = await _geocode_all(competitors)
         profiles = await _enrich_batch(
