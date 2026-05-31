@@ -23,7 +23,7 @@ from clients.claude_client import ClaudeClient
 from clients.linkup_client import LinkupClient
 from models.company import (
     AcquisitionInfo, CompanyProfile, CustomerExample, DataPoint,
-    Funding, FundingRound, HQ, Investor, KeyPerson, Market, NewsItem,
+    Funding, FundingRound, HQ, Investor, KeyPerson, LinkedInSignal, Market, NewsItem,
     PricingDetail, PricingTier,
 )
 from utils.geocoding import geocode
@@ -762,6 +762,17 @@ async def run(
         if n.get("headline")
     ]
 
+    # LinkedIn posts fetched by Lane 2 STEP 3 (date/headline/url) — previously dropped.
+    recent_linkedin_signals = [
+        LinkedInSignal(
+            signal=p.get("headline", ""),
+            date=p.get("date"),
+            source_url=p.get("url"),
+        )
+        for p in (data.get("recent_posts") or [])
+        if isinstance(p, dict) and p.get("headline")
+    ]
+
     def _valid_domain(raw: str | None) -> str | None:
         """Accept domain-like strings (contains '.', no spaces). Reject industry labels."""
         if raw and "." in raw and " " not in raw.strip():
@@ -865,6 +876,8 @@ async def run(
         key_people=key_people,
         growth_signals=data.get("growth_signals") or [],
         recent_news=recent_news,
+        recent_linkedin_signals=recent_linkedin_signals,
+        founder_linkedin_urls=[p.linkedin for p in key_people if p.linkedin],
         source_urls=source_urls,
         pipeline_run_id=run_id,
     )

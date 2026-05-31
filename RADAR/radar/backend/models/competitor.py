@@ -11,6 +11,7 @@ from models.company import (
     HQ,
     Investor,
     KeyPerson,
+    LinkedInSignal,
     PricingTier,
 )
 
@@ -65,15 +66,6 @@ class PricingSignal(BaseModel):
     recent_changes: Optional[str] = None
     source_url: Optional[str] = None
     extracted_at: str
-
-
-class LinkedInSignal(BaseModel):
-    date: Optional[str] = None
-    author: Optional[str] = None
-    signal: str
-    excerpt: Optional[str] = None   # first ~280 chars of post body, for preview card
-    image_url: Optional[str] = None  # post og:image if any (rare — usually text-only)
-    source_url: Optional[str] = None
 
 
 class RecentSignal(BaseModel):
