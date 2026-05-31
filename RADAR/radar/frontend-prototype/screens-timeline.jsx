@@ -220,7 +220,7 @@ function TimelineScreen({ data, onOpenCompany }) {
                     <div style={{fontSize:9.5, color:"var(--fg-4)", fontFamily:"var(--font-mono)"}}>
                       {showEmptyState
                         ? <RowEmptyState status={status} founded={c.founded} />
-                        : total > 0 ? "$" + total.toFixed(0) + "M" : "—"}
+                        : total > 0 ? "€" + total.toFixed(0) + "M" : "—"}
                     </div>
                   </div>
                 </div>

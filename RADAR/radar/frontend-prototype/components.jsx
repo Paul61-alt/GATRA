@@ -6,10 +6,19 @@ const { useState, useEffect, useRef, useMemo, useCallback } = React;
 // âââ Utility ââââââââââââââââââââââââââââââââââââââââââââââââââ
 const fmtMoney = (n) => {
   if (n == null) return "â";
-  if (n >= 1e9) return "$" + (n / 1e9).toFixed(1) + "B";
-  if (n >= 1e6) return "$" + (n / 1e6).toFixed(1) + "M";
-  if (n >= 1e3) return "$" + (n / 1e3).toFixed(0) + "k";
-  return "$" + n;
+  if (n >= 1e9) return "€" + (n / 1e9).toFixed(1) + "B";
+  if (n >= 1e6) return "€" + (n / 1e6).toFixed(1) + "M";
+  if (n >= 1e3) return "€" + (n / 1e3).toFixed(0) + "k";
+  return "€" + n;
+};
+// F2: status-aware funding label so bootstrapped/stealth/not_found don't render as "$0"
+const fmtFunding = (f) => {
+  if (!f) return "—";
+  if (f.status === "bootstrapped") return "Bootstrapped";
+  if (f.status === "stealth")      return "Stealth";
+  if (f.status === "pending")      return "Enriching…";
+  if (f.status === "not_found")    return "—";
+  return fmtMoney(f.total || 0);
 };
 const fmtNum = (n) => {
   if (n == null) return "â";
@@ -140,7 +149,7 @@ function PrintReport({ data }) {
         <div className="pr-meta-row">
           <div><div className="pr-lbl">Founded</div><div className="pr-val">{subject.founded}</div></div>
           <div><div className="pr-lbl">Employees</div><div className="pr-val">{(subject.employees||0).toLocaleString()}</div></div>
-          <div><div className="pr-lbl">Total raised</div><div className="pr-val">{fmtMoney(subject.funding?.total||0)}</div></div>
+          <div><div className="pr-lbl">Total raised</div><div className="pr-val">{fmtFunding(subject.funding)}</div></div>
           <div><div className="pr-lbl">Stage</div><div className="pr-val">{subject.funding?.lastRound||"—"}</div></div>
           <div><div className="pr-lbl">Competitors mapped</div><div className="pr-val">{competitors.length}</div></div>
           <div><div className="pr-lbl">Total market raised</div><div className="pr-val">{fmtMoney(totalRaised)}</div></div>
@@ -170,7 +179,7 @@ function PrintReport({ data }) {
                 <td style={{fontSize:11}}>{c.subCategory || c.category}</td>
                 <td style={{fontSize:11}}>{c.hq?.split(",")[0]}</td>
                 <td style={{textAlign:"right"}}>{c.employees ? fmtNum(c.employees) : "—"}</td>
-                <td style={{textAlign:"right"}}>{fmtMoney(c.funding?.total||0)}</td>
+                <td style={{textAlign:"right"}}>{fmtFunding(c.funding)}</td>
                 <td style={{fontSize:11}}>{c.funding?.lastRound||"—"}</td>
                 <td style={{textAlign:"right"}}>{c.similarity != null ? (c.similarity*100).toFixed(0)+"%" : "—"}</td>
                 <td><span style={{
@@ -198,7 +207,7 @@ function PrintReport({ data }) {
             <div className="pr-co-head">
               <strong>{c.name}</strong>
               <span style={{fontSize:11,color:"#888",marginLeft:8}}>{c.domain}</span>
-              <span style={{marginLeft:"auto",fontSize:11}}>{fmtMoney(c.funding?.total||0)} raised · {c.employees ? fmtNum(c.employees)+" employees" : ""}</span>
+              <span style={{marginLeft:"auto",fontSize:11}}>{fmtFunding(c.funding)}{c.funding?.status === "enriched" ? " raised" : ""} · {c.employees ? fmtNum(c.employees)+" employees" : ""}</span>
             </div>
             <p style={{fontSize:12,color:"#444",margin:"4px 0 6px"}}>{c.tagline}</p>
             <ul className="pr-list">
@@ -236,7 +245,7 @@ function Topbar({ subject, data, onDelete, onRescan, isRescanning }) {
         c.name, c.domain, c.subCategory || c.category,
         c.similarity != null ? (c.similarity * 100).toFixed(0) + "%" : "",
         c.threat || "",
-        c.funding?.total ? "$" + (c.funding.total / 1e6).toFixed(1) + "M" : "",
+        c.funding?.total ? "€" + (c.funding.total / 1e6).toFixed(1) + "M" : "",
         c.funding?.lastRound || "",
         c.employees || "",
         c.hq || "",
@@ -479,11 +488,87 @@ function countryFlag(hqString) {
   return { flag, iso };
 }
 
+// ─── V2 Overview primitives ───────────────────────────────────
+function fmtRelTime(iso) {
+  if (!iso) return "";
+  const then = new Date(iso).getTime();
+  if (Number.isNaN(then)) return "";
+  const diff = (Date.now() - then) / 1000;
+  if (diff < 60) return "just now";
+  if (diff < 3600) return Math.floor(diff / 60) + "m ago";
+  if (diff < 86400) return Math.floor(diff / 3600) + "h ago";
+  if (diff < 2592000) return Math.floor(diff / 86400) + "d ago";
+  if (diff < 31536000) return Math.floor(diff / 2592000) + "mo ago";
+  return Math.floor(diff / 31536000) + "y ago";
+}
+
+function CitationPopover({ children, evidence, sourceUrl, extractedAt }) {
+  const [open, setOpen] = useState(false);
+  if (!evidence && !sourceUrl) return children;
+  return (
+    <span
+      className="citation-trigger"
+      onMouseEnter={() => setOpen(true)}
+      onMouseLeave={() => setOpen(false)}
+    >
+      {children}
+      {open && (
+        <div className="citation-popover">
+          {evidence && <p className="ev">"{evidence}"</p>}
+          {sourceUrl && (
+            <a className="src" href={sourceUrl} target="_blank" rel="noopener noreferrer">
+              {sourceUrl}
+            </a>
+          )}
+          {extractedAt && <span className="ts">extracted {fmtRelTime(extractedAt)}</span>}
+        </div>
+      )}
+    </span>
+  );
+}
+
+function ConfidenceDot({ level = "medium", sourceUrl, evidence, extractedAt }) {
+  return (
+    <CitationPopover evidence={evidence} sourceUrl={sourceUrl} extractedAt={extractedAt}>
+      <span
+        className={`confidence-dot confidence-dot--${level}`}
+        title={`confidence: ${level}`}
+        aria-label={`confidence ${level}`}
+      />
+    </CitationPopover>
+  );
+}
+
+// ─── F2: Funding status empty-state pill ──────────────────────
+// Renders nothing for status "enriched" — only used when rounds.length === 0.
+function RowEmptyState({ status, founded }) {
+  const COPY = {
+    bootstrapped: { label: "Bootstrapped", hint: "No outside capital",    color: "var(--fg-3)" },
+    stealth:      { label: "Stealth",      hint: founded ? `Founded ${founded}` : "Pre-launch", color: "#0ea5e9" },
+    not_found:    { label: "No data",      hint: "Funding not disclosed", color: "var(--fg-4)" },
+    pending:      { label: "Enriching…",   hint: "Lane 1 in progress",    color: "var(--accent, #ff5d00)" },
+  };
+  const c = COPY[status];
+  if (!c) return null;
+  return (
+    <span style={{ fontSize: 10.5, color: c.color, fontFamily: "var(--font-mono)", display: "inline-flex", alignItems: "center", gap: 6 }}>
+      <span style={{
+        padding: "1px 6px", borderRadius: 3,
+        border: `1px solid ${c.color}`,
+        opacity: 0.95, fontWeight: 500, letterSpacing: 0.2,
+      }}>{c.label}</span>
+      <span style={{ color: "var(--fg-4)" }}>{c.hint}</span>
+    </span>
+  );
+}
+
 // Export to window for cross-script access
 Object.assign(window, {
-  fmtMoney, fmtNum, fmtPct, fmtDate,
+  fmtMoney, fmtNum, fmtPct, fmtDate, fmtRelTime, fmtFunding,
   Ic, Icons,
   Sidebar, Topbar, Tabs,
   LogoMark, ThreatTag, Bar, Sparkline, SectionH,
   countryFlag,
+  ConfidenceDot, CitationPopover,
+  RowEmptyState,
 });

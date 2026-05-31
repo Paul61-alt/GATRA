@@ -95,13 +95,13 @@ function OverviewScreen({ data, onOpenCompany, loadingPhase = 2 }) {
               </div>
               <div className="stat">
                 <div className="lbl">Total raised</div>
-                <div className="val">{fmtMoney(subject.funding?.total || 0)}</div>
-                <div className="delta">{subject.funding?.lastRound} · {fmtDate(subject.funding?.lastRoundAt || "")}</div>
+                <div className="val">{fmtFunding(subject.funding)}</div>
+                <div className="delta">{(subject.funding?.rounds?.length || 0) > 0 ? "across " + subject.funding.rounds.length + " round" + (subject.funding.rounds.length === 1 ? "" : "s") : "—"}</div>
               </div>
               <div className="stat">
-                <div className="lbl">ARR</div>
-                <div className="val">{subject.arr ? fmtMoney(subject.arr) : "—"}</div>
-                <div className="delta">{subject.customers ? fmtNum(subject.customers) + " customers" : "—"}</div>
+                <div className="lbl">Last fundraising</div>
+                <div className="val">{subject.funding?.lastRoundAmountEur ? fmtMoney(subject.funding.lastRoundAmountEur) : "—"}</div>
+                <div className="delta">{subject.funding?.lastRound ? subject.funding.lastRound + " · " + fmtDate(subject.funding?.lastRoundAt || "") : "—"}</div>
               </div>
             </>
           ) : (
@@ -302,7 +302,7 @@ function OverviewScreen({ data, onOpenCompany, loadingPhase = 2 }) {
                 </div>
                 <div style={{textAlign:"right"}}>
                   <div className="mono" style={{fontSize:10, color:"var(--fg-4)", letterSpacing:"0.06em", textTransform:"uppercase"}}>Funding</div>
-                  <div className="mono" style={{fontSize:13, fontWeight:500, marginTop:4}}>{fmtMoney((c.funding?.total || 0))}</div>
+                  <div className="mono" style={{fontSize:13, fontWeight:500, marginTop:4}}>{fmtFunding(c.funding)}</div>
                 </div>
                 <ThreatTag level={c.threat} />
               </div>
@@ -447,7 +447,7 @@ function PositioningMatrix({ data, onOpenCompany }) {
                   return [
                     c.name,
                     "Founded: " + (c.founded || "—"),
-                    "Funding: " + fmtMoney(c.funding?.total || 0),
+                    "Funding: " + fmtFunding(c.funding),
                   ];
                 },
                 title: () => "",
@@ -548,7 +548,7 @@ function PositioningMatrix({ data, onOpenCompany }) {
           <div style={{flex:1, minWidth:0}}>
             <div style={{fontWeight:600, fontSize:13}}>{selected.name}</div>
             <div className="mono" style={{fontSize:11, color:"var(--fg-3)", marginTop:2}}>
-              {selected.subCategory} · {fmtMoney(selected.funding?.total || 0)} raised
+              {selected.subCategory} · {fmtFunding(selected.funding)}{selected.funding?.status === "enriched" ? " raised" : ""}
               {!selected.isSubject && " · " + (selected.similarity * 100).toFixed(0) + "% similarity"}
             </div>
           </div>

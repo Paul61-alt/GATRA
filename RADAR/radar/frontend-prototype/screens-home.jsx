@@ -1,20 +1,26 @@
 // screens-home.jsx — Home: list of companies the user has already scanned
 const { useState: _uS_home, useEffect: _uE_home, useRef: _uR_home } = React;
 
-const PAST_SCANS = [
-  { name: "Linear",          domain: "linear.app",         category: "Developer Tools · Project Management",   competitors: 8,  scannedAt: "2 hours ago",   status: "fresh",    isCurrent: true },
-  { name: "Modern Treasury", domain: "moderntreasury.com", category: "B2B Payments · Bank Operations",        competitors: 11, scannedAt: "Yesterday",     status: "fresh" },
-  { name: "Mercury",         domain: "mercury.com",        category: "B2B Banking · SMB Banking",             competitors: 14, scannedAt: "3 days ago",    status: "fresh" },
-  { name: "Ramp",            domain: "ramp.com",           category: "B2B Payments · Spend Management",       competitors: 9,  scannedAt: "1 week ago",    status: "stale" },
-  { name: "Vanta",           domain: "vanta.com",          category: "Security · Compliance Automation",      competitors: 12, scannedAt: "2 weeks ago",   status: "stale" },
-  { name: "Retool",          domain: "retool.com",         category: "Developer Tools · Internal Tooling",    competitors: 7,  scannedAt: "3 weeks ago",   status: "stale" },
-  { name: "Hex",             domain: "hex.tech",           category: "Data · Notebooks & Analytics",          competitors: 10, scannedAt: "1 month ago",   status: "stale" },
-  { name: "Persona",         domain: "withpersona.com",    category: "Identity · KYC / Verification",         competitors: 8,  scannedAt: "1 month ago",   status: "stale" },
-  { name: "Statsig",         domain: "statsig.com",        category: "Developer Tools · Experimentation",     competitors: 6,  scannedAt: "2 months ago",  status: "stale" },
-  { name: "Pylon",           domain: "usepylon.com",       category: "Customer Support · B2B SaaS",           competitors: 9,  scannedAt: "2 months ago",  status: "stale" },
-  { name: "Browserbase",     domain: "browserbase.com",    category: "Developer Tools · Browser Infra",       competitors: 5,  scannedAt: "3 months ago",  status: "archived" },
-  { name: "Resend",          domain: "resend.com",         category: "Developer Tools · Email API",           competitors: 7,  scannedAt: "3 months ago",  status: "archived" },
-];
+function _relativeTime(iso) {
+  if (!iso) return "—";
+  const t = new Date(iso);
+  if (Number.isNaN(t.getTime())) return "—";
+  const diffMs = Date.now() - t.getTime();
+  const mins = Math.round(diffMs / 60000);
+  if (mins < 1) return "Just now";
+  if (mins < 60) return `${mins} min ago`;
+  const hours = Math.round(mins / 60);
+  if (hours < 24) return `${hours} hour${hours === 1 ? "" : "s"} ago`;
+  const days = Math.round(hours / 24);
+  if (days === 1) return "Yesterday";
+  if (days < 7) return `${days} days ago`;
+  const weeks = Math.round(days / 7);
+  if (weeks < 5) return `${weeks} week${weeks === 1 ? "" : "s"} ago`;
+  const months = Math.round(days / 30);
+  if (months < 12) return `${months} month${months === 1 ? "" : "s"} ago`;
+  const years = Math.round(days / 365);
+  return `${years} year${years === 1 ? "" : "s"} ago`;
+}
 
 function RowMenu({ scan, onRescan, onDelete }) {
   const [open, setOpen] = _uS_home(false);
@@ -116,7 +122,29 @@ function RowMenu({ scan, onRescan, onDelete }) {
 
 function HomeScreen({ onOpenCurrent, onNewScan, scanInProgress, onResumeLoading, showToast }) {
   const [q, setQ] = _uS_home("");
-  const [scans, setScans] = _uS_home(PAST_SCANS);
+  const [scans, setScans] = _uS_home([]);
+  const [loading, setLoading] = _uS_home(true);
+  const [loadError, setLoadError] = _uS_home(null);
+
+  _uE_home(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await fetch(`${window.RADAR_API}/scans`);
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        const data = await res.json();
+        if (cancelled) return;
+        setScans(Array.isArray(data) ? data : []);
+        setLoadError(null);
+      } catch (err) {
+        if (cancelled) return;
+        setLoadError(err.message || String(err));
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, []);
 
   const handleRescan = (scan) => {
     setScans(prev => prev.map(s =>
@@ -124,7 +152,7 @@ function HomeScreen({ onOpenCurrent, onNewScan, scanInProgress, onResumeLoading,
     ));
     setTimeout(() => {
       setScans(prev => prev.map(s =>
-        s.domain === scan.domain ? { ...s, status: "fresh", scannedAt: "Just now" } : s
+        s.domain === scan.domain ? { ...s, status: "fresh", scannedAt: new Date().toISOString() } : s
       ));
       if (showToast) showToast({
         label: `Re-scan complete — ${scan.name}`,
@@ -299,9 +327,9 @@ function HomeScreen({ onOpenCurrent, onNewScan, scanInProgress, onResumeLoading,
                     </div>
                   </div>
                 </td>
-                <td style={{color:"var(--fg-2)", fontSize:12.5}}>{s.category}</td>
+                <td style={{color:"var(--fg-2)", fontSize:12.5}}>{s.category || "—"}</td>
                 <td className="num mono" style={{color:"var(--fg-2)"}}>{s.competitors}</td>
-                <td style={{color:"var(--fg-3)", fontSize:12.5}}>{s.scannedAt}</td>
+                <td style={{color:"var(--fg-3)", fontSize:12.5}}>{_relativeTime(s.scannedAt)}</td>
                 <td>
                   {s.status === "scanning" ? (
                     <span style={{display:"inline-flex", alignItems:"center", gap:6, fontSize:11.5, color:"var(--accent)"}}>
@@ -325,11 +353,17 @@ function HomeScreen({ onOpenCurrent, onNewScan, scanInProgress, onResumeLoading,
           </tbody>
         </table>
 
-        {filtered.length === 0 && (
+        {filtered.length === 0 && !scanInProgress && (
           <div style={{
             padding:"60px 20px", textAlign:"center", color:"var(--fg-4)", fontSize:13,
           }}>
-            No analyses match that search.
+            {loading
+              ? "Loading analyses…"
+              : loadError
+                ? `Couldn't load analyses (${loadError}). Backend reachable?`
+                : q
+                  ? "No analyses match that search."
+                  : "No analyses yet — start a new scan."}
           </div>
         )}
       </div>

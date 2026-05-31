@@ -41,7 +41,7 @@ function SelectScreen({ discoverResult, onEnrichComplete, onBack, onScanStart })
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          runId: discoverResult.runId,
+          run_id: discoverResult.runId,
           selected: Array.from(selected),
         }),
       });

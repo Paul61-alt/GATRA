@@ -52,23 +52,37 @@ function SearchScreen({ onComplete, onScanStart, onDiscoverComplete }) {
     { label: "Building radar matrix", detail: "6 dimensions × N companies" },
   ];
 
+  // Refs survive re-renders without relaunching the effect → timer keeps
+  // running across step changes (otherwise resetting startedAt makes target
+  // fall back to 1200, and Math.max freezes the counter at its current value)
+  const startedAtRef = React.useRef(0);
+  const stepRef = React.useRef(step);
+  stepRef.current = step;
+
+  // Abort handle for in-flight /scan/discover. Cancel button calls .abort()
+  // → fetch rejects → Starlette receives client disconnect → cancels the
+  // request task → httpx.AsyncClient closes the connection to Linkup, which
+  // stops burning credits on the in-flight /search call.
+  const abortRef = React.useRef(null);
+  // Set true on cancel — guards late setState writes from the start() coroutine
+  // after the user has already returned to the input phase.
+  const cancelledRef = React.useRef(false);
+
   _uE_search(() => {
     if (phase !== "scanning") return;
+    startedAtRef.current = Date.now();
     let cancelled = false;
     let timer = null;
-    const startedAt = Date.now();
+
+    const CORPUS_STEP_INDEX = 3;
 
     const schedule = () => {
       if (cancelled) return;
-      // Faster ticks during "Searching market corpus" step
-      const isCorpusStep = step === 3;
-      const interval = isCorpusStep ? 180 : 320;
+      const interval = stepRef.current === CORPUS_STEP_INDEX ? 180 : 320;
 
       setSources((s) => {
-        const elapsedSec = (Date.now() - startedAt) / 1000;
-        // Target drifts up with time: ~1200 by 15s, ~1500 by 50s, no ceiling
+        const elapsedSec = (Date.now() - startedAtRef.current) / 1000;
         const target = 1200 + elapsedSec * 8;
-        // Asymptotic easing + small jitter → no plateau feel
         const delta = (target - s) * 0.07 + Math.random() * 6;
         return Math.max(s, Math.floor(s + delta));
       });
@@ -81,7 +95,7 @@ function SearchScreen({ onComplete, onScanStart, onDiscoverComplete }) {
       cancelled = true;
       if (timer) clearTimeout(timer);
     };
-  }, [phase, step]);
+  }, [phase]);
 
   const PHASE_STEP = {
     "UNDERSTAND:start": 0,
@@ -110,6 +124,8 @@ function SearchScreen({ onComplete, onScanStart, onDiscoverComplete }) {
     setFoundCount(0);
     setError(null);
     setPhase("scanning");
+    cancelledRef.current = false;
+    abortRef.current = new AbortController();
     // Generate run_id client-side so localStorage can track this scan *before*
     // the backend response arrives → refresh during discover is recoverable.
     const runId = (window.crypto?.randomUUID?.()) ||
@@ -117,14 +133,13 @@ function SearchScreen({ onComplete, onScanStart, onDiscoverComplete }) {
     if (onScanStart) onScanStart(url.trim(), runId);
 
     // ── Animate the step indicator while /scan/discover runs (UNDERSTAND ~10s + DISCOVER ~5s)
-    let cancelled = false;
     const animate = (async () => {
       setStep(PHASE_STEP["UNDERSTAND:start"]);
       await sleep(2500);
-      if (cancelled) return;
+      if (cancelledRef.current) return;
       setStep(PHASE_STEP["UNDERSTAND:ok"]);
       await sleep(4000);
-      if (cancelled) return;
+      if (cancelledRef.current) return;
       setStep(PHASE_STEP["DISCOVER:start"]);
     })();
 
@@ -134,23 +149,27 @@ function SearchScreen({ onComplete, onScanStart, onDiscoverComplete }) {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ url: url.trim(), runId }),
+        signal: abortRef.current.signal,
       });
+      if (cancelledRef.current) return;
       if (!resp.ok) {
-        cancelled = true;
         const txt = await resp.text();
+        if (cancelledRef.current) return;
         setError(`Backend error ${resp.status}: ${txt.slice(0, 240)}`);
         setPhase("input");
         return;
       }
       discoverResult = await resp.json();
+      if (cancelledRef.current) return;
     } catch (err) {
-      cancelled = true;
+      // AbortError is the user clicking Cancel — silent, no error toast.
+      if (cancelledRef.current || err?.name === "AbortError") return;
       setError(`Network error: ${err.message || err}`);
       setPhase("input");
       return;
     }
-    cancelled = true;
     await animate;
+    if (cancelledRef.current) return;
 
     setStep(PHASE_STEP["DISCOVER:ok"]);
     setFoundCount((discoverResult.candidates || []).length);
@@ -163,6 +182,12 @@ function SearchScreen({ onComplete, onScanStart, onDiscoverComplete }) {
     }
     setPhase("input");
     setUrl("");
+  };
+
+  const cancelScan = () => {
+    cancelledRef.current = true;
+    if (abortRef.current) abortRef.current.abort();
+    setPhase("input");
   };
 
   const handleUrlChange = (e) => {
@@ -728,7 +753,7 @@ function SearchScreen({ onComplete, onScanStart, onDiscoverComplete }) {
 
         <button
           className="tb-btn"
-          onClick={() => setPhase("input")}
+          onClick={cancelScan}
           style={{ color: "var(--fg-4)", fontSize: 12 }}
         >
           Cancel analysis

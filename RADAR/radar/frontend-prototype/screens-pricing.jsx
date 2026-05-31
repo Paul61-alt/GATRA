@@ -23,7 +23,6 @@ function PricingScreen({ data, onOpenCompany }) {
                 <th>Headline</th>
                 <th className="num">Avg. contract</th>
                 <th className="num">Customers</th>
-                <th className="num">ARR</th>
               </tr>
             </thead>
             <tbody>
@@ -38,11 +37,16 @@ function PricingScreen({ data, onOpenCompany }) {
                     </div>
                   </td>
                   <td>{c.pricing.model}</td>
-                  <td>{c.pricing.startsAt === 0 ? <span className="muted">Free / Usage</span> : "$" + c.pricing.startsAt.toLocaleString()}</td>
+                  <td>{
+                    c.pricing.salesGated
+                      ? <span className="muted">Sur devis</span>
+                      : (c.pricing.startsAt == null || c.pricing.startsAt === 0)
+                        ? <span className="muted">Free / Usage</span>
+                        : "€" + c.pricing.startsAt.toLocaleString()
+                  }</td>
                   <td className="mono" style={{fontSize:11.5}}>{c.pricing.mention}</td>
                   <td className="num">{fmtMoney(c.avgContract)}</td>
                   <td className="num">{fmtNum(c.customers)}</td>
-                  <td className="num">{fmtMoney(c.arr)}</td>
                 </tr>
               ))}
             </tbody>

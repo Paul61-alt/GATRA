@@ -167,7 +167,7 @@ function CompanyScreen({ data, companyId }) {
           </div>
           <div className="stat">
             <div className="lbl">Total raised</div>
-            <div className="val">{fmtMoney(c.funding?.total || 0)}</div>
+            <div className="val">{fmtFunding(c.funding)}</div>
             <div className="delta">{c.funding?.lastRound || "—"}</div>
           </div>
           {!c.isSubject && c.similarity != null && (

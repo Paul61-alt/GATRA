@@ -139,7 +139,7 @@ function ListScreen({ data, onOpenCard, onOpenCompany }) {
                     </td>
                     <td className="num">{c.founded}</td>
                     <td className="num">{(c.employees || 0).toLocaleString()}</td>
-                    <td className="num">{fmtMoney(c.funding?.total || 0)}</td>
+                    <td className="num">{fmtFunding(c.funding)}</td>
                     <td className="num" style={{ minWidth: 100 }}>
                       {c.isSubject
                         ? <span className="dim">—</span>
@@ -223,7 +223,7 @@ function ProfileCard({ c, data, onOpenCompany }) {
           { k: "Founded",   v: c.founded,                      mono: true },
           { k: "HQ",        v: `${flag} ${iso}`,               mono: false },
           { k: "Employees", v: (c.employees || 0).toLocaleString(), mono: true },
-          { k: "Raised",    v: fmtMoney(c.funding?.total || 0), mono: true },
+          { k: "Raised",    v: fmtFunding(c.funding),           mono: true },
         ].map((s, i) => (
           <div key={s.k} style={{ padding: "8px 10px", borderRight: i < 3 ? "1px solid " + (c.isSubject ? "var(--accent-bg-2)" : "var(--border-dim)") : "none" }}>
             <div className="mono" style={{ fontSize: 9, letterSpacing: "0.08em", textTransform: "uppercase", color: "var(--fg-4)" }}>{s.k}</div>
