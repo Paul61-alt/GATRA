@@ -28,8 +28,11 @@ load_dotenv()
 # Round 5 = lightweight 1-company eval to validate the 4 fixes (schema without
 # `required`, prompt listing format, filter null/placeholder, filter externals)
 # at minimal cost (€0.055). Linear chosen as best-indexed reference.
+# Round 6 = validate image_url + excerpt extraction on a LESS-FAMOUS company
+# (Maki People, not a daily-posting brand like Linear) — image reliability beyond
+# famous brands is the gate for the LinkedIn-posts-preview feature (2026-05-31).
 COMPETITORS = [
-    {"name": "Linear", "website": "linear.app"},
+    {"name": "Maki People", "website": "makipeople.com"},
 ]
 
 
@@ -102,6 +105,14 @@ LINKEDIN_BATCH_SCHEMA = {
                                     "type": "string",
                                     "description": "Post headline or first 150 chars of post body",
                                 },
+                                "excerpt": {
+                                    "type": "string",
+                                    "description": "First ~280 characters of the post body text, verbatim. Longer than signal — used for the preview card. Null if body not readable.",
+                                },
+                                "image_url": {
+                                    "type": "string",
+                                    "description": "Direct URL of the post's main image (og:image / media.licdn.com), if the post has one. Null if the post is text-only.",
+                                },
                                 "source_url": {
                                     "type": "string",
                                     "description": "Full post URL, format linkedin.com/posts/...",
@@ -151,6 +162,9 @@ def _linkedin_batch_query(competitors: list[dict]) -> str:
         "STEP 3 — For each company page, return the 3 to 5 MOST RECENT public posts "
         "from the company page or its founders (last 12 months). For each post: "
         "date (YYYY-MM-DD), author name, signal (post headline or first 150 chars), "
+        "excerpt (first ~280 chars of the post body, verbatim), "
+        "image_url (direct URL of the post's main image / og:image / media.licdn.com "
+        "if the post has one, else null), "
         "and full post URL (linkedin.com/posts/...).\n\n"
         "Return one object per company in the same order as the input list. "
         "Preserve company names EXACTLY as given (critical for matching). "
@@ -311,6 +325,29 @@ async def main() -> int:
     for it, n in zip(items, sig_counts):
         if n < 1:
             failures.append(f"recent_linkedin_signals == 0 for {it.get('name', '?')}")
+
+    # D2) GATE — image_url + excerpt fill rate (decides image-card vs text-only)
+    all_sigs = [s for it in items for s in (it.get("recent_linkedin_signals") or [])]
+    n_total = len(all_sigs)
+    def _filled(s, key):
+        v = s.get(key)
+        return bool(v) and str(v).strip().lower() not in ("null", "none")
+    n_img = sum(1 for s in all_sigs if _filled(s, "image_url"))
+    n_exc = sum(1 for s in all_sigs if _filled(s, "excerpt"))
+    n_exc_long = sum(
+        1 for s in all_sigs
+        if _filled(s, "excerpt") and len((s.get("excerpt") or "")) > len((s.get("signal") or ""))
+    )
+    print(f"\n[D2] preview-field fill rate over {n_total} posts:")
+    if n_total:
+        print(f"     image_url present : {n_img}/{n_total} ({100*n_img//n_total}%)")
+        print(f"     excerpt present   : {n_exc}/{n_total} ({100*n_exc//n_total}%)")
+        print(f"     excerpt > signal  : {n_exc_long}/{n_total} (richer than headline)")
+        for s in all_sigs:
+            img = "🖼" if _filled(s, "image_url") else "  "
+            exc_len = len((s.get("excerpt") or ""))
+            print(f"       {img} excerpt={exc_len}c  {(s.get('signal') or '')[:60]!r}")
+    print("     → decision: image_url ≥ ~40% ⇒ ship image cards; else text-only card.")
 
     # E) URLs validity (linkedin.com/in/... + linkedin.com/company/...)
     bad_company_urls = [

@@ -71,6 +71,8 @@ class LinkedInSignal(BaseModel):
     date: Optional[str] = None
     author: Optional[str] = None
     signal: str
+    excerpt: Optional[str] = None   # first ~280 chars of post body, for preview card
+    image_url: Optional[str] = None  # post og:image if any (rare — usually text-only)
     source_url: Optional[str] = None
 
 

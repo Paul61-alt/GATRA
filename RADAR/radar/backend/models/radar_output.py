@@ -87,6 +87,15 @@ class NewsItemOut(_CamelModel):
     source_url: Optional[str] = None
 
 
+class LinkedInPostOut(_CamelModel):
+    """A recent LinkedIn post, rendered as a link-preview card on the company screen."""
+    date: Optional[str] = None
+    author: Optional[str] = None
+    excerpt: Optional[str] = None     # post body preview (falls back to signal headline)
+    image_url: Optional[str] = None   # usually null — card is text-only when absent
+    source_url: Optional[str] = None
+
+
 class AcquisitionOut(_CamelModel):
     acquired: bool = False
     acquirer: Optional[str] = None
@@ -147,6 +156,7 @@ class Company(_CamelModel):
     top_3_features: list[str] = Field(default_factory=list)
     tech_stack: list[str] = Field(default_factory=list)
     recent_news: list[NewsItemOut] = Field(default_factory=list)
+    recent_linkedin_posts: list[LinkedInPostOut] = Field(default_factory=list)
     growth_signals: list[str] = Field(default_factory=list)
     funding_rounds: list[FundingRoundOut] = Field(default_factory=list)
     funding_stage: Optional[str] = None
