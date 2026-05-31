@@ -1,0 +1,644 @@
+{
+  "data": {
+    "competitors": [
+      {
+        "name": "Linear",
+        "website": "linear.app",
+        "linkedin_url": "https://www.linkedin.com/company/linearapp",
+        "key_people": [
+          {
+            "name": "Karri Saarinen",
+            "role": "Co-founder, CEO",
+            "linkedin": "https://www.linkedin.com/in/karrisaarinen/",
+            "background": "Co-founder and CEO at Linear, purpose-built tool planning and product development system for teams and agents."
+          },
+          {
+            "name": "Jori Lallo",
+            "role": "Co-founder, CPO",
+            "linkedin": null,
+            "background": "Co-founder and Chief Product Officer at Linear, helping build the product and user experience for the issue tracking and project management tool."
+          },
+          {
+            "name": "Tuomas Artman",
+            "role": "Co-founder, CTO",
+            "linkedin": "https://www.linkedin.com/in/tuomasartman",
+            "background": "Co-founder and Chief Technology Officer at Linear, architecting the technical foundation for the modern issue tracking and project management tool."
+          },
+          {
+            "name": "Cristina Cordova",
+            "role": "COO",
+            "linkedin": null,
+            "background": "Chief Operating Officer at Linear, leading the day-to-day operations of the company that empowers product teams to do their best work."
+          },
+          {
+            "name": "Nan Yu",
+            "role": "Head of Product",
+            "linkedin": null,
+            "background": "Head of Product at Linear, responsible for building and scaling the product that combines UI elegance with world-class performance."
+          }
+        ],
+        "recent_linkedin_signals": [
+          {
+            "date": "2026-05-26",
+            "author": "Linear",
+            "signal": "Klaviyo switched to Linear. Their entire product and engineering team now plan and build in the same tool.",
+            "source_url": "https://www.linkedin.com/posts/linearapp_klaviyo-switched-to-linear-their-entire-activity-7465073028385746945-WNIg"
+          },
+          {
+            "date": "2026-05-22",
+            "author": "Linear",
+            "signal": "Linear Agent use cases - Initiating projects, Synthesizing feedback, Understanding code context",
+            "source_url": "https://www.linkedin.com/posts/linearapp_linear-agent-use-cases-productmanagementmp4-activity-7463649430391517184-RfOx"
+          },
+          {
+            "date": "2026-05-21",
+            "author": "Linear",
+            "signal": "New: Project Slack channels - Linear can now automatically spin up a dedicated Slack channel whenever a new Linear project is created.",
+            "source_url": "https://www.linkedin.com/posts/linearapp_new-project-slack-channels-linear-can-now-activity-7463280356050264064-bf5s"
+          },
+          {
+            "date": "2026-05-20",
+            "author": "Linear",
+            "signal": "Plan and track your software releases directly from Linear. Linear Releases integrates with your CI/CD tools to precisely track the deployment environment, version, and status of every issue.",
+            "source_url": "https://www.linkedin.com/posts/linearapp_plan-and-track-your-software-releases-directly-activity-7462916702964703232-Kuxr"
+          },
+          {
+            "date": "2026-05-15",
+            "author": "Linear",
+            "signal": "Linear Agent × Code Intelligence - Ask Linear how a feature is implemented, why something behaves a certain way, or which technical constraints should shape a project plan – without digging through the codebase or interrupting an engineer.",
+            "source_url": "https://www.linkedin.com/posts/linearapp_linear-agent-code-intelligence-ask-linear-activity-7461088046814367745-WW2y"
+          }
+        ]
+      }
+    ]
+  },
+  "sources": [
+    {
+      "name": "Linear | LinkedIn",
+      "url": "https://www.linkedin.com/company/linearapp",
+      "content": "We&#x27;re hiring: linear.app/careers | At Linear, we are on a mission to bring magic back to software. To empower product teams to do their best work, we are building an issue tracking and project management tool that ...\nLinear | 20,607 followers on LinkedIn. The issue tracker you'll enjoy using. We're hiring: linear.app/careers | At Linear, we are on a mission to bring magic back to software. To empower product teams to do their best work, we are building an issue tracking and project management tool that combines UI elegance with world-class performance.\nTo empower product teams to do their best work, we are building an issue tracking and project management tool that combines UI elegance with world-class performance. Founded in 2019, Linear has become the tool of choice for thousands of high-impact companies to build their products better.\nLinear was set up as a fully remote company from the start. Today, our small but mighty team is distributed across North America and Europe. What unites us is relentless focus, fast execution, and our passion for software craftsmanship.\nIf you work in a company that gives you janky tools, it's probably because the buyers had other goals and the product experience inconsequential to those goals. But I don't this is practice is going to sustain. The pressure and demand for well working and well designed enterprise tools will continue to rise and eventually buyers will realize why they are there – to elevate their teams with the best tools available. ... We've entered a new era for the Linear timeline: › Visualize Milestones › Show Cycle data › New chronology bar › Keyboard commands These new features give you and your team a more detailed, accurate overview of your project progress.",
+      "favicon": "https://favicons.linkup.so?domain=www.linkedin.com",
+      "type": "text"
+    },
+    {
+      "name": "Linear Systems | LinkedIn",
+      "url": "https://www.linkedin.com/company/linear-integrated-systems",
+      "content": "Linear Systems has been manufacturing high-quality discrete components since 1987, serving a wide range of markets including automated test equipment, professional audio, medical electronics, military and test &amp; measurement.\nLinear Systems | 4,550 followers on LinkedIn. Quality Through Innovation Since 1987 | Linear Systems’ semiconductors are the best in the industry and our goal is to enable our customers to build world-class products based upon our parts. Linear Systems has been manufacturing high-quality discrete components since 1987, serving a wide range of markets including automated test equipment, professional audio, medical electronics, military and test & measurement.\nReport this company · Linear Systems’ semiconductors are the best in the industry and our goal is to enable our customers to build world-class products based upon our parts.\nExternal link for Linear Systems · Industry · Semiconductors · Company size · 11-50 employees · Headquarters · Fremont, California · Type · Privately Held · Founded · 1987 · Specialties ·\nWe offer improved and direct replacements for over 2,000 current and discontinued small signal discretes from Fairchild, Vishay-Siliconix, Analog Devices, Interfet, Intersil, Motorola and National Semiconductor. Linear Systems stocks a large inventory to provide short lead times and quick response to last minute orders/pull-in requests with no minimum order requirements.",
+      "favicon": "https://favicons.linkup.so?domain=www.linkedin.com",
+      "type": "text"
+    },
+    {
+      "name": "linear A | LinkedIn",
+      "url": "https://www.linkedin.com/company/linear-a",
+      "content": "linear A | 745 followers on LinkedIn. a data-focused practice | Linear A was established on the fundamental principal of leveraging data to drive value within organizations we collaborate with.\nlinear A | 745 followers on LinkedIn. a data-focused practice | Linear A was established on the fundamental principal of leveraging data to drive value within organizations we collaborate with. Data is a common language - it uniquely connects people, commerce, industries, disciplines, opportunities and problem-solving techniques.\nReport this company · Linear A was established on the fundamental principal of leveraging data to drive value within organizations we collaborate with. Data is a common language - it uniquely connects people, commerce, industries, disciplines, opportunities and problem-solving techniques.\nExternal link for linear A · Industry · Data Infrastructure and Analytics · Company size · 2-10 employees · Headquarters · Yutan, NE · Type · Partnership · Founded · 2018 · Specialties ·\nLinear A is a data-focused practice, founded in the idea that data alone is only the first step – we believe the correct interpretation of data cuts through the noise into and transforms the thread of data into information, building a strong foundation for knowledge.",
+      "favicon": "https://favicons.linkup.so?domain=www.linkedin.com",
+      "type": "text"
+    },
+    {
+      "name": "LED Linear | LinkedIn",
+      "url": "https://www.linkedin.com/company/led-linear",
+      "content": "LED Linear | 12,149 followers on LinkedIn. LED Linear develops and manufactures high quality linear LED lighting solutions for sophisticated interior and exterior. | LED Linear develops and manufactures high quality linear lighting systems based ...\nLED Linear | 12,149 followers on LinkedIn. LED Linear develops and manufactures high quality linear LED lighting solutions for sophisticated interior and exterior. | LED Linear develops and manufactures high quality linear lighting systems based on LED for technically sophisticated interior and exterior lighting.\nLED Linear trade marks are LED Linear GmbH are: LED Linear™, LEDsClick™, TjAway™, VarioLED™, HYDRALUX™, XOOLIGHT™, XOOLINE™, XOOLUM™, XOOLUX™, XOOMINAIRE™, XOOMINARIS™, XOOMINESCENT™, XOOTUBE™. LED Linear products are sold at many locations worldwide through a network of partners and distributors. Our branches are located in the USA, Canada, Singapore, India, Australia, France, Spain, UK and in the Middle East. Worldwide, the company has about 155 employees.\nThe company also has a good network in the lighting design community and works together on a friendly basis with many design offices. One example is Mrs. Gabriela Vidal, Lighting Designer formed in Wismar as an Architectural LD, Master, now based in Palma de Mallorca, Spain. She is specialized with all LED Linear products through her work for the company.\n🌟 At LED Linear, we take pride in fostering a diverse and inclusive work environment where women play a significant role. We are proud to announce that 42% of our workforce comprises strong, talented women who enrich our company every day with their dedication and expertise.",
+      "favicon": "https://favicons.linkup.so?domain=www.linkedin.com",
+      "type": "text"
+    },
+    {
+      "name": "Linear Solutions Inc. | LinkedIn",
+      "url": "https://www.linkedin.com/company/linearsolutions",
+      "content": "The Nation&#x27;s Leading Independent Supplier of Electrical Raceway Products Manufactured in North America | The Nation&#x27;s Leading Independent Supplier of Electrical Metal Conduit Manufactured in North America Now offering accessories with world ...\nLinear Solutions Inc. | 407 followers on LinkedIn. The Nation's Leading Independent Supplier of Electrical Raceway Products Manufactured in North America | The Nation's Leading Independent Supplier of Electrical Metal Conduit Manufactured in North America Now offering accessories with world class delivery!\nPlease reach out for more information on how you can contribute or send your condolences. Our thoughts are with Robert's family and loved ones as they navigate through this challenging time. He will be deeply missed, but his impact on our company and our hearts will endure. Rest in peace, Robert. ... Linear Solutions Inc.\n🔩🛠️ At Linear Solutions, we take pride in going the extra mile to serve our customers' needs. Check out this behind-the-scenes glimpse into our value-added manufacturing process! 👀 Watch as we craft a custom thread on galvanized rigid electrical conduit, showcasing our dedication to quality and precision. As one of the few companies in our field offering this specialized service, we're committed to providing unparalleled support to electrical distributors for any project requirements.\nCheck out our latest video showcasing the abundance of PVC stock at our Griffith facility. With ample supplies of schedule 40 and schedule 80 PVC, in both 10-foot and 20-foot lengths, Linear Solutions is geared up to support your projects as temperatures rise.",
+      "favicon": "https://favicons.linkup.so?domain=www.linkedin.com",
+      "type": "text"
+    },
+    {
+      "name": "Karri Saarinen - Linear.app | LinkedIn",
+      "url": "https://www.linkedin.com/in/karrisaarinen/",
+      "content": "Karri Saarinen is the co-founder and CEO of Linear, purpose-built tool planning and… · Experience: Linear.app · Education: Y Combinator · Location: San Diego Metropolitan Area · 500+ connections on LinkedIn. View Karri Saarinen’s profile on LinkedIn, a professional community of 1 billion ...\nKarri Saarinen is the co-founder and CEO of Linear, purpose-built tool planning and… · Experience: Linear.app · Education: Y Combinator · Location: San Diego Metropolitan Area · 500+ connections on LinkedIn. View Karri Saarinen’s profile on LinkedIn, a professional community of 1 billion members.\nThis would begin to answer the HOW question we kept getting again and again. So we started to pitch this idea of a bigger, deeper report + case studies to the very best companies we could think of, our dream partners basically: Anthropic, Stripe, Notion, Linear, Shopify, Sierra and Framer.\nWhat excites me most is how agents and AI are making Linear vision more true: the product building system for modern companies. We’ve spent years building the foundation around context & goals, (customer feedback, docs, projects, issues, initiatives), coordination, and planning.\nWe had seen what hyper-hiring does to companies and wanted to avoid it at Linear. Our rule was at most, roughly double the team each year. 3 → 6 → 15 → 30 → 50 → 80 → 120 to maintain culture and stability. What followed was that we became profitable early, growth keeps accelerating, revenue per employee keeps rising, and attrition has stayed very low.",
+      "favicon": "https://favicons.linkup.so?domain=www.linkedin.com",
+      "type": "text"
+    },
+    {
+      "name": "LINEAR GmbH | LinkedIn",
+      "url": "https://www.linkedin.com/company/linear",
+      "content": "LINEAR GmbH | 2,422 followers on LinkedIn. The BIM Engineering Software | For more than 25 years LINEAR has been offering probably the largest product portfolio of design software for MEP design from a single source: drawing, calculation, simulation ...\nReport this company · For more than 25 years LINEAR has been offering probably the largest product portfolio of design software for MEP design from a single source: drawing, calculation, simulation and 3D design programs. Seamlessly integrated, easy to use and therefore easy to learn.\nExternal link for LINEAR GmbH · Industries · Software Development · Company size · 51-200 employees · Headquarters · Aachen, NRW · Type · Privately Held · Specialties ·\nThe fact that these can be safely migrated when switching to new operating systems, CAD versions or even when standards are changed has always been and still is our first priority. LINEAR is an Autodesk “ISV Partner”, a Microsoft “Gold Certified Partner” and part of the Fujitsu “Alliance Program”. By these, maximum compatibility of the software is ensured.\nArkance Systems ist ein Netzwerk von Experten, das Euch in #Belgien und den #Niederlanden für alle Themen rund um #BIM, #DigitalTwin, Industrie 4.0 und anderes IoT zur Verfügung steht. Das macht sie zum perfekten Ansprechpartner, um die beste #LINEAR Softwarelösung für eine effiziente TGA-Planung zu finden.",
+      "favicon": "https://favicons.linkup.so?domain=www.linkedin.com",
+      "type": "text"
+    },
+    {
+      "name": "Linear Technology | LinkedIn",
+      "url": "https://www.linkedin.com/company/linear-technology",
+      "content": "Linear Technology | 18,242 followers on LinkedIn. On March 10, 2017, Linear Technology officially became part of Analog Devices. For more information, please follow the Analog Devices company page.",
+      "favicon": "https://favicons.linkup.so?domain=www.linkedin.com",
+      "type": "text"
+    },
+    {
+      "name": "Linear Controls | LinkedIn",
+      "url": "https://www.linkedin.com/company/linear-controls",
+      "content": "Linear Controls | 1,738 followers on LinkedIn. We believe in unity, delivery and trust. | Linear Controls, Inc. has quickly grown to be a unique company in the automation industry.\nLinear Controls | 1,738 followers on LinkedIn. We believe in unity, delivery and trust. | Linear Controls, Inc. has quickly grown to be a unique company in the automation industry. It is the only company in the Acadiana area that can bring an automation project from start to finish: beginning with the engineering, to design, fabrication, assembly, programming, testing and installation.\nIt is the only company in the Acadiana area that can bring an automation project from start to finish: beginning with the engineering, to design, fabrication, assembly, programming, testing and installation. Linear Controls is defined by its values of unity, delivery and trust, providing control system solutions with excellence.\nPneumatic Technician Linear Controls is looking for Pneumatic Technician to work a 14/14 rotation on offshore construction sites performing routine troubleshooting and pneumatic maintenance repairs on assigned systems equipment and facilities. ~Perform pneumatic diagnostic and repair work on pneumatic systems.\nLinear Controls, Inc. offers competitive pay along with an excellent benefits package, which includes Medical, Dental, 401(K), Life Insurance, Short Term Disability, and Paid Holidays and Vacation. Equal Opportunity Employer.",
+      "favicon": "https://favicons.linkup.so?domain=www.linkedin.com",
+      "type": "text"
+    },
+    {
+      "name": "Linear Technologies, Inc. | LinkedIn",
+      "url": "https://www.linkedin.com/company/lineartechnologies",
+      "content": "Linear Technologies, Inc. | 307 followers on LinkedIn. Since 1994, LTI has satisfied the IT requirements of over 16,000 corporate customers globally. Our clients range in size from start-ups to companies listed in the Fortune 500.\nLinear Technologies, Inc. | 307 followers on LinkedIn. Since 1994, LTI has satisfied the IT requirements of over 16,000 corporate customers globally. Our clients range in size from start-ups to companies listed in the Fortune 500. We provide appropriate turn-key solutions given your needs, schedule, projected growth, and budget.\nSince 1994, LTI has satisfied the IT requirements of over 16,000 corporate customers globally. Our clients range in size from start-ups to companies listed in the Fortune 500. We provide appropriate turn-key solutions given your needs, schedule, projected growth, and budget. ... External link for Linear Technologies, Inc.",
+      "favicon": "https://favicons.linkup.so?domain=www.linkedin.com",
+      "type": "text"
+    },
+    {
+      "name": "Linear",
+      "url": "https://www.linkedin.com/company/linearapp",
+      "content": "# Linear\nThe product development system for teams and agents.\nWe're hiring: linear.app/careers\n**Website:** https://linear.app | **Employees:** 230 | **Followers:** 79,701\n**HQ:** San Francisco, California, US | **Founded:** 2019 | **Industries:** Software Development\n\n## About\nAt Linear, we are on a mission to bring magic back to software. To empower product teams to do their best work, we are building an issue tracking and project management tool that combines UI elegance with world-class performance. Founded in 2019, Linear has become the tool of choice for thousands of high-impact companies to build their products better.\n\nLinear was set up as a fully remote company from the start. Today, our small but mighty team is distributed across North America and Europe. What unites us is relentless focus, fast execution, and our passion for software craftsmanship. We are all makers at heart and care deeply about the quality of our work.",
+      "favicon": "",
+      "type": "text"
+    },
+    {
+      "name": "Linear LinkedIn Post - 2026-05-26T16:15:04.317Z",
+      "url": "https://www.linkedin.com/posts/linearapp_klaviyo-switched-to-linear-their-entire-activity-7465073028385746945-WNIg?utm_source=social_share_send&utm_medium=member_desktop_web&rcm=ACoAAGj6EUsBwuFPCIp5myOkvtHnxAocOjDrxV4",
+      "content": "\nKlaviyo switched to Linear.\nTheir entire product and engineering team now plan and build in the same tool. \n\nHere’s why they moved:\nhttps://lnkd.in/dZUe8EjU\n---\nPost Statistics:\n  - Celebrate: 10\n  - Comments: 1\n  - Insight: 1\n  - Like: 61\n  - Love: 2\n  - Reposts: 9\n  - Total reactions: 74",
+      "favicon": "",
+      "type": "text"
+    },
+    {
+      "name": "Linear LinkedIn Post - 2026-05-22T17:58:12.106Z",
+      "url": "https://www.linkedin.com/posts/linearapp_linear-agent-use-cases-productmanagementmp4-activity-7463649430391517184-RfOx?utm_source=social_share_send&utm_medium=member_desktop_web&rcm=ACoAAGj6EUsBwuFPCIp5myOkvtHnxAocOjDrxV4",
+      "content": "\n📂 Linear Agent use cases\n └─ product_management.mp4\n      └─ Initiating projects\n      └─ Synthesizing feedback\n      └─ Understanding code context\n---\nPost Statistics:\n  - Celebrate: 4\n  - Comments: 3\n  - Insight: 2\n  - Like: 164\n  - Love: 19\n  - Reposts: 8\n  - Support: 3\n  - Total reactions: 192",
+      "favicon": "",
+      "type": "text"
+    },
+    {
+      "name": "Linear LinkedIn Post - 2026-05-21T17:31:37.926Z",
+      "url": "https://www.linkedin.com/posts/linearapp_new-project-slack-channels-linear-can-now-activity-7463280356050264064-bf5s?utm_source=social_share_send&utm_medium=member_desktop_web&rcm=ACoAAGj6EUsBwuFPCIp5myOkvtHnxAocOjDrxV4",
+      "content": "\nNew: Project Slack channels\nLinear can now automatically spin up a dedicated Slack channel whenever a new Linear project is created. Project members are added instantly, and project updates are shared in the channel by default.\n---\nPost Statistics:\n  - Celebrate: 5\n  - Comments: 7\n  - Like: 97\n  - Love: 7\n  - Reposts: 1\n  - Support: 1\n  - Total reactions: 110",
+      "favicon": "",
+      "type": "text"
+    },
+    {
+      "name": "Linear LinkedIn Post - 2026-05-20T17:26:36.274Z",
+      "url": "https://www.linkedin.com/posts/linearapp_plan-and-track-your-software-releases-directly-activity-7462916702964703232-Kuxr?utm_source=social_share_send&utm_medium=member_desktop_web&rcm=ACoAAGj6EUsBwuFPCIp5myOkvtHnxAocOjDrxV4",
+      "content": "\nPlan and track your software releases directly from Linear.\n\nLinear Releases integrates with your CI/CD tools to precisely track the deployment environment, version, and status of every issue, giving team members and agents your full deployment context.\n\nHere's how it works ↓\n---\nPost Statistics:\n  - Celebrate: 8\n  - Comments: 3\n  - Insight: 1\n  - Like: 68\n  - Love: 6\n  - Reposts: 1\n  - Total reactions: 83",
+      "favicon": "",
+      "type": "text"
+    },
+    {
+      "name": "Linear LinkedIn Post - 2026-05-15T16:20:10.673Z",
+      "url": "https://www.linkedin.com/posts/linearapp_linear-agent-code-intelligence-ask-linear-activity-7461088046814367745-WW2y?utm_source=social_share_send&utm_medium=member_desktop_web&rcm=ACoAAGj6EUsBwuFPCIp5myOkvtHnxAocOjDrxV4",
+      "content": "\nLinear Agent × Code Intelligence\nAsk Linear how a feature is implemented, why something behaves a certain way, or which technical constraints should shape a project plan – without digging through the codebase or interrupting an engineer.\n---\nPost Statistics:\n  - Celebrate: 6\n  - Comments: 6\n  - Like: 121\n  - Love: 15\n  - Reposts: 3\n  - Total reactions: 142",
+      "favicon": "",
+      "type": "text"
+    },
+    {
+      "name": "Linear LinkedIn Post - 2026-05-14T19:10:07.021Z",
+      "url": "https://www.linkedin.com/posts/linearapp_code-intelligence-for-linear-agent-linear-activity-7460768425532039169-yQq7?utm_source=social_share_send&utm_medium=member_desktop_web&rcm=ACoAAGj6EUsBwuFPCIp5myOkvtHnxAocOjDrxV4",
+      "content": "\nIntroducing Code Intelligence.\nGive Linear Agent controlled access to your codebase and turn repositories into shared product context your whole team can use.\nhttps://lnkd.in/efnS3TGM\n---\nPost Statistics:\n  - Celebrate: 14\n  - Comments: 3\n  - Insight: 4\n  - Like: 166\n  - Love: 13\n  - Reposts: 11\n  - Support: 1\n  - Total reactions: 198",
+      "favicon": "",
+      "type": "text"
+    },
+    {
+      "name": "Linear LinkedIn Post - 2026-05-13T16:04:20.798Z",
+      "url": "https://www.linkedin.com/posts/linearapp_in-october-of-last-year-cars24-while-preparing-activity-7460359287018573824-rT03?utm_source=social_share_send&utm_medium=member_desktop_web&rcm=ACoAAGj6EUsBwuFPCIp5myOkvtHnxAocOjDrxV4",
+      "content": "\nIn October of last year, Cars24, while preparing for an IPO, renewed its multi-year Jira license. Within a few weeks, the company would treat that contract as a sunk cost and walk away from it.\n\nHere is why:\nhttps://lnkd.in/e_jyMAwa\n---\nPost Statistics:\n  - Celebrate: 3\n  - Comments: 2\n  - Insight: 6\n  - Like: 72\n  - Love: 2\n  - Reposts: 6\n  - Total reactions: 83",
+      "favicon": "",
+      "type": "text"
+    },
+    {
+      "name": "Linear LinkedIn Post - 2026-05-04T15:24:46.916Z",
+      "url": "https://www.linkedin.com/posts/linearapp_linear-releases-linear-agent-auto-generate-activity-7457087839445368832-k-Ln?utm_source=social_share_send&utm_medium=member_desktop_web&rcm=ACoAAGj6EUsBwuFPCIp5myOkvtHnxAocOjDrxV4",
+      "content": "\nLinear Releases + Linear Agent = \nAuto-generate release notes\n---\nPost Statistics:\n  - Celebrate: 11\n  - Comments: 13\n  - Like: 149\n  - Love: 8\n  - Reposts: 2\n  - Support: 3\n  - Total reactions: 171",
+      "favicon": "",
+      "type": "text"
+    },
+    {
+      "name": "Linear LinkedIn Post - 2026-04-30T17:07:56.319Z",
+      "url": "https://www.linkedin.com/posts/linearapp_introducing-linear-releases-manage-software-activity-7455664248220753921-FfTQ?utm_source=social_share_send&utm_medium=member_desktop_web&rcm=ACoAAGj6EUsBwuFPCIp5myOkvtHnxAocOjDrxV4",
+      "content": "\nIntroducing Linear Releases.\nManage software releases directly from Linear. Track the deployment environment, version, and status of every issue to give team members and agents your full deployment context.\n---\nPost Statistics:\n  - Celebrate: 33\n  - Comments: 15\n  - Insight: 9\n  - Like: 417\n  - Love: 66\n  - Reposts: 13\n  - Support: 2\n  - Total reactions: 528",
+      "favicon": "",
+      "type": "text"
+    },
+    {
+      "name": "Linear LinkedIn Post - 2026-04-29T14:00:28.970Z",
+      "url": "https://www.linkedin.com/posts/linearapp_linear-agent-x-posthog-connect-posthog-to-activity-7455254685554384896-R8dk?utm_source=social_share_send&utm_medium=member_desktop_web&rcm=ACoAAGj6EUsBwuFPCIp5myOkvtHnxAocOjDrxV4",
+      "content": "\nLinear Agent x PostHog\nConnect PostHog to the Linear Agent to validate ideas and bridge the gap between project plans and real product usage.\n---\nPost Statistics:\n  - Celebrate: 1\n  - Comments: 1\n  - Like: 80\n  - Love: 8\n  - Reposts: 2\n  - Total reactions: 89",
+      "favicon": "",
+      "type": "text"
+    },
+    {
+      "name": "Linear LinkedIn Post - 2026-04-28T18:12:49.421Z",
+      "url": "https://www.linkedin.com/posts/linearapp_our-approach-to-hiring-is-a-little-different-activity-7454955801342955521-Y8UG?utm_source=social_share_send&utm_medium=member_desktop_web&rcm=ACoAAGj6EUsBwuFPCIp5myOkvtHnxAocOjDrxV4",
+      "content": "\nOur approach to hiring is a little different. We value slope over credentials, judgment over polish, and real work over interviews.\n\nHere’s what the process looks like:\nhttps://lnkd.in/dNNFFHNM\n---\nPost Statistics:\n  - Celebrate: 19\n  - Comments: 5\n  - Insight: 7\n  - Like: 257\n  - Love: 43\n  - Reposts: 8\n  - Total reactions: 326",
+      "favicon": "",
+      "type": "text"
+    },
+    {
+      "name": "Linear LinkedIn Post - 2026-04-28T14:32:55.657Z",
+      "url": "https://www.linkedin.com/posts/linearapp_linear-agent-x-glean-pull-in-company-knowledge-activity-7454900462685847552-dK2M?utm_source=social_share_send&utm_medium=member_desktop_web&rcm=ACoAAGj6EUsBwuFPCIp5myOkvtHnxAocOjDrxV4",
+      "content": "\nLinear Agent x Glean\nPull in company knowledge and context from Glean to help Linear Agent generate sharper project plans and updates.\n---\nPost Statistics:\n  - Celebrate: 3\n  - Comments: 3\n  - Like: 60\n  - Love: 4\n  - Reposts: 5\n  - Support: 1\n  - Total reactions: 68",
+      "favicon": "",
+      "type": "text"
+    },
+    {
+      "name": "Linear LinkedIn Post - 2026-04-27T17:11:33.751Z",
+      "url": "https://www.linkedin.com/posts/linearapp_ramps-internal-coding-agent-now-writes-60-activity-7454577996599943169-TXjs?utm_source=social_share_send&utm_medium=member_desktop_web&rcm=ACoAAGj6EUsBwuFPCIp5myOkvtHnxAocOjDrxV4",
+      "content": "\nRamp's internal coding agent now writes 60%+ of their merged PRs. With Linear as the underlying layer for structured product context, it can take on issues and work them to completion.\n\nHere’s how they got there:\nhttps://lnkd.in/dcBibGrQ\n---\nPost Statistics:\n  - Celebrate: 1\n  - Comments: 1\n  - Insight: 4\n  - Like: 53\n  - Love: 3\n  - Reposts: 5\n  - Total reactions: 61",
+      "favicon": "",
+      "type": "text"
+    },
+    {
+      "name": "Linear LinkedIn Post - 2026-04-27T12:59:05.858Z",
+      "url": "https://www.linkedin.com/posts/linearapp_linear-agent-x-notion-bring-docs-meeting-activity-7454514461731700738-jKx0?utm_source=social_share_send&utm_medium=member_desktop_web&rcm=ACoAAGj6EUsBwuFPCIp5myOkvtHnxAocOjDrxV4",
+      "content": "\nLinear Agent x Notion\nBring docs, meeting notes, and other context from Notion into Linear and turn them into actionable projects and issues.\n---\nPost Statistics:\n  - Celebrate: 6\n  - Comments: 6\n  - Like: 100\n  - Love: 11\n  - Reposts: 1\n  - Total reactions: 117",
+      "favicon": "",
+      "type": "text"
+    },
+    {
+      "name": "Linear LinkedIn Post - 2026-04-25T15:54:21.186Z",
+      "url": "https://www.linkedin.com/posts/linearapp_linear-agent-x-granola-connect-the-granola-activity-7453833790482866176-AroY?utm_source=social_share_send&utm_medium=member_desktop_web&rcm=ACoAAGj6EUsBwuFPCIp5myOkvtHnxAocOjDrxV4",
+      "content": "\nLinear Agent x Granola\nConnect the Granola MCP server to turn meeting notes into project specs, sales calls into customer requests, and 1:1s into concrete issues.\n---\nPost Statistics:\n  - Celebrate: 6\n  - Comments: 3\n  - Insight: 4\n  - Like: 68\n  - Love: 3\n  - Reposts: 2\n  - Support: 1\n  - Total reactions: 82",
+      "favicon": "",
+      "type": "text"
+    },
+    {
+      "name": "Linear LinkedIn Post - 2026-04-24T16:52:08.525Z",
+      "url": "https://www.linkedin.com/posts/linearapp_new-ai-tools-promise-to-auto-generate-interfaces-activity-7453485945691070464-0GsT?utm_source=social_share_send&utm_medium=member_desktop_web&rcm=ACoAAGj6EUsBwuFPCIp5myOkvtHnxAocOjDrxV4",
+      "content": "\nNew AI tools promise to auto-generate interfaces, turn words to product instantly, or collapse design directly into code. But that’s not the hard part of design.\n\n→ https://lnkd.in/db-hkaUX\n---\nPost Statistics:\n  - Celebrate: 34\n  - Comments: 15\n  - Insight: 14\n  - Like: 506\n  - Love: 64\n  - Reposts: 45\n  - Support: 4\n  - Total reactions: 622",
+      "favicon": "",
+      "type": "text"
+    },
+    {
+      "name": "Linear LinkedIn Post - 2026-04-23T16:35:58.132Z",
+      "url": "https://www.linkedin.com/posts/linearapp_new-mcp-support-for-linear-agent-connect-activity-7453119487702261761-2Zgm?utm_source=social_share_send&utm_medium=member_desktop_web&rcm=ACoAAGj6EUsBwuFPCIp5myOkvtHnxAocOjDrxV4",
+      "content": "\nNew: MCP support for Linear Agent\nConnect tools like Granola, Notion, PostHog, Glean, Intercom and many others to pull in context for creating issues, drafting PRDs, and writing project updates.\n---\nPost Statistics:\n  - Celebrate: 28\n  - Comments: 9\n  - Insight: 1\n  - Like: 209\n  - Love: 29\n  - Reposts: 7\n  - Total reactions: 267",
+      "favicon": "",
+      "type": "text"
+    },
+    {
+      "name": "Linear LinkedIn Post - 2026-04-22T18:50:30.524Z",
+      "url": "https://www.linkedin.com/posts/linearapp_workspace-agents-in-chatgpt-codex-powered-activity-7452790957902704640-mQOd?utm_source=social_share_send&utm_medium=member_desktop_web&rcm=ACoAAGj6EUsBwuFPCIp5myOkvtHnxAocOjDrxV4",
+      "content": "\nWorkspace agents in ChatGPT can pull context from Linear, create issues, and move work forward. No need to ask twice.\n---\nPost Statistics:\n  - Celebrate: 2\n  - Comments: 2\n  - Insight: 2\n  - Like: 77\n  - Love: 2\n  - Reposts: 3\n  - Total reactions: 83",
+      "favicon": "",
+      "type": "text"
+    },
+    {
+      "name": "Linear LinkedIn Post - 2026-04-17T15:20:53.894Z",
+      "url": "https://www.linkedin.com/posts/linearapp_linear-your-ai-coding-tool-open-any-issue-activity-7450926268365029376-HFYd?utm_source=social_share_send&utm_medium=member_desktop_web&rcm=ACoAAGj6EUsBwuFPCIp5myOkvtHnxAocOjDrxV4",
+      "content": "\nNew: Support for custom coding tools\nLaunch coding tools from a custom URL with query params, or use custom scripts to open issues through a CLI tool, internal script, or custom development workflow.\n---\nPost Statistics:\n  - Like: 7\n  - Support: 1\n  - Total reactions: 8",
+      "favicon": "",
+      "type": "text"
+    },
+    {
+      "name": "Linear LinkedIn Post - 2026-04-16T16:38:21.402Z",
+      "url": "https://www.linkedin.com/posts/linearapp_linear-is-now-available-for-microsoft-teams-activity-7450583373560848384-ye05?utm_source=social_share_send&utm_medium=member_desktop_web&rcm=ACoAAGj6EUsBwuFPCIp5myOkvtHnxAocOjDrxV4",
+      "content": "\nLinear is now available for Microsoft Teams.\n\nMention @Linear in any Teams channel and the agent will create issues informed by your conversation's context.\n---\nPost Statistics:\n  - Celebrate: 11\n  - Comments: 6\n  - Like: 110\n  - Love: 16\n  - Reposts: 10\n  - Support: 1\n  - Total reactions: 138",
+      "favicon": "",
+      "type": "text"
+    },
+    {
+      "name": "Karri Saarinen - Co-Founder, CEO at Linear",
+      "url": "https://www.linkedin.com/in/karrisaarinen/",
+      "content": "Karri Saarinen is the co-founder and CEO of Linear, purpose-built tool planning and… · Experience: Linear.app · Education: Y Combinator · Location: San Diego Metropolitan Area · 500+ connections on LinkedIn.\nKarri Saarinen is the co-founder and CEO of Linear, purpose-built tool planning and… · Experience: Linear.app · Education: Y Combinator · Location: San Diego Metropolitan Area · 500+ connections on LinkedIn. View Karri Saarinen’s profile on LinkedIn, a professional community of 1 billion members.\nWe never hired for layoffs. We hired with the hope that people would stay, grow alongside us, and build Linear in the long term. Nothing about the culture is performative. No 996. No sleeping at the office (we’re remote, we gather couple of times a year.) People are here because they care deeply about making something the best it can be.\nThis would begin to answer the HOW question we kept getting again and again. So we started to pitch this idea of a bigger, deeper report + case studies to the very best companies we could think of, our dream partners basically: Anthropic, Stripe, Notion, Linear, Shopify, Sierra and Framer.\nWhat excites me most is how agents and AI are making Linear vision more true: the product building system for modern companies. We’ve spent years building the foundation around context & goals, (customer feedback, docs, projects, issues, initiatives), coordination, and planning.",
+      "favicon": "https://favicons.linkup.so?domain=www.linkedin.com",
+      "type": "text"
+    },
+    {
+      "name": "Peter Joseph Puleo - Linear Technologies, Inc. | LinkedIn",
+      "url": "https://www.linkedin.com/in/peter-j-puleo/",
+      "content": "· Experience: Linear Technologies, Inc. · Location: New York · 500+ connections on LinkedIn. View Peter Joseph Puleo’s profile on LinkedIn, a professional community of 1 billion members.\nLinear Technologies, Inc. ... President & CEO of Linear Technologies.\nM TO-Pros’s CEO Mildred Tolentino attended the 2023 CMAA conference in Washington DC.\nOur CEO expressed: “It’s great to reconnect again with old…",
+      "favicon": "https://favicons.linkup.so?domain=www.linkedin.com",
+      "type": "text"
+    },
+    {
+      "name": "Sami Malik - Founder & CEO at Linear Health",
+      "url": "https://www.linkedin.com/in/sami-malik-9ab3b467",
+      "content": "· Experience: Linear Health · Education: Glasgow Caledonian University · Location: Austin · 500+ connections on LinkedIn. View Sami Malik’s profile on LinkedIn, a professional community of 1 billion members.\nFounder & CEO at Linear Health. Building AI agents that handle healthcare's operational… · Experience: Linear Health · Education: Glasgow Caledonian University · Location: Austin · 500+ connections on LinkedIn. View Sami Malik’s profile on LinkedIn, a professional community of 1 billion members.\nMeet Sana Arshad, CEO & Founder of CFO of Smiles 🦷💙 She works with dental practice owners to uncover where money is quietly slipping through the cracks — whether it’s inconsistent bookkeeping, delayed financials, or decisions being made without clear numbers.\nWe're proud to have Linear Health as a Stedi Platform Partner.\nLinear Health builds custom AI agents to automate referrals, prior auths, care gap closure, and contact center operations directly within the EHR.",
+      "favicon": "https://favicons.linkup.so?domain=www.linkedin.com",
+      "type": "text"
+    },
+    {
+      "name": "Meet Karri Saarinen, the CEO of Linear | Carlos Gonzalez ...",
+      "url": "https://www.linkedin.com/posts/villaumbrosia_theproductpodcast-productmanagement-activity-7237147699051950080-pv3H",
+      "content": "We cannot provide a description for this page right now",
+      "favicon": "https://favicons.linkup.so?domain=www.linkedin.com",
+      "type": "text"
+    },
+    {
+      "name": "Linear CEO Karri Saarinen: \"Our customer base is quite powerful\"",
+      "url": "https://www.runtime.news/linear-ceo-karri-saarinen-our-customer-base-is-quite-powerful/",
+      "content": "&quot;We have this fairly simple idea that engineering is really the front line of all this information,&quot; Saarinen said. Tom Krazit May 15, 2025 · Linear CEO Karri Saarinen (Credit: Linear) May 15 2025 12:06 PM 7 min read Share ·\nFollow LinkedIn RSS · Q&A · Linear started off as an issue-tracking tool helping developers coordinate on eliminating blockers and fixing problems, but has expanded into a product-development system. \"We have this fairly simple idea that engineering is really the front line of all this information,\" Saarinen said. Tom Krazit May 15, 2025 · Linear CEO Karri Saarinen (Credit: Linear) May 15 2025 12:06 PM 7 min read Share ·\nLinear has raised over $50 million to build a modern alternative, and it counts some of today's fastest-growing tech companies as customers. Founded in 2019 by CEO Karri Saarinen, Tuomas Artman, and Jori Lallo, Linear started off as an issue-tracking tool helping developers coordinate when eliminating blockers and fixing problems.\nToday: An interview with Linear CEO Karri Saarinen on the role of AI in product-management software, CoreWeave's up and down year has an up and down week, and the latest enterprise moves.\nLinear now has 14,000 customers using its software to build their own products — including OpenAI, Scale AI, and Brex — and unusually for an enterprise tech startup of its age, the company has been profitable since the beginning, Saarinen said.",
+      "favicon": "https://favicons.linkup.so?domain=www.runtime.news",
+      "type": "text"
+    },
+    {
+      "name": "Karri Saarinen - CEO & Co-founder @ Linear - Crunchbase Person Profile",
+      "url": "https://www.crunchbase.com/person/karri-saarinen",
+      "content": "CEO &amp; Co-founder · Primary Organization · Linear · Location · San Francisco, California, United States · Regions · San Francisco Bay Area, West Coast, Western US · Gender · Male · Investor Type · obfuscated · obfuscation · LinkedIn · View on LinkedIn ·\nCEO & Co-founder · Primary Organization · Linear · Location · San Francisco, California, United States · Regions · San Francisco Bay Area, West Coast, Western US · Gender · Male · Investor Type · obfuscated · obfuscation · LinkedIn · View on LinkedIn ·",
+      "favicon": "https://favicons.linkup.so?domain=www.crunchbase.com",
+      "type": "text"
+    },
+    {
+      "name": "Linear | LinkedIn",
+      "url": "https://www.linkedin.com/company/linearapp",
+      "content": "Linear reposted this · Karri Saarinen · Co-Founder, CEO at Linear 1mo · Report this post · Last night, we at Linear hosted a design leadership event. We invited about ~25 design leaders from top companies to join Katie Dill and me to discuss ...\nLinear reposted this · Karri Saarinen · Co-Founder, CEO at Linear 1mo · Report this post · Last night, we at Linear hosted a design leadership event. We invited about ~25 design leaders from top companies to join Katie Dill and me to discuss b2b design, quality, and craft.\nLinear | 20,607 followers on LinkedIn. The issue tracker you'll enjoy using. We're hiring: linear.app/careers | At Linear, we are on a mission to bring magic back to software. To empower product teams to do their best work, we are building an issue tracking and project management tool that combines UI elegance with world-class performance.\nAt Linear, we are on a mission to bring magic back to software. To empower product teams to do their best work, we are building an issue tracking and project management tool that combines UI elegance with world-class performance. Founded in 2019, Linear has become the tool of choice for thousands of high-impact companies to build their products better.\nLinear was set up as a fully remote company from the start. Today, our small but mighty team is distributed across North America and Europe. What unites us is relentless focus, fast execution, and our passion for software craftsmanship.",
+      "favicon": "https://favicons.linkup.so?domain=www.linkedin.com",
+      "type": "text"
+    },
+    {
+      "name": "Inside Linear: Why craft and focus still win in product building | Karri Saarinen (Co-founder and CEO)",
+      "url": "https://review.firstround.com/podcast/inside-linear-why-craft-and-focus-still-win-in-product-building/",
+      "content": "Karri Saarinen is the co-founder and CEO of Linear, the project management tool built for high-performance software teams. Since its founding in 2019, Linear has achieved a valuation of $1.25B and now counts companies like OpenAI, Ramp and Vercel ...\nKarri Saarinen is the co-founder and CEO of Linear, the project management tool built for high-performance software teams. Since its founding in 2019, Linear has achieved a valuation of $400 million and now counts companies like OpenAI, Ramp and Vercel as customers.\nAnd then I was at the Airbnb when there were like, already quite massive scale and, but they were still growing. and it was kinda like good to see like how different companies operate, how the CEOs operate. Like what, what goes wrong? Even in this like very successful companies. And I think you, realize that even like these very successful companies are, they have problems too. Like every company has problems. And, and as a startup you don't have to get everything right, like you just have to get few things right. And then you can like, fix things over time. Brett: you think linear would be successful if you didn't work at Coinbase and Airbnb?\nAnd then maybe the third thing was that I noticed in all of the companies I worked at, that actually the, the ICS and the high level leadership was, I think more philosophically aligned. Because I think CEOs and a lot of the high level leadership, they just wanna see things happening.\nI think like, few lessons I've learned, one was the, the business side that, like, I probably at the time, like after that company thought like if I start a new company, I will definitely start a company that I know there's a market for and make sure that there's a market so linear.",
+      "favicon": "https://favicons.linkup.so?domain=review.firstround.com",
+      "type": "text"
+    },
+    {
+      "name": "About – Linear",
+      "url": "https://linear.app/about",
+      "content": "Karri SaarinenCo-founder, CEO · Jori LalloCo-founder, CPO · Tuomas ArtmanCo-founder, CTO · Cristina CordovaCOO · Nan YuHead of Product · Tom MoorHead of Engineering · Casey BertenthalHead of Sales · Jamie FinniganHead of Security · Tim ...\nKarri SaarinenCo-founder, CEO · Jori LalloCo-founder, CPO · Tuomas ArtmanCo-founder, CTO · Cristina CordovaCOO · Nan YuHead of Product · Tom MoorHead of Engineering · Casey BertenthalHead of Sales · Jamie FinniganHead of Security · Tim Qi · Matthew Roberts ·\nStewart ButterfieldFormer CEO, Slack · Guillermo RauchCEO, Vercel · Dick CostoloFormer CEO, Twitter · Josh MillerCEO, Browser Company · Andrew MasonCEO, Descript · Immad AkhundCEO, Mercury · Claire Hughes JohnsonFormer COO, Stripe · Jorn van DijkCEO, Framer ·\nWe’re bringing magic back to software.",
+      "favicon": "https://favicons.linkup.so?domain=linear.app",
+      "type": "text"
+    },
+    {
+      "name": "Cindy Johnson - Founder, CEO, Linear Integrated Systems ...",
+      "url": "https://www.linkedin.com/in/cindy-johnson-659a579/",
+      "content": "Experience: Linear Systems · Location: San Francisco Bay Area · 500+ connections on LinkedIn. View Cindy Johnson’s profile on LinkedIn, a professional community of 1 billion members.\nAt the Future of Memory and Storage (FMS) Conference in Santa Clara, NEO Semiconductor unveiled its new “Extreme” High Bandwidth Memory (X-HBM), which promises up to 16X more bandwidth or 10X higher density than \"traditional\" HBM. CEO Andy Hsu introduced the concept during his keynote yesterday, positioning X-HBM as a potential game-changer for future AI servers.\nThe new funding will accelerate mass production and global commercialization of xMEMS’ piezoMEMS-based loudspeakers and micro-cooling chips. Led by Joseph Jiang, CEO & Co-Founder, xMEMS is redefining audio and thermal innovation with its monolithic piezoMEMS platform, which uses thin-film piezoelectric materials to deliver high performance in ultra-compact form factors.\nPerceptia Introduces pPLL08N: A Family of Compact Narrow-Band RF PLLs which Complement pPLL08W Sydney, Australia – September 25, 2025 – Perceptia Devices, a leader in low-jitter clocking IP, today announced the launch of its latest product, pPLL08N, a family of narrow-band RF phase-locked loops (PLLs) designed to complement the company’s widely adopted pPLL08W wide-band solution. “pPLL08N extends our PLL portfolio to give customers more targeted design choices,” said Julian Jenkins, CEO of Perceptia Devices.\nMany popular ADI op-amps are excellent building blocks—but pairing them with a discrete JFET front end can unlock lower noise, higher input impedance, and more design flexibility. In this newsletter, we break down real-world upgrade paths using Linear Systems ultra-low noise JFETs and explain where discrete inputs outperform integrated FET solutions.",
+      "favicon": "https://favicons.linkup.so?domain=www.linkedin.com",
+      "type": "text"
+    },
+    {
+      "name": "Tuomas Artman",
+      "url": "https://www.linkedin.com/in/tuomasartman",
+      "content": "- Tuomas Artman reposted this: For decades, interfaces have guided users along predefined roads: Files and folders, buttons and menus, screens and flows. User journeys were dynamic, but predictable.  \nAI and LLMs are about to change that.\nBut will they?  \n(Link to blog post in comments)\n- Tuomas Artman reposted this: Introducing Customer Requests  \n› Capture customer feedback\n› Understand user needs at scale\n› Build what customers actually want\n- Tuomas Artman reposted this: Update: the epsiode is out: https://lnkd.in/ew89pM4a Tomorrow's podcast episode: How Linear gets so much done, with such a small team. With Sabin R. , Linear's first engineering manager.  \n10,000+ companies use Linear, including 66% of Forbes Top 50 AI companies. They are profitable, full-remote and have 25 engineers. Sabin is Linear's first EM - and, as luck would have it, we worked together at Uber for a few years beforehand. We also touch on those parts a bit - comparing what's different at Linear, versus practices at Uber.  \nSearch for \"The Pragmatic Engineer Podcast\" on your favorite player, or subscribe on YouTube to get the episode: https://lnkd.in/eqZqkiqC\n- Tuomas Artman reposted this: 🚀 We are thrilled to announce the beta launch of our platform! 🚀 Our mission is to democratize investment opportunities, making pre-IPO investments accessible to everyone from everywhere🌟\nIn our latest blog, Linear Co-founder Tuomas Artman explores what this concept looks like, as well as the early lessons learned while building Linear, including:\n• Narrow down your initial audience and build for them: Figure out who you're building the product for and make the target audience as small as possible before expanding.\n• Build and leverage your waitlist: The waitlist is the grinding stone with which you can sharpen your idea into something truly valuable that will succeed at market, so use it effectively.\n• Trust your gut and validate demand with your users: Talk, talk, talk to your users and find out how invested in the product they are (and if they’d be willing to pay).  \nRead more in our latest blog (link in comments).\n- Tuomas Artman reposted this: Linear is the default tool of choice for ambitious startups to build and scale their products. We are now making it even easier for teams to get started: Join the new Linear Startup Program through one of our partners and upgrade for free!  \n(Link in the comments)\n- Tuomas Artman shared this: A few years ago, I gave a talk at React Helsinki about the Linear Sync engine.\nWe have come a long way since then, so we recorded a sequel to that talk at our company offsite a few weeks ago, detailing the challenges we’ve overcome scaling the engine:\nhttps://lnkd.in/d6YuiRsS\n- Tuomas Artman  commented on a post: Congrats to the whole team!\n- Tuomas Artman  commented on a post: What a ride!\nWhen Rob Skillington and I started Chronosphere 6 years ago, our goal was to solve the most complex observability challenges for cloud-native enterprises. By joining the global cybersecurity leader, we are now positioned to solve those challenges at an unprecedented scale.  \nTo the Chronosphere team: I couldn’t be more proud of you all and what we’ve achieved. I’m even more excited to see what we will build as part of Palo Alto Networks.  \nTo our customers and partners: Our mission to provide the world’s most powerful observability platform remains unchanged, and our ability to execute has just been supercharged. We look forward to continuing this journey with you.  \nWe are ready to hit the ground running and accelerate the move toward autonomous remediation with Cortex AgentiX.  \nThank you again Nikesh Arora , Lee Klarich , and Dipak Golechha for the warm welcome and for your partnership.  \nDay one - let’s go! https://bit.ly/4sZNan3\n- Tuomas Artman liked this: Announcing Linear Reviews.\nA modern code review experience for humans and agents.\nJoin the waitlist for early access: https://linear.app/reviews\n- Tuomas Artman liked this: 4 years at Linear ! 🚀 time flies\n- Tuomas Artman liked this: Dear network,\nI am currently available for freelance consulting and interim assignments.  \nMy scope includes, among others:\n• Service design and Business design, and strategy – Productization, growth strategies, operating models, and strategic repositioning",
+      "favicon": "https://favicons.linkup.so?domain=www.linkedin.com",
+      "type": "text"
+    },
+    {
+      "name": "Tuomas Artman | Sequoia Capital",
+      "url": "https://sequoiacap.com/founder/tuomas-artman/",
+      "content": "Tuomas Artman Linear Partners Stephanie Zhan Partnered In 2019 The Finnish Trio Designing for the Developers Spotlight Read That’s one of the reasons why we designed \\[Linear] so well. I hope that it inspires people to build better software.",
+      "favicon": "https://favicons.linkup.so?domain=sequoiacap.com",
+      "type": "text"
+    },
+    {
+      "name": "Maria 01 Builders&#039; Breakfast: Rethinking the MVP – Lessons from Tuomas Artman, Linear &#8211; maria.io",
+      "url": "https://maria.io/events/maria-01-builders-breakfast-rethinking-the-mvp-lessons-from-tuomas-artman-linear/",
+      "content": "# Maria 01 Builders’ Breakfast: Rethinking the MVP – Lessons from Tuomas Artman, Linear  \nHosted by:Maria 01  \nJoin us for the next edition of **Builders’ Breakfast**, where visionary founders share their real-life startup stories—the wins, the challenges, and the breakthroughs. Join us for a fireside chat with **Tuomas Artman**, Co-Founder of [Linear](https://linear.app/homepage), the modern issue-tracking tool that’s gained significant traction in the US tech scene. Backed by [Sequoia Capital](https://www.sequoiacap.com/article/linear-spotlight/) and [Accel VC](https://www.accel.com/), Linear has redefined how startups approach product development.  \n**What to Expect:**  \n- **Beyond the Traditional MVP:**Tuomas will share why the classic “just ship it” mentality doesn’t always cut it. Discover how Linear focused on building a product that was not just viable but*substantially better*than existing solutions.\n- **Strategic User Engagement:**Learn how Linear utilized waitlists not just as a buzz generator but as a strategic tool to gather meaningful feedback and refine their product before a full-scale launch.\n- **Designing with Purpose:**Understand how Linear’s Finnish roots influenced their commitment to craftsmanship, simplicity, and user-centric design, setting them apart in a crowded market.  \nWhether you’re a founder, product manager, or developer, this session offers valuable insights into building products that resonate in today’s competitive landscape.\n**Reserve your spot now and enjoy a morning of insightful conversation, networking, and, of course, breakfast.**  \nDoors open & breakfast served  \nWelcome words by Maria 01  \nFireside chat with Tuomas Artman  \nQ&A  \nNetworking  \nEnd of the event  \nCan’t see the form? **You can access it here directly.**",
+      "favicon": "https://favicons.linkup.so?domain=maria.io",
+      "type": "text"
+    },
+    {
+      "name": "Linear — The issue tracker built for high-performance teams | Startups.fm — Startups.fm",
+      "url": "https://www.startups.fm/startups/linear",
+      "content": "# Linear  \nThe issue tracker built for high-performance teams  \n[Visit](https://linear.app?utm_source=startups.fm&utm_medium=directory&utm_campaign=startup-page)  \nDEVTOOLSSeries CEst. 201950–100 employeesSan Francisco  \nLinear is the project management tool that software teams actually love. Built with a keyboard-first design and blazing-fast performance, it brings the focus and efficiency of tools built for elite teams. Used by companies like Vercel, Raycast, and Mercury, Linear has become the standard for product teams that care about shipping fast.  \nTotal Raised$52M  \nSequoia CapitalAccelAbstract Ventures\n## Founders  \nK  \nKarri Saarinen  \nJ  \nJori Lallo  \nT  \nTuomas Artman\n### Add a badge to your site  \nShow visitors you're featured on Startups.fm.  \n← Preview  \n```\n<a href=\"https://startups.fm/startups/linear\" target=\"_blank\" rel=\"noopener noreferrer\">\n<img src=\"https://startups.fm/badge/linear\" alt=\"Featured on Startups.fm\" height=\"28\" />\n</a>\n```  \nNewsletter",
+      "favicon": "https://favicons.linkup.so?domain=www.startups.fm",
+      "type": "text"
+    },
+    {
+      "name": "Linear | Index Ventures",
+      "url": "https://www.indexventures.com/companies/linear/",
+      "content": "Linear The issue tracking tool you'll enjoy using. Founders/CEOs Jori Lallo Karri Saarinen Tuomas Artman Index Team Vlad Loktev Sector Business Applications Website linear.app Opens in a new window.",
+      "favicon": "https://favicons.linkup.so?domain=www.indexventures.com",
+      "type": "text"
+    },
+    {
+      "name": "Explore 158 apps in Linear Integrations",
+      "url": "https://appmarketplace.com/marketplaces/linear-integrations/",
+      "content": "Last updated 25 October 2025  \n3.80% over the last 30 days.  \nIn Linear's ecosystem  \nFounded in 2019, Linear is a project management and issue tracking tool to help software development. Co-founded by Karri Saarinen, Jori Lallo and Tuomas Artman who brought experience from companies like Airbnb, Coinbase and Uber.  \nBased in San Francisco, Linear aims to simplify workflows for product teams by combining beautiful UI with high performance.Linear has features for project planning, issue tracking and team collaboration. Their design philosophy is simplicity and efficiency so teams can focus on shipping good software without the clutter of traditional project management tools.  \nWith a valuation of $400m and over $52m raised from Sequoia and Accel, Linear is a big player in the software development space. Linear achieved strong product market fit by initially targeting small tech startups and then expanding to bigger companies.  \n(% of all Linear marketplace partners)  \nLinear partners that are listed in 4 or more app marketplaces and have earned 25 or more reviews.",
+      "favicon": "https://favicons.linkup.so?domain=appmarketplace.com",
+      "type": "text"
+    },
+    {
+      "name": "undefined",
+      "url": "https://www.bytebase.com/solutions/gaming/",
+      "content": "# GAMING  \n- Multi-Server Schema Management\n- Data Access Control\n- Change Review & Rollback  \nWe use Bytebase to manage our multi-region database migrations. Bytebase has been great and their team has been very responsive in addressing any requests we’ve had.  \nTuomas Artman - Co-founder at Linear",
+      "favicon": "https://favicons.linkup.so?domain=www.bytebase.com",
+      "type": "text"
+    },
+    {
+      "name": "undefined",
+      "url": "https://www.bytebase.com/solutions/technology/",
+      "content": "# Technology  \n- VCS Integration (GitOps)\n- Multi-Tenant Database Management\n- API Integration (Headless)  \nWe use Bytebase to manage our multi-region database migrations. Bytebase has been great and their team has been very responsive in addressing any requests we’ve had.  \nTuomas Artman - Co-founder at Linear",
+      "favicon": "https://favicons.linkup.so?domain=www.bytebase.com",
+      "type": "text"
+    },
+    {
+      "name": "Violetta Korhonen",
+      "url": "https://www.linkedin.com/in/violetta-korhonen",
+      "content": "## Current Position\n**Community Events Manager**\n<p class=\"show-more-less-text__text--more\" tabindex=\"-1\">\n- Led the planning and execution of Maria 01 NOW, a large-scale startup event with 100+ startups pitching across 2 stages, 40 jury members, and 500+ attendees.<br>- Curated and hosted ourBuilders' Breakfast series focused on founder stories, with speakers like Tuomas Artman (Linear), Niko Karstikko (Bob W), Kristo Ovaska (Taito.ai), and Sokari Saarenmaa (Aiven).<br>- Organise and host other key events like afterworks and founders' meetups that bring together startups, partners, and the wider tech ecosystem.<br>- Handle internal comms, onboarding, and Slack updates to keep members informed and involved.<br>- Act fast and adapt to what’s needed — content, feedback collection, comms, or logistics.  \n<button class=\"show-more-less-text__button show-more-less-button\nshow-more-less-text__button--less\" data-tracking-control-name=\"public_profile_experience-item_show-less-text-btn\" aria-label=\"Show less description for this position\" aria-expanded=\"true\">\nShow less  \n<icon class=\"show-more-less-text__button-icon show-more-less-button-icon\" data-delayed-url=\"https://static.licdn.com/aero-v1/sc/h/4chtt12k98xwnba1nimld2oyg\"></icon>\n</button>  \n</p>\n### Community & Events Manager at Maria 01 (2024-07-01 – Present)\n- Led the planning and execution of Maria 01 NOW, a large-scale startup event with 100+ startups pitching across 2 stages, 40 jury members, and 500+ attendees. - Curated and hosted ourBuilders' Breakfast series focused on founder stories, with speakers like Tuomas Artman (Linear), Niko Karstikko (Bob W), Kristo Ovaska (Taito.ai), and Sokari Saarenmaa (Aiven). - Organise and host other key events like afterworks and founders' meetups that bring together startups, partners, and the wider tech ecosystem. - Handle internal comms, onboarding, and Slack updates to keep members informed and involved. - Act fast and adapt to what’s needed — content, feedback collection, comms, or logistics. Show less",
+      "favicon": "https://favicons.linkup.so?domain=www.linkedin.com",
+      "type": "text"
+    },
+    {
+      "name": "Tuomas Artman - Seedtable Person Profile",
+      "url": "https://www.seedtable.com/person/Tuomas_Artman-YX3NA34",
+      "content": "Mentioned on:  \nDiscover the fastest growing tech startups around the world.  \nDiscover the most active investors around the world.  \nBy Industry  \nBy City  \nBy Country  \nBy Continent  \nBy Location  \nBy Stage  \nfounder of Linear, based in Finland  \nTime Atlas Labs is a privacy-focused app for tracking daily activities founded in 2024 by Juho Pennanen, Aapo Kyrola and Markus Stenberg.",
+      "favicon": "https://favicons.linkup.so?domain=www.seedtable.com",
+      "type": "text"
+    },
+    {
+      "name": "Linear Capital | LinkedIn",
+      "url": "https://www.linkedin.com/company/linear-venture",
+      "content": "The general characteristics of the companies we care about are: data-based, AI-driven, and commercially-applicable. As of today, the total valuation of companies invested by Linear ...\nLinear Capital | 796 followers on LinkedIn. We strive to be the best Data Intelligence Technology Fund in China. The general characteristics of the companies we care about are: data-based, AI-driven, and commercially-applicable. As of today, the total valuation of companies invested by Linear Capital has reached approximately US $15 billion.\nWe are delighted to share a personnel announcement about Linear Capital: Jun Yang, former Co-founder and CTO of Dada, has recently joined Linear Capital as a Venture Partner. Jun will assist in deal sourcing, participate in project evaluations, and be an advisor of portfolio companies.\nHe has worked as an engineer and engineer manager at technology companies in Silicon Valley such as Google, Facebook, and Square. In 2015, he joined Dada (which went public in 2020) as a Co-founder and CTO. Jun received his undergraduate and master's degrees in Computer Science and Engineering from Zhejiang University, and later earned his Ph.D. degree in Computer Science from Carnegie Mellon University. Linear Capital's founding partner and CEO, Harry Wang, said: \"I met Jun 15 years ago when we worked together at Facebook.\nLinear Capital 2023 AGM: Rebound 2023 On May 13-14, Linear Capital held its 2023 AGM in Shanghai. This was the first offline meeting since the 2019 AGM (\"Industrialized AI\"), after three years of online AGMs in 2020, 2021, and 2022. We invited more than 200 limited partners, founders of portfolio companies, and friends of Linear Capital to our AGM to meet face-to-face and exchange ideas.",
+      "favicon": "https://favicons.linkup.so?domain=www.linkedin.com",
+      "type": "text"
+    },
+    {
+      "name": "Linear Agency",
+      "url": "https://www.linkedin.com/company/thelinearagency",
+      "content": "We cannot provide a description for this page right now",
+      "favicon": "https://favicons.linkup.so?domain=www.linkedin.com",
+      "type": "text"
+    },
+    {
+      "name": "LinearB | LinkedIn",
+      "url": "https://www.linkedin.com/company/linearb",
+      "content": "LinearB | 8,938 followers on LinkedIn. Software Delivery Management for engineering leaders. Align your teams &amp; resources to deliver better business results 📈 | LinearB is the leader in software delivery management solutions that enables engineering leaders to improve their team’s operational efficiency and align R&amp;D investments to business goals.\nLinearB | 8,938 followers on LinkedIn. Software Delivery Management for engineering leaders. Align your teams & resources to deliver better business results 📈 | LinearB is the leader in software delivery management solutions that enables engineering leaders to improve their team’s operational efficiency and align R&D investments to business goals.\nThis is why LinearB has a research group that analyzes the data from thousands of dev teams worldwide to build our annual engineering benchmarks report. You can use this report to quickly understand how your engineering organization compares on productivity metrics to companies of a similar size, industry, geographic location, and more.\n🎉Exciting News!🎉 LinearB has been nominated for the People's Choice Award for 2024's best Startup companies in Israel by Globes!🏆 We couldn't have done this without the support of our amazing team and loyal customers 🙌 If you believe in our mission to help teams deliver software faster and moreefficiently, please take a moment to vote for us at the link below [HEB] 👇 #beststartup #bestplacetowork #SEI #Devtools\nLinearB is the leader in software delivery management solutions that enables engineering leaders to improve their team’s operational efficiency and align R&D investments to business goals. The LinearB platform goes beyond passive engineering metrics to build workflow automation that improves dev team performance.",
+      "favicon": "https://favicons.linkup.so?domain=www.linkedin.com",
+      "type": "text"
+    },
+    {
+      "name": "Linear Transfer Automation Inc. | LinkedIn",
+      "url": "https://www.linkedin.com/company/linear-transfer-automation-inc-",
+      "content": "To Serve, To Strive, Without Compromise | Linear Transfer Automation is a leading manufacturer of Transfer Automation, De-Stackers, Loaders, and Press-to-Press Automation. Through sophisticated technology and constant innovation, ...\nLinear Transfer Automation Inc. | 2,469 followers on LinkedIn. To Serve, To Strive, Without Compromise | Linear Transfer Automation is a leading manufacturer of Transfer Automation, De-Stackers, Loaders, and Press-to-Press Automation. Through sophisticated technology and constant innovation, we strive to deliver flawless transfer systems.\nFind a company that is the product leader in thier segment,then backs up its products with the best support/service possible from an amazing group of talented customer focused team members .I would like to thank not only our valued customers who have embraced our automation solutions, but also thank our entire team at Linear for everything you have done over the years.\nToday I have a personal milestone anniversary, as Dec 1st (1998) marks the 25th year since I started at Linear. How does someone stay at one company for 25 years?\nThe low profile of the rail reduces tripping potential and makes the work environment more accessible. 🛠️ The clamping profile on both sides makes it easy to replace the round rail in the event of damage. For more information, email sales@lineartransfer.com to find out which RoundTrack solution is right for you.",
+      "favicon": "https://favicons.linkup.so?domain=www.linkedin.com",
+      "type": "text"
+    },
+    {
+      "name": "Linear Financial Technologies | LinkedIn",
+      "url": "https://www.linkedin.com/company/linear-financial-technologies",
+      "content": "Report this company · Linear was acquired by Amount in January 2022. Please see www.amount.com for more details. Website · http://www.amount.com · External link for Linear Financial Technologies · Industry · Financial Services · Company size · 201-500 employees ·\nReport this company · Linear was acquired by Amount in January 2022. Please see www.amount.com for more details. Website · http://www.amount.com · External link for Linear Financial Technologies · Industry · Financial Services · Company size · 201-500 employees ·",
+      "favicon": "https://favicons.linkup.so?domain=www.linkedin.com",
+      "type": "text"
+    },
+    {
+      "name": "PBC Linear | LinkedIn",
+      "url": "https://www.linkedin.com/company/pbc-linear-a-pacific-bearing-company",
+      "content": "PBC Linear | 3,503 followers on LinkedIn. PBC Linear provides precise and long-lasting linear bearings, actuators, linear guides and shafting. | PBC Linear began in 1983 as Pacific Bearing Company, creating a patented and innovative solution ...\nPBC Linear began in 1983 as Pacific Bearing Company, creating a patented and innovative solution to the common problem of failing linear ball bearings. Since then, we have greatly expanded our technology, expertise and services into a complete linear motion manufacturer.\nYesterday, our PBC Linear Roadshow visited Hi-Lite Machine Company in Sheboygan, WI.\nYesterday, our PBC Linear Roadshow visited AK Pizza Crust in Green Bay, WI.\nYesterday our PBC Linear Roadshow visited CMD Corporation in Appleton WI.",
+      "favicon": "https://favicons.linkup.so?domain=www.linkedin.com",
+      "type": "text"
+    },
+    {
+      "name": "Create a LinkedIn Company Page",
+      "url": "https://business.linkedin.com/advertise/linkedin-pages",
+      "content": "Provide your company name, industry, website URL, and other essential business information. ... Upload a logo and cover image, and write a compelling description for a strong first impression.\nProvide your company name, industry, website URL, and other essential business information. ... Upload a logo and cover image, and write a compelling description for a strong first impression. Tips and best practices to maximize your impact after you’ve created your Page.\nAsk employees to invite their contacts to follow your Page. When your team invites their own connections, your Page reach grows even faster. ... Companies that post weekly see 2x higher engagement.\nLinkedIn has a few pages to choose from, depending on your business’s goals. Here are a few: Company Pages (free): Make your business discoverable on LinkedIn and build your presence with this main business Page.\nCareer Pages (paid): Help people learn about your culture and your organization to attract talent to job opportunities. You can add a Life or What We Do tab to create a targeted audience for your Page. Company Pages help members find, learn about, and connect with your business.",
+      "favicon": "https://favicons.linkup.so?domain=business.linkedin.com",
+      "type": "text"
+    },
+    {
+      "name": "Linear Lux",
+      "url": "https://www.linkedin.com/company/linear-lux",
+      "content": "We cannot provide a description for this page right now",
+      "favicon": "https://favicons.linkup.so?domain=www.linkedin.com",
+      "type": "text"
+    },
+    {
+      "name": "Linear Health Sciences | LinkedIn",
+      "url": "https://www.linkedin.com/company/linear-health-sciences",
+      "content": "Report this company · Our team ... on fluid flow control. Linear Health Sciences develops cutting-edge innovative technology to prevent unwanted disconnection of medical tubing from patients....\nReport this company · Our team at Linear Health is dedicated to the pursuit of higher level value when it comes to medical devices focusing on fluid flow control. Linear Health Sciences develops cutting-edge innovative technology to prevent unwanted disconnection of medical tubing from patients.\nExternal link for Linear Health Sciences · Industry · Medical Equipment Manufacturing · Company size · 2-10 employees · Headquarters · OKLAHOMA CITY, OK · Type · Privately Held · Founded · 2015 · Specialties · Medical Device, Product Development, Vascular Access, IV, and Nursing ·\nNHIA is excited to announce the finalists for the 2024 Innovation Award: Avoset® - Eitan Medical Brightree Pharmacy Outcomes - Brightree Eitan Insights® - Eitan Medical Orchid Safety Release Valve - Linear Health Sciences The award recognizes groundbreaking products or services that advance the home and alternate site infusion industry.\nThis changing of the tide in the #standardofcare is a testament to the continuum of care necessary for patients and clinicians alike. More success stories every day coming out deploying the Linear's #SRV - questions contact us at nursing@linearsciences.com #ins #ava #vascularaccess #nursing",
+      "favicon": "https://favicons.linkup.so?domain=www.linkedin.com",
+      "type": "text"
+    },
+    {
+      "name": "Linear | Creative Content Company",
+      "url": "https://www.linkedin.com/company/linear-creative-content-company",
+      "content": "1 billion members | Manage your professional identity. Build and engage with your professional network. Access knowledge, insights and opportunities.",
+      "favicon": "https://favicons.linkup.so?domain=www.linkedin.com",
+      "type": "text"
+    },
+    {
+      "name": "Karri Saarinen — Designer",
+      "url": "https://karrisaarinen.com/",
+      "content": "Co-founder, CEO Linear · Principal Designer &amp; Design Systems, Airbnb · Early design &amp; Head of Design, Coinbase · Co-Founder, Kippt, (Y Combinator) Co-Founder, Rails Girls · Starting Linear · Crafting the Airbnb Cereal Typeface · Lottie, Airbnb&#x27;s library for animations ·\nCo-founder, CEO Linear · Principal Designer & Design Systems, Airbnb · Early design & Head of Design, Coinbase · Co-Founder, Kippt, (Y Combinator) Co-Founder, Rails Girls · Starting Linear · Crafting the Airbnb Cereal Typeface · Lottie, Airbnb's library for animations ·",
+      "favicon": "https://favicons.linkup.so?domain=karrisaarinen.com",
+      "type": "text"
+    },
+    {
+      "name": "Inside Linear: Building with taste, craft, and focus | Karri Saarinen (co-founder, designer, CEO)",
+      "url": "https://www.lennysnewsletter.com/p/inside-linear-building-with-taste",
+      "content": "(1:28:29) Lessons learned during ... round · Referenced: • Linear: https://linear.app/ • Vercel: https://vercel.com/ • Nan Yu on LinkedIn: https://www.linkedin.com/in/thenanyu/ • The Linear method: https://linear.app/method ...\nKarri Saarinen is the co-founder and CEO of Linear, an issue-tracking tool that has quickly become the fastest-growing and most beloved in the world. Before Linear, Karri was the principal designer and co-creator of design systems at Airbnb and the founding designer at Coinbase.\nIn today’s episode, he shares: • How to prioritize craft in product development • The Linear method for modern software development • How Linear operates with only one PM • Why every product needs good design in 2023 • Strategies for staying focused amid distractions • Linear’s unique hiring strategies • Sneak peek of a soon-to-be-released Linear feature · Listen now on Apple, Spotify, Overcast, and YouTube. ... • Lessons from scaling Ramp | Sri Batchu (Ramp, Instacart, Opendoor): https://www.lennyspodcast.com/lessons-from-scaling-ramp-sri-batchu-ramp-instacart-opendoor/ • Eric Yuan on LinkedIn: https://www.linkedin.com/in/ericsyuan/\n(1:28:29) Lessons learned during Karri’s transition from IC to CEO · (1:30:21) Sneak peek into the upcoming “asks” feature at Linear · (1:32:04) Lightning round · Referenced: • Linear: https://linear.app/ • Vercel: https://vercel.com/ • Nan Yu on LinkedIn: https://www.linkedin.com/in/thenanyu/ • The Linear method: https://linear.app/method ·\nSequoia CEO coach: Why it’s never been easier to start a company, and never been harder to scale one | Brian Halligan (co-founder, HubSpot)",
+      "favicon": "https://favicons.linkup.so?domain=www.lennysnewsletter.com",
+      "type": "text"
+    },
+    {
+      "name": "LinkedIn: Log In or Sign Up",
+      "url": "https://www.linkedin.com/in/jorilallo",
+      "content": "1 billion members | Manage your professional identity. Build and engage with your professional network. Access knowledge, insights and opportunities.",
+      "favicon": "https://favicons.linkup.so?domain=www.linkedin.com",
+      "type": "text"
+    },
+    {
+      "name": "Karri Saarinen (@karrisaarinen) / Posts / X",
+      "url": "https://x.com/karrisaarinen",
+      "content": "ceo of · @linear · Californialinear.app · Joined March 2008 · 1,050 Following · 74K Followers · Pinned · Karri Saarinen · @karrisaarinen · · · Jan 28 · Craft, chocolate and Linear.\nceo of · @linear · Californialinear.app · Joined March 2008 · 1,050 Following · 74K Followers · Pinned · Karri Saarinen · @karrisaarinen · · · Jan 28 · Craft, chocolate and Linear. Really happy how this · @linear customer story came together. Quote · Linear ·",
+      "favicon": "https://favicons.linkup.so?domain=x.com",
+      "type": "text"
+    },
+    {
+      "name": "Huai (Harry) Wang - Linear Capital | LinkedIn",
+      "url": "https://www.linkedin.com/in/hwang123/",
+      "content": "Huai Wang (Harry) is the CEO &amp; Founder of Linear Capital (Linear), a fund management… · Experience: Linear Capital · Education: Stanford University · Location: {:currentLocation} · 500+ connections on LinkedIn.\nHuai Wang (Harry) is the CEO & Founder of Linear Capital (Linear), a fund management… · Experience: Linear Capital · Education: Stanford University · Location: {:currentLocation} · 500+ connections on LinkedIn. View Huai (Harry) Wang’s profile on LinkedIn, a professional community of 1 billion members.\nLinear Capital · Stanford University · Websites · Resume · http://docs.google.com/Doc?id=dgfgqxqk_29g38q67 · 新浪微博 · http://weibo.com/nonoidea · Report this profile · Huai Wang (Harry) is the CEO & Founder of Linear Capital (Linear), a fund management…\n2023 has been a year of positive change and growth, and I have a lot to be thankful for. I took on an exciting new role as Venture Partner at Linear…",
+      "favicon": "https://favicons.linkup.so?domain=www.linkedin.com",
+      "type": "text"
+    },
+    {
+      "name": "Karri Saarinen, Co-Founder and CEO @Linear: How to be Grow Capital Efficiently in a World of BS Growth",
+      "url": "https://www.thetwentyminutevc.com/karri-saarinen",
+      "content": "Karri Saarinen is the Co-Founder and CEO of Linear. The company has raised from some of the best in the business including Sequoia and Accel. Before founding Linear, Karri was the principal designer at Airbnb and the founding designer at Coinbase.",
+      "favicon": "https://favicons.linkup.so?domain=www.thetwentyminutevc.com",
+      "type": "text"
+    },
+    {
+      "name": "Linear's Executive Team & Leadership | Meet Our Leaders",
+      "url": "https://websets.exa.ai/websets/directory/linear-executives",
+      "content": "This foundation has positioned Linear as an industry leader, enabling it to scale rapidly and serve thousands of software development teams worldwide. Karri Saarinen is the CEO and Co-founder of Linear, shaping the company&#x27;s vision to create a top-tier project and issue tracking platform focused ...\nExplore Linear's executive leadership, including our CEO, CTO, and other key executives driving innovation in software development.\nLearn about the key executives at Linear who drive innovation and growth in software development.\nThis foundation has positioned Linear as an industry leader, enabling it to scale rapidly and serve thousands of software development teams worldwide. Karri Saarinen is the CEO and Co-founder of Linear, shaping the company's vision to create a top-tier project and issue tracking platform focused on quality and speed in software development.\nKarri co-founded Linear and has served as CEO since 2019, demonstrating a deep commitment to software craftsmanship and innovation. His background includes experience in software and product development, and he is frequently featured in industry forums for his thought leadership on product quality.",
+      "favicon": "https://favicons.linkup.so?domain=websets.exa.ai",
+      "type": "text"
+    },
+    {
+      "name": "Karri Saarinen - Rethink - Design Leaders",
+      "url": "https://www.rethinkhq.com/speakers/karri-saarinen",
+      "content": "Co-founder, CEO Linear App · Karri Saarinen, co-founded Linear.app, the more enjoyable and efficient way to manage software development. Previously, Principal Designer and design systems lead at Airbnb. Created the founding design at Coinbase. Co-founded Y Combinator backed startup Kippt and ...\nCo-founder, CEO Linear App · Karri Saarinen, co-founded Linear.app, the more enjoyable and efficient way to manage software development. Previously, Principal Designer and design systems lead at Airbnb. Created the founding design at Coinbase. Co-founded Y Combinator backed startup Kippt and education non-profit Rails Girls.\nCo-founder, CEO | Design Systems",
+      "favicon": "https://favicons.linkup.so?domain=www.rethinkhq.com",
+      "type": "text"
+    },
+    {
+      "name": "Cristina Cordova - Linear | LinkedIn",
+      "url": "https://www.linkedin.com/in/cristinajcordova",
+      "content": "· Experience: Linear · Education: Stanford University · Location: San Francisco · 500+ connections on LinkedIn. View Cristina Cordova’s profile on LinkedIn, a professional community of 1 billion members.\nThis week, we're breaking down the moves that matter: 💡 Plaid CEO Zach Perret tells Karen Webster the company is evolving from data connectivity to becoming \"the analytics platform for financial services\" while betting big on agentic AI.\nPlaid's CEO just said the next five years will look completely different than the last five, but somehow that's not even this week's biggest plot twist.\nWe never hired for layoffs. We hired with the hope that people would stay, grow alongside us, and build Linear in the long term.\nNew: Project Slack channels Linear can now automatically spin up a dedicated Slack channel whenever a new Linear project is created.",
+      "favicon": "https://favicons.linkup.so?domain=www.linkedin.com",
+      "type": "text"
+    },
+    {
+      "name": "Tuomas Artman - Linear | LinkedIn",
+      "url": "https://es.linkedin.com/in/tuomasartman",
+      "content": "Opendoor CEO Kaz Nejatian messaged one of our investors a couple months ago: “Can you introduce me to Linear’s CEO?\nOpendoor CEO Kaz Nejatian messaged one of our investors a couple months ago: “Can you introduce me to Linear’s CEO?\nIN SOFTWARE YOU ARE BUILDING SANDCASTLES (2025) A short film about life and work at Linear.\nI switched gears (a while ago, in July actually 🙈) and moved to Linear from GitLab after more than 7 years.",
+      "favicon": "https://favicons.linkup.so?domain=es.linkedin.com",
+      "type": "text"
+    },
+    {
+      "name": "Artman Adventures",
+      "url": "https://www.linkedin.com/company/artman-adventures",
+      "content": "# Artman Adventures  \nTømrer- og snedkerfirma i Ølstykke offers a wide range of services including facade, renovation, and tilbygning. They provide services for both small and large projects, ensuring efficient construction management. They also offer services for doors and windows, roofing, kitchens, and more.\n## Overview\n- **Industry:** Animation and Post-production\n- **Type:** Self-Employed\n- **Founded:** 2006\n- **Size:** Myself Only\n- **Website:** http://artman.dk\n- **LinkedIn:** https://www.linkedin.com/company/artman-adventures\n## Contact\n- **Phone:** +45 61 71 01 37, 41614684\n- **Email:** info@artman.dk",
+      "favicon": "https://favicons.linkup.so?domain=www.linkedin.com",
+      "type": "text"
+    },
+    {
+      "name": "Meet Web Summit&#x27;s 2025 speakers | Web Summit | November 9-12, 2026",
+      "url": "https://websummit.com/speakers/filters/eyJpbmR1c3RyeSI6IlNhYVMifQ==/",
+      "content": "&lt;iframe src=\"https://www.googletagmanager.com/ns.html?id=GTM-NL9TBN\" height=\"0\" width=\"0\" style=\"display:none;visibility:hidden\"&gt;&lt;/iframe&gt; Login AttendeesMeet our attendeesMeet our speakersContent tracksScheduleMeetupsWhat to expect? ExhibitorsPartner with usMeet our partners StartupsApply for our startup programmeIBM Sports Tech Startup Prize CompetitionFeatured startupsStartup journeyImpact startups InvestorsInvestorsVenture MediaMedia? Join us at Web SummitMeet our media partnersBlog MoreWeb Summit reviewsNight SummitWomen in TechDeveloper programmeINSPIRE programmeHotelsVolunteersAmbassadors programmeSummariesApply to speakSupport center Icon / MyTicket Book tickets Icon / Chevron / Up Copy Exhibit Our 2025 speakers Book tickets Matthew Prince Matthew Prince Co-founder & CEO Cloudflare Anu Bharadwaj Anu Bharadwaj President Atlassian Arvind Jain Arvind Jain CEO Glean Timothy Young Timothy Young CEO Jasper Sarah Franklin Sarah Franklin CEO Lattice Jeanne DeWitt Grosser Jeanne DeWitt Grosser COO Vercel Des Traynor Des Traynor Co-founder & Chief Strategy Officer Intercom Jeff Kim Jeff Kim CEO of Yanolja Cloud Yanolja Chris Bedi Chris Bedi CCO ServiceNow Rahul Vohra Rahul Vohra Founder & CEO Superhuman Marcelo Lebre Marcelo Lebre Co-founder, President Remote Vadim Vladimirskiy Vadim Vladimirskiy Co-founder & CEO Nerdio Ramprakash Ramamoorthy Ramprakash Ramamoorthy Director of AI Research Zoho Corporation Malte Kosub Malte Kosub Co-founder & CEO Parloa Tuomas Artman\nof AI Research Zoho Corporation Malte Kosub Malte Kosub Co-founder & CEO Parloa Tuomas Artman Tuomas Artman Co-founder & CTO Linear 1 2 3 Find out more. Join the Web Summit network * Email address * First name Sign up for our newsletter",
+      "favicon": "https://favicons.linkup.so?domain=websummit.com",
+      "type": "text"
+    },
+    {
+      "name": "Artman Terapias",
+      "url": "https://br.linkedin.com/company/artman-terapias",
+      "content": "# Artman Terapias  \nArtman Terapias offers tools for autoconhecimento to help individuals reconect themselves to their happiness.\n## Overview\n- **Industry:** Medical Practices\n- **Headquarters:** Brazil\n- **Website:** https://artmanterapias.com.br\n- **LinkedIn:** https://br.linkedin.com/company/artman-terapias\n## Keywords\nartman terapias, autoconhecimento, felicidade, ferramentas",
+      "favicon": "https://favicons.linkup.so?domain=br.linkedin.com",
+      "type": "text"
+    },
+    {
+      "name": "ARTMAN ASSOCIES",
+      "url": "https://fr.linkedin.com/company/artman-associes",
+      "content": "# ARTMAN ASSOCIES  \nArtman et associés is a company specialized in property management. They assist in the selection and implementation of the most suitable taxation operations and systems. They offer services such as property acquisition, historical property management, malraux property management, lmp/lmnp property management, and common law investment.\n## Overview\n- **Headquarters:** Paris, France\n- **Website:** http://artmanassocies.com\n- **LinkedIn:** https://fr.linkedin.com/company/artman-associes",
+      "favicon": "https://favicons.linkup.so?domain=fr.linkedin.com",
+      "type": "text"
+    },
+    {
+      "name": "Jori Lallo - Linear",
+      "url": "https://linear.app/now/author/jorilallo",
+      "content": "Skip to content → Product Resources Customers Pricing Now Contact Docs Open app Log in Sign up Now All Changelog Community News Craft AI Practices Press Search… Jori Lallo Co-founder, CPO Post mortem on Linear incident from Jan 24th, 2024 Jori Lallo, Tuomas Artman, and more · Jan 30, 2024 →",
+      "favicon": "https://favicons.linkup.so?domain=linear.app",
+      "type": "text"
+    },
+    {
+      "name": "Artmanas Comercio De Presentes E Artesanatos",
+      "url": "https://br.linkedin.com/company/artmanas-comercio-de-presentes-e-artesanatos",
+      "content": "# Artmanas Comercio De Presentes E Artesanatos  \n## Overview\n- **Industry:** Retail\n- **Size:** Myself Only\n- **Headquarters:** Franca, Brazil\n- **Website:** http://artmanas.com.br\n- **LinkedIn:** https://br.linkedin.com/company/artmanas-comercio-de-presentes-e-artesanatos",
+      "favicon": "https://favicons.linkup.so?domain=br.linkedin.com",
+      "type": "text"
+    },
+    {
+      "name": "ARTMAN GRAPHIC DESIGN",
+      "url": "https://www.linkedin.com/company/artman-graphic-design",
+      "content": "# ARTMAN GRAPHIC DESIGN  \nArtman Graphic Design is an illustration, web design, and art company based in west Michigan. Owned by T. Artman and Catherine DeJong Artman, illustrators.\n## Overview\n- **Industry:** Graphic Design\n- **Type:** Self-Employed\n- **Size:** 1-10 employees (5 employees)\n- **Website:** http://artmangraphicdesign.com\n- **LinkedIn:** https://www.linkedin.com/company/artman-graphic-design\n## Keywords\nillustrator, web design, west Michigan, art company, T. Artman",
+      "favicon": "https://favicons.linkup.so?domain=www.linkedin.com",
+      "type": "text"
+    },
+    {
+      "name": "Artman studio design",
+      "url": "https://www.linkedin.com/company/artman-studio-design",
+      "content": "# Artman studio design  \nArtman studio design, Inc. is a company that specializes in design and design services for various clients. They offer logo design, black & white logo, and black & white version of their clients' logo. They also have a after school program for black youths and a black and white version of their clients' logo.\n## Overview\n- **Headquarters:** Rochester, United States\n- **Website:** http://artmanstudiodesign.com\n- **LinkedIn:** https://www.linkedin.com/company/artman-studio-design",
+      "favicon": "https://favicons.linkup.so?domain=www.linkedin.com",
+      "type": "text"
+    },
+    {
+      "name": "Learn how Linear handles privacy",
+      "url": "https://zendpa.com/vendors/linear",
+      "content": "#### Name  \nTuomas Artman\n### Data Processing Agreement  \nThe DPA is a contract between you and Linear that has to be in place when processing personal data and transferring it to Linear.  \nView Linear's Data Processing Agreement\n### Subprocessors  \nSubprocessors are companies that provide a service for Linear and who have or potentially will get access to personal data of Linear customers.  \nView Linear's complete list of subprocessors",
+      "favicon": "https://favicons.linkup.so?domain=zendpa.com",
+      "type": "text"
+    },
+    {
+      "name": "ARTMAN INTERIM",
+      "url": "https://fr.linkedin.com/company/artman-interim",
+      "content": "# ARTMAN INTERIM  \n## Overview\n- **Industry:** Staffing and Recruiting\n- **Headquarters:** orvault, France\n- **LinkedIn:** https://fr.linkedin.com/company/artman-interim",
+      "favicon": "https://favicons.linkup.so?domain=fr.linkedin.com",
+      "type": "text"
+    }
+  ]
+}
