@@ -28,8 +28,8 @@ window.RADAR_TWEAK_DEFAULTS = /*EDITMODE-BEGIN*/{
 // Populated after a real scan; starts empty so the app boots into Home/New scan
 window.RADAR_DATA = null;
 
-// Backend URL — change if your backend runs on a different port
-window.RADAR_API = "http://localhost:8000";
+// Backend URL — Render-hosted prod backend (change to localhost:8000 for local dev)
+window.RADAR_API = "https://radar-backend-je6o.onrender.com";
 
 // ─── Bearer token auth helpers (shared secret, gates /scan* endpoints) ────────
 window.RADAR_TOKEN_KEY = "radar:token";
