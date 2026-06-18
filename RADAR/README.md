@@ -165,7 +165,7 @@ Current state, bench results, and next milestones live in [`STATUS.yaml`](STATUS
 
 ## License
 
-No license file is currently set. Until one is added, treat this as **private / all rights reserved** — ask the maintainers before reusing.
+Released under the [MIT License](../LICENSE). Free to use, modify, and distribute — keep the copyright notice.
 
 ---
 
