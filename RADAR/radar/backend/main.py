@@ -5,6 +5,7 @@ import os
 import re
 import time
 from contextlib import asynccontextmanager
+from dataclasses import dataclass
 from datetime import datetime, timezone
 from typing import Optional
 from uuid import uuid4
@@ -295,6 +296,72 @@ def _candidates_to_enrich_dicts(candidates: list[DiscoverCandidate]) -> list[dic
     ]
 
 
+@dataclass
+class PipelinePhasesResult:
+    """Output of the 4-phase scan sequence, before it is packed into a PipelineRun.
+
+    Returned as a named struct (not a bare tuple) so call sites read fields by
+    name and adding a field never silently shifts positional unpacking across
+    the three scan endpoints.
+    """
+    company_profile: object
+    competitor_profiles: list
+    discover_sources: list
+    discover_threat_scores: dict
+    radar_scores: list
+
+
+async def run_pipeline_phases(
+    domain: str,
+    linkup,
+    run_id: str,
+    *,
+    event_cb=None,
+    on_phase=None,
+) -> PipelinePhasesResult:
+    """Run the full UNDERSTAND → DISCOVER → ENRICH → SYNTHESIZE sequence once.
+
+    Single source of truth for how the phases connect and what each is called
+    with. The scan endpoints (/analyze, /scan, /scan/stream) are thin wrappers:
+    they own caching, cost-capture, response shape and PipelineRun assembly, but
+    never the phase wiring — so a phase signature change touches exactly here.
+
+    event_cb : optional async callback forwarded into each phase for fine-grained
+               sub-phase progress (used by the SSE endpoint; None elsewhere).
+    on_phase : optional async callback invoked at each phase boundary as
+               on_phase(phase, status, **info) — lets the SSE endpoint emit
+               coarse start/ok events without re-duplicating the sequence.
+    """
+    async def _phase(phase: str, status: str, **info) -> None:
+        if on_phase is not None:
+            await on_phase(phase, status, **info)
+
+    await _phase("UNDERSTAND", "start")
+    company_profile = await understand.run(domain, linkup, run_id, claude=app.state.claude, event_cb=event_cb)
+    await _phase("UNDERSTAND", "ok", name=company_profile.name)
+
+    await _phase("DISCOVER", "start")
+    candidates, discover_sources, discover_threat_scores = await discover.run(company_profile, linkup, event_cb=event_cb)
+    competitor_dicts = _candidates_to_enrich_dicts(candidates)
+    await _phase("DISCOVER", "ok", count=len(candidates))
+
+    await _phase("ENRICH", "start")
+    competitor_profiles = await enrich.run(competitor_dicts, linkup, run_id, event_cb=event_cb, byok=linkup.byok, domain=domain)
+    await _phase("ENRICH", "ok", count=len(competitor_profiles))
+
+    await _phase("SYNTHESIZE", "start")
+    radar_scores = _synthesize_safe(company_profile, competitor_profiles, run_id)
+    await _phase("SYNTHESIZE", "ok", count=len(radar_scores))
+
+    return PipelinePhasesResult(
+        company_profile=company_profile,
+        competitor_profiles=competitor_profiles,
+        discover_sources=discover_sources,
+        discover_threat_scores=discover_threat_scores,
+        radar_scores=radar_scores,
+    )
+
+
 class EnrichRequest(BaseModel):
     model_config = ConfigDict(alias_generator=to_camel, populate_by_name=True)
     run_id: str
@@ -329,14 +396,7 @@ async def analyze(
         linkup = _resolve_linkup(x_linkup_key)
 
         async with app.state.pipeline_sem:
-            company_profile = await understand.run(domain, linkup, run_id, claude=app.state.claude)
-
-            candidates, discover_sources, discover_threat_scores = await discover.run(company_profile, linkup)
-            competitor_dicts = _candidates_to_enrich_dicts(candidates)
-
-            competitor_profiles = await enrich.run(competitor_dicts, linkup, run_id, byok=linkup.byok, domain=domain)
-
-            radar_scores = _synthesize_safe(company_profile, competitor_profiles, run_id)
+            phases = await run_pipeline_phases(domain, linkup, run_id)
 
         run = PipelineRun(
             id=run_id,
@@ -344,11 +404,11 @@ async def analyze(
             status=PipelineStatus.COMPLETED,
             created_at=created_at,
             completed_at=datetime.now(timezone.utc).isoformat(),
-            company_profile=company_profile,
-            competitors=competitor_profiles,
-            discover_source_urls=discover_sources,
-            radar_scores=radar_scores,
-            threat_scores=discover_threat_scores,
+            company_profile=phases.company_profile,
+            competitors=phases.competitor_profiles,
+            discover_source_urls=phases.discover_sources,
+            radar_scores=phases.radar_scores,
+            threat_scores=phases.discover_threat_scores,
         )
 
         result = run.model_dump(mode="json")
@@ -400,11 +460,7 @@ async def scan(
 
         async with app.state.pipeline_sem:
             async with _capture_scan_cost(linkup, run_id, "full_scan"):
-                company_profile = await understand.run(domain, linkup, run_id, claude=app.state.claude)
-                candidates, discover_sources, discover_threat_scores = await discover.run(company_profile, linkup)
-                competitor_dicts = _candidates_to_enrich_dicts(candidates)
-                competitor_profiles = await enrich.run(competitor_dicts, linkup, run_id, byok=linkup.byok, domain=domain)
-                radar_scores = _synthesize_safe(company_profile, competitor_profiles, run_id)
+                phases = await run_pipeline_phases(domain, linkup, run_id)
 
         run = PipelineRun(
             id=run_id,
@@ -412,11 +468,11 @@ async def scan(
             status=PipelineStatus.COMPLETED,
             created_at=created_at,
             completed_at=datetime.now(timezone.utc).isoformat(),
-            company_profile=company_profile,
-            competitors=competitor_profiles,
-            discover_source_urls=discover_sources,
-            radar_scores=radar_scores,
-            threat_scores=discover_threat_scores,
+            company_profile=phases.company_profile,
+            competitors=phases.competitor_profiles,
+            discover_source_urls=phases.discover_sources,
+            radar_scores=phases.radar_scores,
+            threat_scores=phases.discover_threat_scores,
         )
 
         radar_output = pipeline_run_to_radar_output(run)
@@ -467,26 +523,17 @@ async def scan_stream(
             run_id = str(uuid4())
             created_at = datetime.now(timezone.utc).isoformat()
             t0 = time.monotonic()
+
+            async def on_phase(phase: str, status: str, **info) -> None:
+                await queue.put({"phase": phase, "status": status, **info})
+
             try:
                 linkup = _resolve_linkup(x_linkup_key)
                 async with app.state.pipeline_sem:
                     async with _capture_scan_cost(linkup, run_id, "full_scan_stream"):
-                        await queue.put({"phase": "UNDERSTAND", "status": "start"})
-                        company_profile = await understand.run(domain, linkup, run_id, claude=app.state.claude, event_cb=emit)
-                        await queue.put({"phase": "UNDERSTAND", "status": "ok", "name": company_profile.name})
-
-                        await queue.put({"phase": "DISCOVER", "status": "start"})
-                        candidates, discover_sources, _ = await discover.run(company_profile, linkup, event_cb=emit)
-                        competitor_dicts = _candidates_to_enrich_dicts(candidates)
-                        await queue.put({"phase": "DISCOVER", "status": "ok", "count": len(candidates)})
-
-                        await queue.put({"phase": "ENRICH", "status": "start"})
-                        competitor_profiles = await enrich.run(competitor_dicts, linkup, run_id, event_cb=emit, byok=linkup.byok, domain=domain)
-                        await queue.put({"phase": "ENRICH", "status": "ok", "count": len(competitor_profiles)})
-
-                        await queue.put({"phase": "SYNTHESIZE", "status": "start"})
-                        radar_scores = _synthesize_safe(company_profile, competitor_profiles, run_id)
-                        await queue.put({"phase": "SYNTHESIZE", "status": "ok", "count": len(radar_scores)})
+                        phases = await run_pipeline_phases(
+                            domain, linkup, run_id, event_cb=emit, on_phase=on_phase
+                        )
 
                 run = PipelineRun(
                     id=run_id,
@@ -494,10 +541,10 @@ async def scan_stream(
                     status=PipelineStatus.COMPLETED,
                     created_at=created_at,
                     completed_at=datetime.now(timezone.utc).isoformat(),
-                    company_profile=company_profile,
-                    competitors=competitor_profiles,
-                    discover_source_urls=discover_sources,
-                    radar_scores=radar_scores,
+                    company_profile=phases.company_profile,
+                    competitors=phases.competitor_profiles,
+                    discover_source_urls=phases.discover_sources,
+                    radar_scores=phases.radar_scores,
                 )
                 radar_output = pipeline_run_to_radar_output(run)
                 result = radar_output.model_dump(by_alias=True, mode="json", exclude_none=True)
