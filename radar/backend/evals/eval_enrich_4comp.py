@@ -7,7 +7,7 @@ rendered live via rich.live; results are written incrementally to
 Cost: 4 × $1.50 = ~€5.60.
 
 Usage:
-    cd RADAR/radar/backend && source .venv/bin/activate
+    cd radar/backend && source .venv/bin/activate
     python -m evals.eval_enrich_4comp
 """
 from __future__ import annotations

@@ -25,7 +25,7 @@ URL entrée
 [5. TRANSFORM]   ──► RadarOutput (format frontend)
 ```
 
-Chaque phase = 1 fichier dans `RADAR/radar/backend/pipeline/`.
+Chaque phase = 1 fichier dans `radar/backend/pipeline/`.
 
 ---
 
@@ -54,7 +54,7 @@ Chaque phase = 1 fichier dans `RADAR/radar/backend/pipeline/`.
 
 ## 1. UNDERSTAND — profil de l'entreprise
 
-**Fichier** : `RADAR/radar/backend/pipeline/understand.py`
+**Fichier** : `radar/backend/pipeline/understand.py`
 
 **Ce qu'il fait** : prend un domaine (ex: makipeople.com), retourne un `CompanyProfile` complet (employees, funding, customers, positioning, etc.) en appelant Linkup `/fetch` + `/search` + Claude pour merger.
 
@@ -74,7 +74,7 @@ Chaque phase = 1 fichier dans `RADAR/radar/backend/pipeline/`.
 
 ## 2. DISCOVER — trouver les concurrents
 
-**Fichier** : `RADAR/radar/backend/pipeline/discover.py`
+**Fichier** : `radar/backend/pipeline/discover.py`
 
 **Architecture v2** : 3 recherches parallèles standard (au lieu d'1 deep) → Claude merge → optional threat scoring.
 
@@ -94,7 +94,7 @@ Chaque phase = 1 fichier dans `RADAR/radar/backend/pipeline/`.
 
 ## 3. ENRICH — profil détaillé des concurrents
 
-**Fichier** : `RADAR/radar/backend/pipeline/enrich.py`
+**Fichier** : `radar/backend/pipeline/enrich.py`
 
 **2 modes** (`RADAR_ENRICH_MODE` env var) :
 - **`batched`** (défaut) : 1 seul appel `/research` pour TOUS les concurrents → €1.50 fixe
@@ -119,7 +119,7 @@ Chaque phase = 1 fichier dans `RADAR/radar/backend/pipeline/`.
 
 ## 4. SYNTHESIZE — scores radar 6 axes
 
-**Fichier** : `RADAR/radar/backend/pipeline/synthesize.py`
+**Fichier** : `radar/backend/pipeline/synthesize.py`
 
 **6 axes calculés** : Breadth, Depth, Global, Developer, Pricing, Trust. Chacun 0-100.
 
@@ -144,7 +144,7 @@ Chaque phase = 1 fichier dans `RADAR/radar/backend/pipeline/`.
 
 ## 5. TRANSFORM — formater pour le frontend
 
-**Fichier** : `RADAR/radar/backend/pipeline/transform.py`
+**Fichier** : `radar/backend/pipeline/transform.py`
 
 **Ce qu'il fait** : convertit `PipelineRun` (interne) → `RadarOutput` (format JSON frontend).
 
@@ -207,7 +207,7 @@ Chaque phase = 1 fichier dans `RADAR/radar/backend/pipeline/`.
 
 ## 7. Models (formats de données)
 
-Dossier : `RADAR/radar/backend/models/`
+Dossier : `radar/backend/models/`
 
 | Fichier | Contient |
 |---|---|
@@ -222,7 +222,7 @@ Dossier : `RADAR/radar/backend/models/`
 
 ## 8. Utils
 
-Dossier : `RADAR/radar/backend/utils/`
+Dossier : `radar/backend/utils/`
 
 | Fichier | Rôle |
 |---|---|
@@ -235,7 +235,7 @@ Dossier : `RADAR/radar/backend/utils/`
 
 ## 9. API endpoints (main.py)
 
-**Fichier** : `RADAR/radar/backend/main.py`
+**Fichier** : `radar/backend/main.py`
 
 | Endpoint | Méthode | Ligne | Usage |
 |---|---|---|---|

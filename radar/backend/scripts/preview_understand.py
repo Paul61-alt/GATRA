@@ -1,12 +1,12 @@
 #!/usr/bin/env python3
 """Load cached CompanyProfile → transform → write data.js for frontend preview.
 
-Usage (from RADAR/radar/backend/):
+Usage (from radar/backend/):
     source .venv/bin/activate
     python3 scripts/preview_understand.py makipeople.com
 
 Then in another terminal:
-    cd RADAR/radar/frontend-prototype
+    cd radar/frontend-prototype
     python3 -m http.server 8080
     open http://localhost:8080
 """
@@ -26,7 +26,7 @@ from models.pipeline import PipelineRun, PipelineStatus
 from pipeline.transform import pipeline_run_to_radar_output
 
 # Paths: scripts/ → backend/ → radar/ → cache/ and frontend-prototype/
-_RADAR_DIR = Path(__file__).resolve().parents[2]  # RADAR/radar/
+_RADAR_DIR = Path(__file__).resolve().parents[2]  # radar/
 CACHE_DIR = _RADAR_DIR / "cache"
 FRONTEND = _RADAR_DIR / "frontend-prototype"
 

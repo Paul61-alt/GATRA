@@ -1,6 +1,6 @@
-# Task: Copier plan Supabase dans RADAR/docs
+# Task: Copier plan Supabase dans docs
 
-**Action:** Copier contenu vers `/Users/paul.pietra/Dev/GATRA/RADAR/docs/SUPABASE_PERSISTENCE.md`  
+**Action:** Copier contenu vers `/Users/paul.pietra/Dev/GATRA/docs/SUPABASE_PERSISTENCE.md`  
 **Source:** `/Users/paul.pietra/.claude/plans/actuellement-nous-sommes-en-fluffy-llama.md`  
 **Nommage:** cohérent avec `docs/Learning/ARCHITECTURE.md`
 

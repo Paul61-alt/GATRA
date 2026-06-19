@@ -236,10 +236,10 @@ Below hero: small chip `🕐 Scanned 2h ago · Pipeline 3f21038e · Analysis v4.
 
 ## Critical files (read-only references for future implementation)
 
-- [RADAR/radar/frontend-prototype/screens-overview.jsx](RADAR/radar/frontend-prototype/screens-overview.jsx) — current Overview component (lines 27–353)
-- [RADAR/radar/frontend-prototype/data.js](RADAR/radar/frontend-prototype/data.js) — the data shape passed to OverviewScreen
-- [RADAR/radar/backend/pipeline/transform.py](RADAR/radar/backend/pipeline/transform.py) — maps cache JSON → frontend data shape (will need to expose more fields)
-- [RADAR/radar/cache/understand_makipeople.com.json](RADAR/radar/cache/understand_makipeople.com.json) — reference cache used in this brief
+- [radar/frontend-prototype/screens-overview.jsx](radar/frontend-prototype/screens-overview.jsx) — current Overview component (lines 27–353)
+- [radar/frontend-prototype/data.js](radar/frontend-prototype/data.js) — the data shape passed to OverviewScreen
+- [radar/backend/pipeline/transform.py](radar/backend/pipeline/transform.py) — maps cache JSON → frontend data shape (will need to expose more fields)
+- [radar/cache/understand_makipeople.com.json](radar/cache/understand_makipeople.com.json) — reference cache used in this brief
 
 ---
 

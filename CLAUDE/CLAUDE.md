@@ -78,7 +78,7 @@ radar/
 Et au niveau du repo (hors `radar/`) :
 
 ```
-RADAR/
+GATRA/                          ← repo root
 ├── docs/
 │   └── design-system/         ← specs markdown (principes, tokens, components, motion, voice, iconography, moodboard)
 └── radar/frontend/src/design-system/
@@ -188,11 +188,11 @@ Les types TypeScript dans `frontend/src/types/` sont des mirrors manuels des mod
 
 ## 🚀 Commandes utiles
 
-> **⚠️ Backend tourne dans un venv Python.** Toujours rappeler à l'utilisateur d'activer le venv ET d'être dans `RADAR/radar/backend/` avant toute commande Python ou `braintrust`.
+> **⚠️ Backend tourne dans un venv Python.** Toujours rappeler à l'utilisateur d'activer le venv ET d'être dans `radar/backend/` avant toute commande Python ou `braintrust`.
 >
 > Setup terminal type pour ce projet :
 > ```bash
-> cd /Users/paul.pietra/Dev/GATRA/RADAR/radar/backend
+> cd /Users/paul.pietra/Dev/GATRA/radar/backend
 > source .venv/bin/activate
 > export $(grep -v '^#' .env | xargs)   # charge LINKUP/ANTHROPIC/BRAINTRUST keys
 > ```
@@ -200,7 +200,7 @@ Les types TypeScript dans `frontend/src/types/` sont des mirrors manuels des mod
 
 ```bash
 # Backend
-cd RADAR/radar/backend
+cd radar/backend
 source .venv/bin/activate
 pip install -r requirements.txt
 uvicorn main:app --reload --port 8000
@@ -216,7 +216,7 @@ braintrust eval evals/eval_discover.py
 braintrust eval evals/eval_enrich.py
 
 # Frontend
-cd RADAR/radar/frontend
+cd radar/frontend
 npm install
 npm run dev   # port 3000
 
@@ -277,7 +277,7 @@ python scripts/precompute_demo.py  # à créer en semaine 3
 
 ## 📚 Doc sync — ARCHITECTURE.md
 
-`RADAR/docs/Learning/ARCHITECTURE.md` est la source de vérité du pipeline pour Paul (non-dev).
+`docs/Learning/ARCHITECTURE.md` est la source de vérité du pipeline pour Paul (non-dev).
 
 **Règle obligatoire** : à chaque modification de
 - Pipeline phases (UNDERSTAND/DISCOVER/ENRICH/TRANSFORM)
@@ -298,9 +298,9 @@ RADAR a un design system formel — Palantir corporate × Perplexity transparenc
 
 ### Structure hybride
 
-- **Specs lisibles** : `RADAR/docs/design-system/` (markdown — principes, visual language, tokens, components, motion, voice, iconography, moodboard)
-- **Source of truth code** : `RADAR/radar/frontend/src/design-system/tokens.ts` (constantes TS)
-- **Preset Tailwind** : `RADAR/radar/frontend/src/design-system/tailwind.preset.ts` (consomme tokens.ts, exposé à Tailwind via `tailwind.config.ts`)
+- **Specs lisibles** : `docs/design-system/` (markdown — principes, visual language, tokens, components, motion, voice, iconography, moodboard)
+- **Source of truth code** : `radar/frontend/src/design-system/tokens.ts` (constantes TS)
+- **Preset Tailwind** : `radar/frontend/src/design-system/tailwind.preset.ts` (consomme tokens.ts, exposé à Tailwind via `tailwind.config.ts`)
 
 ### Règles non négociables
 
@@ -312,7 +312,7 @@ RADAR a un design system formel — Palantir corporate × Perplexity transparenc
 
 ### Composants disponibles
 
-Voir `RADAR/docs/design-system/03_components.md` pour la liste complète et leurs specs. Avant de créer un nouveau composant, vérifier qu'un existant ne couvre pas le besoin.
+Voir `docs/design-system/03_components.md` pour la liste complète et leurs specs. Avant de créer un nouveau composant, vérifier qu'un existant ne couvre pas le besoin.
 
 ### Quand modifier le design system
 

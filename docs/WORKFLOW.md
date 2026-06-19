@@ -17,9 +17,9 @@ On s'est retrouvés avec **3 branches qui réécrivent le même fichier** (`scre
 
 | Zone | Owner | Chemin |
 |------|-------|--------|
-| Backend (moteur, pipeline, evals, models) | **Paul** | `RADAR/radar/backend/**` |
-| Frontend (écrans, UI) | **Cofounder** | `RADAR/radar/frontend-prototype/**` |
-| Contrat front/back (l'interface entre les deux) | **À deux** | `RADAR/radar/frontend-prototype/FRONTEND_CONTRACT.md` |
+| Backend (moteur, pipeline, evals, models) | **Paul** | `radar/backend/**` |
+| Frontend (écrans, UI) | **Cofounder** | `radar/frontend-prototype/**` |
+| Contrat front/back (l'interface entre les deux) | **À deux** | `radar/frontend-prototype/FRONTEND_CONTRACT.md` |
 
 Effet : vos fichiers ne se chevauchent quasi plus → quasi zéro conflit.
 
