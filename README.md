@@ -64,4 +64,4 @@ python3 -m http.server 8080     # open http://localhost:8080
 
 ## Credits
 
-Built by **Paul Pietra** (backend & pipeline) and cofounder (frontend & design). Powered by [Linkup](https://linkup.so) and [Anthropic Claude](https://www.anthropic.com).
+Built by **Paul Pietra** (backend & pipeline) and **Mathieu Gaillarde** (frontend & design). Powered by [Linkup](https://linkup.so) and [Anthropic Claude](https://www.anthropic.com).
