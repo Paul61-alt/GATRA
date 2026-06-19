@@ -40,7 +40,7 @@ chore(ci): add ruff lint workflow
 ## Local dev setup
 
 ```bash
-cd RADAR/radar/backend
+cd radar/backend
 source .venv/bin/activate
 export $(grep -v '^#' .env | xargs)
 ```

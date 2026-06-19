@@ -8,7 +8,7 @@ Search endpoint").
 Cost: €0.055 / run.
 
 Usage:
-    cd RADAR/radar/backend && source .venv/bin/activate
+    cd radar/backend && source .venv/bin/activate
     python -m evals.eval_linkedin_research
 """
 import asyncio

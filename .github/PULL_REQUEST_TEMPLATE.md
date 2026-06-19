@@ -21,4 +21,4 @@ Short description of the change and the motivation.
 - [ ] `STATUS.yaml` / `CLAUDE.md` updated if pipeline logic changed
 - [ ] No secrets, `.env`, or client data committed
 
-See [CONTRIBUTING.md](../RADAR/CONTRIBUTING.md) for the full rules.
+See [CONTRIBUTING.md](../CONTRIBUTING.md) for the full rules.

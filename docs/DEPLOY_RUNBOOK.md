@@ -49,11 +49,11 @@ If Render service has been idle >15 min, the first request triggers a cold start
 
 ```bash
 git checkout feat/render-deploy
-# edit files in RADAR/radar/frontend-prototype/
+# edit files in radar/frontend-prototype/
 git commit -am "fix(frontend): ..."
 git push origin feat/render-deploy
 # then trigger Vercel redeploy:
-cd RADAR/radar/frontend-prototype
+cd radar/frontend-prototype
 export PATH="/Users/paul.pietra/.npm-global/bin:$PATH"
 vercel deploy --prod --yes
 ```
@@ -64,7 +64,7 @@ Vercel does NOT auto-deploy on push (not connected to GitHub). CLI deploy = expl
 
 ```bash
 git checkout feat/render-deploy
-# edit files in RADAR/radar/backend/
+# edit files in radar/backend/
 git commit -am "fix(backend): ..."
 git push origin feat/render-deploy
 ```
@@ -102,12 +102,12 @@ If you add a custom domain, update `FRONTEND_URL` in Render and redeploy.
 
 ```bash
 # Backend
-cd RADAR/radar/backend
+cd radar/backend
 source .venv/bin/activate
 # leave RADAR_REQUIRE_AUTH unset (or =0) so /scan works without a token in local
 uvicorn main:app --reload
 
-# Frontend — edit RADAR/radar/frontend-prototype/index.html:
+# Frontend — edit radar/frontend-prototype/index.html:
 #   window.RADAR_API = "http://localhost:8000"
 # Serve any way (file:// works, or python3 -m http.server 8080)
 ```

@@ -151,7 +151,7 @@ Système de protection contre l'explosion de coûts Linkup.
 ## Cache flow (court-circuit du pipeline)
 
 - **Clé** : `radar_{domain}_{YYYY-MM-DD}` (UTC)
-- **Storage** : `RADAR/radar/cache/radar_{domain}_{date}.json`
+- **Storage** : `radar/cache/radar_{domain}_{date}.json`
 - **Lecture** : `main.py:207` (`/scan/stream`) et `main.py:154` (`/scan`) read cache AVANT de lancer le pipeline
 - **Écriture** : `main.py:248` (stream) et `main.py:183` (scan) après transform OK
 - **Invalidation** : naturelle par date (J+1 → cache miss → re-scan)
@@ -197,7 +197,7 @@ Ces champs sont des placeholders dans `transform.py`. Claude les calculera dans 
 
 ```bash
 # Serveur complet (dev = MAX_ENRICH=1 pour limiter le coût)
-cd RADAR/radar/backend
+cd radar/backend
 source .venv/bin/activate
 RADAR_MAX_ENRICH=1 uvicorn main:app --reload --port 8000
 

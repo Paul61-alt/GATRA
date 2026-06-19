@@ -3,7 +3,7 @@
 Demo-day usage: run once before the show with the target domain so the
 subsequent /scan call hits cache and returns instantly.
 
-    cd RADAR/radar/backend && python -m scripts.warm_cache notion.so
+    cd radar/backend && python -m scripts.warm_cache notion.so
 
 Mirrors the /scan handler logic (main.py:171-217). Caps competitors at 10
 to match the auto-enrich frontend flow.

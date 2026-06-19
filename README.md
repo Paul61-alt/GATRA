@@ -15,11 +15,11 @@ Winner of the **Linkup hackathon** (May 2026). Now open source.
 
 **New scan** — paste a product URL, get a ranked competitive map in ~60s:
 
-![Radar — new scan](RADAR/docs/screenshots/scan_page.png)
+![Radar — new scan](docs/screenshots/scan_page.png)
 
 **Your analyses** — every URL you've scanned, ranked by recency:
 
-![Radar — analyses history](RADAR/docs/screenshots/homepage.png)
+![Radar — analyses history](docs/screenshots/homepage.png)
 
 ---
 
@@ -44,15 +44,14 @@ JSON → Claude extraction → React frontend (Overview, Map, Pricing, Timeline,
 
 ## Repository layout
 
-The app lives under [`RADAR/`](RADAR/):
+Everything lives at the repository root:
 
 ```
-RADAR/
-├── radar/backend/             ← FastAPI + Pydantic pipeline (Python 3.11+)
-├── radar/frontend-prototype/  ← build-free React 18 (CDN + Babel), static deploy
-├── docs/                      ← architecture, deploy runbook, design system
-├── CLAUDE/CLAUDE.md           ← engineering conventions
-└── CONTRIBUTING.md            ← contribution rules
+radar/backend/             ← FastAPI + Pydantic pipeline (Python 3.11+)
+radar/frontend-prototype/  ← build-free React 18 (CDN + Babel), static deploy
+docs/                      ← architecture, deploy runbook, design system
+CLAUDE/CLAUDE.md           ← engineering conventions
+CONTRIBUTING.md            ← contribution rules
 ```
 
 ---
@@ -69,7 +68,7 @@ RADAR/
   - **`BRAINTRUST_API_KEY`** — only if you run evals
   - **`SUPABASE_URL` + `SUPABASE_SERVICE_KEY`** — persistence; falls back to local JSON cache if absent
 
-> 💸 **Cost note:** a full pipeline run costs ~€0.60 on Linkup (a 15-item batch scan can hit ~€4.50). Never loop a real pipeline to debug — the unit tests stub the Claude client (`RADAR/radar/backend/tests/test_memo.py`), so they run with no network and no API spend.
+> 💸 **Cost note:** a full pipeline run costs ~€0.60 on Linkup (a 15-item batch scan can hit ~€4.50). Never loop a real pipeline to debug — the unit tests stub the Claude client (`radar/backend/tests/test_memo.py`), so they run with no network and no API spend.
 
 ---
 
@@ -78,13 +77,13 @@ RADAR/
 ### Backend
 
 ```bash
-cd RADAR/radar/backend
+cd radar/backend
 python3 -m venv .venv
 source .venv/bin/activate
 pip install -r requirements.txt
 ```
 
-Create `RADAR/radar/backend/.env` (never commit it — see `.env.example`):
+Create `radar/backend/.env` (never commit it — see `.env.example`):
 
 ```bash
 LINKUP_API_KEY=lp-xxxxxxxx
@@ -101,13 +100,13 @@ SUPABASE_SERVICE_KEY=eyJ...service-role-key...
 No build step. It's plain HTML + `.jsx` transpiled in-browser by Babel standalone, with React loaded from CDN. You only need a static server.
 
 ```bash
-cd RADAR/radar/frontend-prototype
+cd radar/frontend-prototype
 python3 -m http.server 8080
 ```
 
 Then open http://localhost:8080.
 
-Point the frontend at your local backend by editing `window.RADAR_API` in [`RADAR/radar/frontend-prototype/index.html`](RADAR/radar/frontend-prototype/index.html):
+Point the frontend at your local backend by editing `window.RADAR_API` in [`radar/frontend-prototype/index.html`](radar/frontend-prototype/index.html):
 
 ```js
 window.RADAR_API = "http://localhost:8000";
@@ -120,7 +119,7 @@ window.RADAR_API = "http://localhost:8000";
 ### Run the API
 
 ```bash
-cd RADAR/radar/backend
+cd radar/backend
 source .venv/bin/activate
 uvicorn main:app --reload --port 8000
 ```
@@ -136,7 +135,7 @@ Key endpoints: `POST /scan` (full run), `POST /scan/stream` (SSE progress), `GET
 ### Run a single pipeline phase from the CLI
 
 ```bash
-cd RADAR/radar/backend
+cd radar/backend
 source .venv/bin/activate
 
 python -m pipeline.understand "doctolib.fr"
@@ -155,7 +154,7 @@ braintrust eval evals/eval_enrich.py
 ### Clear the cache
 
 ```bash
-rm -rf RADAR/radar/cache/*.json
+rm -rf radar/cache/*.json
 ```
 
 ---
@@ -168,7 +167,7 @@ rm -rf RADAR/radar/cache/*.json
 - **Frontend** — build-free React 18 prototype (CDN + Babel standalone), dark-mode only, deployed as static files on Vercel.
 - **Deploy** — Vercel (frontend) + Render (backend). `/health` must stay rate-limit-exempt or Render restarts kill in-flight scans.
 
-Full conventions and pipeline detail: [`RADAR/CLAUDE/CLAUDE.md`](RADAR/CLAUDE/CLAUDE.md). Architecture (non-technical): [`RADAR/docs/Learning/ARCHITECTURE.md`](RADAR/docs/Learning/ARCHITECTURE.md). Design system: [`RADAR/docs/design-system/`](RADAR/docs/design-system/). Deploy runbook: [`RADAR/docs/DEPLOY_RUNBOOK.md`](RADAR/docs/DEPLOY_RUNBOOK.md).
+Full conventions and pipeline detail: [`CLAUDE/CLAUDE.md`](CLAUDE/CLAUDE.md). Architecture (non-technical): [`docs/Learning/ARCHITECTURE.md`](docs/Learning/ARCHITECTURE.md). Design system: [`docs/design-system/`](docs/design-system/). Deploy runbook: [`docs/DEPLOY_RUNBOOK.md`](docs/DEPLOY_RUNBOOK.md).
 
 ---
 
@@ -182,15 +181,15 @@ Full conventions and pipeline detail: [`RADAR/CLAUDE/CLAUDE.md`](RADAR/CLAUDE/CL
 
 ## Contribution
 
-See [`RADAR/CONTRIBUTING.md`](RADAR/CONTRIBUTING.md) for the full rules. In short:
+See [`CONTRIBUTING.md`](CONTRIBUTING.md) for the full rules. In short:
 
 - **Branches:** `feature/`, `fix/`, `chore/`, `docs/` (e.g. `fix/similarity-scores`)
 - **Commits:** [Conventional Commits](https://www.conventionalcommits.org/) — `type(scope): short description`
 - **Never push to `main`** directly — open a PR.
 - If you change a Pydantic model, update the matching frontend data shape in the same PR.
-- If you change pipeline phases, Linkup endpoints, models, or budget guards, update [`RADAR/docs/Learning/ARCHITECTURE.md`](RADAR/docs/Learning/ARCHITECTURE.md) in the same task.
+- If you change pipeline phases, Linkup endpoints, models, or budget guards, update [`docs/Learning/ARCHITECTURE.md`](docs/Learning/ARCHITECTURE.md) in the same task.
 
-Current state, bench results, and next milestones live in [`RADAR/STATUS.yaml`](RADAR/STATUS.yaml).
+Current state, bench results, and next milestones live in [`STATUS.yaml`](STATUS.yaml).
 
 ---
 

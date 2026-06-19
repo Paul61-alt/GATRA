@@ -1,7 +1,7 @@
 """Probe script — compare Linkup strategies for the UNDERSTAND phase.
 
 Usage:
-    cd /Users/paul.pietra/Dev/GATRA/RADAR/radar/backend
+    cd /Users/paul.pietra/Dev/GATRA/radar/backend
     source .venv/bin/activate
     python3 -m evals.probe_understand linear.app
     python3 -m evals.probe_understand linear.app --strategies search-std,search-deep

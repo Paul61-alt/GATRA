@@ -15,7 +15,7 @@ We are scaling beyond a single page. Every new surface (landing, loading console
 ## Structure (hybrid: docs + code)
 
 ```
-RADAR/
+GATRA/                               ← repo root
 ├── docs/design-system/              ← human-readable specs (this folder)
 │   ├── 00_principles.md             ← what we believe
 │   ├── 01_visual_language.md        ← mood, references, what we do/don't do

@@ -4,7 +4,7 @@ Compare Research (Investigate) vs current enrich approach on a known competitor.
 Supports both sourcedAnswer (text) and structured (JSON schema) output.
 
 Usage:
-    cd /Users/paul.pietra/Dev/GATRA/RADAR/radar/backend
+    cd /Users/paul.pietra/Dev/GATRA/radar/backend
     source .venv/bin/activate
     python3 -m evals.poc_research linear.app
     python3 -m evals.poc_research linear.app --structured

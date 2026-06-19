@@ -19,7 +19,7 @@
 **/node_modules/
 
 # Runtime data / cache (may contain scan data)
-RADAR/radar/cache/
+radar/cache/
 
 # Eval outputs
 **/*_result.json

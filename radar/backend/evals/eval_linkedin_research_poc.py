@@ -12,7 +12,7 @@ Architecture difference:
 Cost: 3 companies × €0.25 = €0.75 / run.
 
 Usage:
-    cd RADAR/radar/backend && source .venv/bin/activate
+    cd radar/backend && source .venv/bin/activate
     python -m evals.eval_linkedin_research_poc
 """
 import asyncio

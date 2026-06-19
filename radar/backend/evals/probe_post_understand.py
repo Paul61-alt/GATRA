@@ -1,7 +1,7 @@
 """Probe script — test DISCOVER + ENRICH phases using a cached UNDERSTAND profile.
 
 Usage:
-    cd /Users/paul.pietra/Dev/GATRA/RADAR/radar/backend
+    cd /Users/paul.pietra/Dev/GATRA/radar/backend
     source .venv/bin/activate
 
     # Use a cached understand profile (default strategy: fetch-claude)
