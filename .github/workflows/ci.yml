@@ -42,3 +42,9 @@ jobs:
         env:
           LINKUP_API_KEY: "ci-placeholder"
           ANTHROPIC_API_KEY: "ci-placeholder"
+
+      - name: Unit tests
+        run: python3 tests/test_memo.py
+        env:
+          LINKUP_API_KEY: "ci-placeholder"
+          ANTHROPIC_API_KEY: "ci-placeholder"
