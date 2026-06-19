@@ -177,7 +177,7 @@ Released under the [MIT License](../LICENSE). Free to use, modify, and distribut
 
 ## Contact & credits
 
-- **Paul Pietra** — Cofounder - backend & pipeline
-- **Mathieu Gaillarde** - Cofounder — frontend & design
+- **Paul Pietra** — backend & pipeline
+- **Mathieu Gaillarde** — frontend & design
 
 Built for the Linkup hackathon (May 2026). Powered by [Linkup](https://linkup.so) and [Anthropic Claude](https://www.anthropic.com).
