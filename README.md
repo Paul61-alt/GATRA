@@ -1,168 +1,67 @@
 # RADAR
 
-Competitive intelligence tool for VCs. Paste a startup URL → get a structured competitive memo in under 60 seconds.
+**Competitive intelligence for VCs.** Paste a startup URL → get a structured competitive memo (company profile, ranked competitors, pricing signals, positioning maps) in under 60 seconds.
 
-Built for the **Linkup hackathon** — ship > perfect.
-
----
-
-## What it does
+Winner of the **Linkup hackathon** (May 2026). Now open source.
 
 ```
 URL startup
-    ↓
-[PHASE 1 — UNDERSTAND] ~15s
-  Linkup /search + /fetch Crunchbase → CompanyProfile
-    ↓
-[PHASE 2 — DISCOVER] ~20s
-  Linkup /search deep → 15 competitors deduplicated by website
-    ↓
-[PHASE 3 — ENRICH] ~60s
-  Linkup /tasks batch + /fetch pricing → CompetitorProfile × 15 + PricingSignals
-    ↓
-JSON → Claude extraction → React frontend
+    ↓  [UNDERSTAND ~15s]  Linkup search + Crunchbase fetch → CompanyProfile
+    ↓  [DISCOVER  ~20s]   Linkup deep search → ~15 competitors (deduped by website)
+    ↓  [ENRICH    ~60s]   Linkup batch + pricing fetch → CompetitorProfile × N + signals
+    ↓  Claude extraction → React frontend (Overview · Map · Pricing · Timeline · Positioning)
 ```
 
----
+## Repository layout
 
-## Stack
-
-| Layer | Tech |
-|---|---|
-| Backend | Python 3.11+, FastAPI, Pydantic v2 |
-| LLM extraction | `claude-sonnet-4-20250514` |
-| Search | Linkup API |
-| Frontend | React 18, Tailwind, TypeScript, Vite |
-| Map | Leaflet (react-leaflet) |
-| Geocoding | Nominatim (OSM) |
-| Deploy | Vercel (frontend) + Railway/Render (backend) |
-
-No SQL DB, no Redis, no Docker. JSON file cache, async everywhere.
-
----
-
-## Project layout
+The app lives under [`RADAR/`](RADAR/):
 
 ```
 RADAR/
-├── AGENTS.md                     ← agent communication rules
-├── STATUS.yaml                   ← single source of truth, current state
-├── CLAUDE/CLAUDE.md              ← full architecture & conventions
-├── docs/
-│   ├── design-system/            ← 12 markdown specs (Palantir × Perplexity, dark only)
-│   ├── learning/
-│   └── smoke-report/
-└── radar/
-    ├── BACKLOG.md                ← NOW/NEXT/LATER
-    ├── JOURNAL.md                ← daily log
-    ├── backend/
-    │   ├── main.py               ← FastAPI + CORS + rate limit + kill switch + cache
-    │   ├── pipeline/             ← understand.py / discover.py / enrich.py
-    │   ├── clients/              ← linkup_client.py / claude_client.py
-    │   ├── models/               ← Pydantic v2 (DataPoint pattern)
-    │   ├── utils/                ← geocoding (Nominatim), cache, dedup
-    │   └── evals/                ← Braintrust evals per phase + bench
-    ├── frontend/
-    │   ├── src/components/       ← CompanyCard, CompetitorGrid, CompetitorMap, PricingSignalFeed
-    │   ├── src/design-system/    ← tokens.ts + tailwind.preset.ts (source of truth)
-    │   └── src/pages/index.tsx
-    ├── cache/                    ← gitignored JSON cache
-    └── scripts/
+├── radar/backend/          ← FastAPI + Pydantic pipeline (Python 3.11+)
+├── radar/frontend-prototype/  ← build-free React 18 (CDN + Babel), static deploy
+├── docs/                   ← architecture, deploy runbook, design system
+├── CLAUDE/CLAUDE.md        ← engineering conventions
+└── README.md              ← full setup, usage, and architecture
 ```
 
----
+## Quickstart
 
-## Setup
-
-### Backend
+Full instructions (env vars, run, evals): **[`RADAR/README.md`](RADAR/README.md)**.
 
 ```bash
+# Backend
 cd RADAR/radar/backend
-python3 -m venv .venv
-source .venv/bin/activate
+python3 -m venv .venv && source .venv/bin/activate
 pip install -r requirements.txt
-
-# .env (do NOT commit)
-# LINKUP_API_KEY=...
-# ANTHROPIC_API_KEY=...
-# NOMINATIM_USER_AGENT=radar-hackathon
-
+cp .env.example .env            # then fill in your keys
 uvicorn main:app --reload --port 8000
+
+# Frontend (no build step — just a static server)
+cd RADAR/radar/frontend-prototype
+python3 -m http.server 8080     # open http://localhost:8080
 ```
 
-### Frontend
-
-```bash
-cd RADAR/radar/frontend
-npm install
-npm run dev   # port 3000
-```
-
-`frontend/.env.local`:
-
-```
-NEXT_PUBLIC_API_URL=http://localhost:8000
-```
-
----
-
-## Run a pipeline phase (CLI)
-
-```bash
-cd RADAR/radar/backend
-source .venv/bin/activate
-
-python -m pipeline.understand "doctolib.fr"
-python -m pipeline.discover "doctolib.fr"
-python -m pipeline.enrich '["livi.fr", "qare.fr", "medadom.com"]'
-```
-
-## Evals
-
-```bash
-braintrust eval evals/eval_understand.py
-braintrust eval evals/eval_discover.py
-braintrust eval evals/eval_enrich.py
-```
-
----
-
-## Current state
-
-See [`RADAR/STATUS.yaml`](RADAR/STATUS.yaml) for the live snapshot — health, components, bench results, gaps, next milestones.
-
-Latest bench (4 domains, target total <90s):
-
-| Domain | Understand | Discover | Enrich | Total |
-|---|---:|---:|---:|---:|
-| linear.app | 12.0s | 107.2s | 17.4s | 136.5s |
-| pennylane.com | 11.0s | 78.0s | 21.6s | 110.6s |
-| mistral.ai | 45.0s | 132.1s | 16.5s | 193.6s |
-| cal.com | 9.7s | 59.4s | 22.7s | 91.7s |
-
-**Known bottleneck:** Phase 2 (discover) runs 5× slower than target. Investigating Linkup `/tasks` batch vs sequential calls.
-
----
-
-## Demo cache (pre-computed)
-
-Five companies must be in cache before live demo: Doctolib, Notion, Slite, Alan, Pennylane. See `STATUS.yaml > pre_cache_demo`.
-
----
+> 💸 **Cost note:** the `/scan*` endpoints call paid APIs. A full run is ~€0.60; a 15-item batch can hit ~€4.50. The backend ships with daily budget caps (see `.env.example`) and a fail-closed auth gate. Use `backend/tests/fixtures/` mocks for debugging loops.
 
 ## Documentation
 
-- Architecture & conventions → [`RADAR/CLAUDE/CLAUDE.md`](RADAR/CLAUDE/CLAUDE.md)
-- Design system specs → [`RADAR/docs/design-system/`](RADAR/docs/design-system/)
-- Design tokens (code) → [`RADAR/radar/frontend/src/design-system/tokens.ts`](RADAR/radar/frontend/src/design-system/tokens.ts)
-- Backlog → [`RADAR/radar/BACKLOG.md`](RADAR/radar/BACKLOG.md)
-- Journal → [`RADAR/radar/JOURNAL.md`](RADAR/radar/JOURNAL.md)
+- Setup & usage → [`RADAR/README.md`](RADAR/README.md)
+- Architecture (non-technical) → [`RADAR/docs/Learning/ARCHITECTURE.md`](RADAR/docs/Learning/ARCHITECTURE.md)
+- Engineering conventions → [`RADAR/CLAUDE/CLAUDE.md`](RADAR/CLAUDE/CLAUDE.md)
+- Contributing → [`RADAR/CONTRIBUTING.md`](RADAR/CONTRIBUTING.md)
+- Deploy runbook → [`RADAR/docs/DEPLOY_RUNBOOK.md`](RADAR/docs/DEPLOY_RUNBOOK.md)
 
----
+## Security
 
-## Notes
+- All secrets come from environment variables — never commit `.env` (it is gitignored).
+- `/scan*` endpoints are gated by a shared bearer token (`RADAR_SHARED_TOKEN`); the API fails closed if it is unset.
+- Testers can supply their own Linkup key via the `X-Linkup-Key` header (BYOK).
 
-- Linkup never returns GPS coordinates — always resolve `city + country` via Nominatim (1 req/s rate limit).
-- Every Pydantic field sourced from Linkup/Claude uses the `DataPoint` pattern: `value + confidence + source_url + extracted_at`.
-- Dark mode only, no toggle. Mono (JetBrains) for data, sans (Inter) for prose.
-- Cost: ~€0.60 per full pipeline run on Linkup. Use `tests/fixtures/` mocks for debugging loops.
+## License
+
+[MIT](LICENSE) — free to use, modify, and distribute; keep the copyright notice.
+
+## Credits
+
+Built by **Paul Pietra** (backend & pipeline) and cofounder (frontend & design). Powered by [Linkup](https://linkup.so) and [Anthropic Claude](https://www.anthropic.com).

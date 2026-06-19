@@ -11,7 +11,13 @@ Built during the **Linkup hackathon** — philosophy: ship > perfect.
 - **Live app:** https://frontend-prototype-opal.vercel.app (password-gated — ask for the access token)
 - **Backend API:** https://radar-backend-je6o.onrender.com
 
-> Drop a screenshot or GIF here (e.g. `docs/screenshot-overview.png`) once you have one — the Overview and Positioning tabs make the best previews.
+**New scan** — paste a product URL, get a ranked competitive map in ~60s:
+
+![Radar — new scan](docs/screenshots/scan_page.png)
+
+**Your analyses** — every URL you've scanned, ranked by recency:
+
+![Radar — analyses history](docs/screenshots/homepage.png)
 
 ---
 
@@ -165,13 +171,13 @@ Current state, bench results, and next milestones live in [`STATUS.yaml`](STATUS
 
 ## License
 
-No license file is currently set. Until one is added, treat this as **private / all rights reserved** — ask the maintainers before reusing.
+Released under the [MIT License](../LICENSE). Free to use, modify, and distribute — keep the copyright notice.
 
 ---
 
 ## Contact & credits
 
-- **Paul Pietra** — backend & pipeline — paulpietra83@gmail.com
-- Cofounder — frontend & design
+- **Paul Pietra** — Cofounder - backend & pipeline
+- **Mathieu Gaillarde** - Cofounder — frontend & design
 
 Built for the Linkup hackathon (May 2026). Powered by [Linkup](https://linkup.so) and [Anthropic Claude](https://www.anthropic.com).

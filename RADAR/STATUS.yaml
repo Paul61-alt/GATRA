@@ -1,6 +1,5 @@
 # RADAR — Status snapshot
-# Source-of-truth pour "où on en est". Co-existe avec BACKLOG.md (NOW/NEXT/LATER) et JOURNAL.md (daily).
-# Update manuel quand jalon franchi. Pas de duplication avec BACKLOG (référencer les IDs S0.1, S0.2…).
+# Source-of-truth pour "où on en est". Update manuel quand un jalon est franchi.
 
 project:
   name: RADAR
@@ -139,7 +138,7 @@ bench_results:
     note: "E2E full run. Data quality issues: 5/15 enrichis, scores hardcodés, sourcesScanned=0, duplicate Freebe."
 
 # ─────────────────────────────────────────────────────────────
-# NEXT MILESTONES — dérivés de BACKLOG.md (référence IDs)
+# NEXT MILESTONES
 # ─────────────────────────────────────────────────────────────
 next_milestones:
   - id: S0.1
@@ -263,9 +262,8 @@ cut_line:
 # REFERENCES — fichiers source-of-truth
 # ─────────────────────────────────────────────────────────────
 references:
-  architecture: RADAR/CLAUDE/CLAUDE.md
-  backlog: radar/BACKLOG.md
-  journal: radar/JOURNAL.md
+  architecture: RADAR/docs/Learning/ARCHITECTURE.md
+  conventions: RADAR/CLAUDE/CLAUDE.md
   bench: radar/backend/evals/bench_results.csv
   design_system_specs: docs/design-system/
   design_system_tokens: radar/frontend/src/design-system/tokens.ts
