@@ -4,6 +4,8 @@
 
 Winner of the **Linkup hackathon** (May 2026). Now open source.
 
+> The repo is named `GATRA` (team handle); the product is **RADAR**.
+
 ---
 
 ## Demo
@@ -67,7 +69,7 @@ RADAR/
   - **`BRAINTRUST_API_KEY`** — only if you run evals
   - **`SUPABASE_URL` + `SUPABASE_SERVICE_KEY`** — persistence; falls back to local JSON cache if absent
 
-> 💸 **Cost note:** a full pipeline run costs ~€0.60 on Linkup (a 15-item batch scan can hit ~€4.50). Use the mocks in `RADAR/radar/backend/tests/fixtures/` for debugging loops — never loop a real pipeline.
+> 💸 **Cost note:** a full pipeline run costs ~€0.60 on Linkup (a 15-item batch scan can hit ~€4.50). Never loop a real pipeline to debug — the unit tests stub the Claude client (`RADAR/radar/backend/tests/test_memo.py`), so they run with no network and no API spend.
 
 ---
 
