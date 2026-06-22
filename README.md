@@ -11,8 +11,7 @@ Winner of the **Linkup hackathon** (May 2026). Now open source.
 ## Demo
 
 - **Live app:** https://frontend-prototype-opal.vercel.app (password-gated — ask for the access token)
-- **Backend API:** https://radar-backend-je6o.onrender.com
-
+  
 **New scan** — paste a product URL, get a ranked competitive map in ~60s:
 
 ![Radar — new scan](docs/screenshots/scan_page.png)
